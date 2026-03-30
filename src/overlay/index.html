@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TWiSTroll</title>
+<style>
+:root{
+  --jamie:#2DD4BF;
+  --del:#F97316;
+  --caut:#A78BFA;
+  --taco:#84CC16;
+  --tw:#FF4D00;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:rgba(0,0,0,0)!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;
+  width:340px;height:1080px;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* === CANVAS — fully transparent, bubbles float freely === */
+.canvas{
+  width:340px;height:1080px;
+  position:relative;
+}
+
+/* === WATERMARK — barely there, top right corner === */
+.wm{
+  position:absolute;top:12px;right:14px;
+  display:flex;align-items:center;gap:5px;
+  opacity:0.5;
+}
+.wm-t{font-size:11px;font-weight:800;letter-spacing:-0.3px;color:var(--tw)}
+.wm-r{font-size:11px;font-weight:800;letter-spacing:-0.3px;color:rgba(255,255,255,0.8)}
+.wm .ld{
+  width:5px;height:5px;border-radius:50%;background:#EF4444;
+  will-change:opacity;animation:pulse 2s ease-in-out infinite;
+}
+
+/* === RECONNECTING === */
+.recon{
+  display:none;position:absolute;top:30px;right:14px;
+  align-items:center;gap:4px;opacity:0.7;
+}
+.recon.show{display:flex}
+.recon span{font-size:7px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(239,68,68,0.8)}
+.recon .sp{
+  width:6px;height:6px;
+  border:1.5px solid rgba(239,68,68,0.3);border-top-color:#EF4444;
+  border-radius:50%;will-change:transform;animation:spin 0.8s linear infinite;
+}
+
+/* ============================================================
+   PERSONA BUBBLES
+   
+   Each persona owns a fixed vertical zone in the right side
+   of the canvas. Bubbles don't jump around — the viewer
+   always knows where to look for each voice.
+   
+   Zone layout (1080px height):
+     Jamie:     200px - 350px  (upper-mid)
+     Delinquent: 370px - 520px
+     Cautious:  540px - 690px
+     Taco:      710px - 860px
+   
+   Each bubble is a dark frosted pill floating on pure
+   transparency. Persona-colored accent on the left edge.
+   Invisible until first reaction arrives.
+   ============================================================ */
+.persona{
+  position:absolute;
+  right:14px;left:14px;
+  opacity:0;
+  will-change:transform,opacity;
+  transition:opacity 500ms ease;
+  pointer-events:none;
+}
+
+/* Visible once text arrives */
+.persona.has-text{opacity:0.5;pointer-events:auto}
+.persona.active{opacity:1}
+
+/* Vertical positions — each persona owns a zone */
+.persona.jamie{top:200px}
+.persona.delinquent{top:370px}
+.persona.cautious{top:540px}
+.persona.taco{top:710px}
+
+/* === BUBBLE PILL === */
+.bubble{
+  background:rgba(15,15,18,0.82);
+  border-radius:6px;
+  padding:10px 14px 10px 16px;
+  position:relative;
+  display:inline-block;
+  max-width:100%;
+}
+
+/* Persona-colored left accent */
+.bubble::before{
+  content:'';position:absolute;
+  left:0;top:8px;bottom:8px;
+  width:2.5px;border-radius:2px;
+}
+
+/* === SPEAKER NAME — tiny, above the bubble === */
+.p-name{
+  font-size:8px;font-weight:800;letter-spacing:0.12em;
+  text-transform:uppercase;line-height:1;
+  margin-bottom:4px;padding-left:2px;
+  color:rgba(255,255,255,0.6);
+}
+
+/* === REACTION TEXT === */
+.reaction-text{
+  font-weight:400;line-height:1.4;
+  color:rgba(255,255,255,0.92);
+  will-change:opacity;transition:opacity 180ms ease;
+  overflow:hidden;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;
+}
+.reaction-text.fade-out{opacity:0}
+.reaction-text.waiting{
+  color:rgba(255,255,255,0.25);
+  font-style:italic;font-size:10px!important;
+}
+
+/* ============================================================
+   FOUR VOICES — color accents + typographic personality
+   ============================================================ */
+
+/* Jamie — teal, precise, small */
+.persona.jamie .bubble::before{background:var(--jamie)}
+.persona.jamie .p-name{color:var(--jamie)}
+.persona.jamie .reaction-text{font-size:12.5px;letter-spacing:0.005em}
+
+/* Delinquent — orange, italic, urgent */
+.persona.delinquent .bubble::before{background:var(--del)}
+.persona.delinquent .p-name{color:var(--del)}
+.persona.delinquent .reaction-text{font-size:13px;font-style:italic}
+
+/* Cautious — purple, faded, detached */
+.persona.cautious .bubble::before{background:var(--caut)}
+.persona.cautious .p-name{color:var(--caut)}
+.persona.cautious .reaction-text{font-size:12.5px;color:rgba(255,255,255,0.7)}
+.persona.cautious.active .reaction-text{color:rgba(255,255,255,0.85)}
+
+/* Taco — green, big, bold punchline */
+.persona.taco .bubble::before{background:var(--taco)}
+.persona.taco .p-name{color:var(--taco)}
+.persona.taco .reaction-text{font-size:14px;font-weight:500}
+
+/* ============================================================
+   ANIMATIONS — transform + opacity only, OBS safe
+   ============================================================ */
+@keyframes pop{
+  0%{transform:scale(0.96);opacity:0}
+  50%{transform:scale(1.01)}
+  100%{transform:scale(1);opacity:1}
+}
+.persona.arrive{animation:pop 350ms cubic-bezier(0.34,1.56,0.64,1) forwards}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Status — invisible in prod */
+.status{
+  position:absolute;bottom:4px;right:14px;
+  display:flex;align-items:center;gap:3px;
+  opacity:0.25;
+}
+.status span{font-size:6px;font-weight:500;color:rgba(255,255,255,0.5)}
+body.prod .status{display:none}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- Watermark — barely visible -->
+  <div class="wm">
+    <div class="ld"></div>
+    <span class="wm-t">TWiST</span><span class="wm-r">roll</span>
+  </div>
+
+  <div class="recon" id="recon"><div class="sp"></div><span>Reconnecting</span></div>
+
+  <!-- Jamie — upper zone -->
+  <div class="persona jamie" id="panel-jamie">
+    <div class="p-name">Not Jamie</div>
+    <div class="bubble">
+      <div class="reaction-text waiting" id="text-jamie">...</div>
+    </div>
+  </div>
+
+  <!-- Delinquent -->
+  <div class="persona delinquent" id="panel-delinquent">
+    <div class="p-name">Not Delinquent</div>
+    <div class="bubble">
+      <div class="reaction-text waiting" id="text-delinquent">...</div>
+    </div>
+  </div>
+
+  <!-- Cautious -->
+  <div class="persona cautious" id="panel-cautious">
+    <div class="p-name">Not Cautious</div>
+    <div class="bubble">
+      <div class="reaction-text waiting" id="text-cautious">...</div>
+    </div>
+  </div>
+
+  <!-- Taco — lower zone -->
+  <div class="persona taco" id="panel-taco">
+    <div class="p-name">Not Taco</div>
+    <div class="bubble">
+      <div class="reaction-text waiting" id="text-taco">...</div>
+    </div>
+  </div>
+
+  <div class="status" id="status-bar">
+    <span id="status-session"></span>
+    <span id="status-ago"></span>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var WS='ws://localhost:3001',RB=1e3,RM=15e3,FO=180;
+  var ws,ra=0,lr=null;
+  var P=new URLSearchParams(location.search);
+  if(P.get('mode')==='prod')document.body.classList.add('prod');
+  var isDemo=P.get('demo')==='true';
+  var IDS=['jamie','delinquent','cautious','taco'];
+  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco',
+           jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco'};
+
+  function up(id,txt){
+    var p=document.getElementById('panel-'+id),t=document.getElementById('text-'+id);
+    if(!p||!t)return;
+    t.classList.remove('waiting');
+    t.classList.add('fade-out');
+    setTimeout(function(){
+      t.textContent=txt;
+      t.classList.remove('fade-out');
+      // Mark as having content
+      p.classList.add('has-text');
+      // Pop animation
+      p.classList.remove('arrive');
+      void p.offsetWidth;
+      p.classList.add('arrive');
+    },FO);
+    // Spotlight — active persona at full opacity, others dimmed
+    IDS.forEach(function(x){
+      var e=document.getElementById('panel-'+x);
+      if(e){if(x===id)e.classList.add('active');else e.classList.remove('active')}
+    });
+    lr=Date.now();
+  }
+
+  function conn(){
+    if(ws&&(ws.readyState<2))return;
+    try{ws=new WebSocket(WS)}catch(e){sr();return}
+    ws.onopen=function(){ra=0;rc(false)};
+    ws.onmessage=function(e){try{hm(JSON.parse(e.data))}catch(x){}};
+    ws.onclose=function(){rc(true);sr()};
+    ws.onerror=function(){};
+  }
+  function sr(){var d=Math.min(RB*Math.pow(1.5,ra),RM);ra++;setTimeout(conn,d)}
+  function rc(s){var e=document.getElementById('recon');if(e){if(s)e.classList.add('show');else e.classList.remove('show')}}
+  function hm(d){
+    if(d.type==='troll_comment'){var id=MAP[d.persona];if(id&&d.text)up(id,d.text)}
+    if(d.type==='status'&&d.session){var e=document.getElementById('status-session');if(e)e.textContent=d.session}
+  }
+
+  function tick(){
+    if(P.get('mode')==='prod')return;
+    setInterval(function(){
+      var e=document.getElementById('status-ago');if(!e)return;
+      if(!lr){e.textContent='';return}
+      var s=Math.floor((Date.now()-lr)/1e3);
+      e.textContent=s<5?'now':s<60?s+'s':Math.floor(s/60)+'m';
+    },1e3);
+  }
+
+  // Demo mode — short punchy reactions
+  var DM={
+    jamie:['40x revenue multiple. That math doesn\'t math.',
+      'Pre-money, not post. Big difference.',
+      'SAFE notes convert at the cap. Correct.',
+      'Unverifiable without actual MRR.'],
+    delinquent:['Big Calendar is BEHIND THIS.',
+      'Every meeting note is a PROPHECY.',
+      'They call it productivity. I call it SURVEILLANCE.',
+      'This changes EVERYTHING.'],
+    cautious:['Won\'t exist in 3 years.',
+      'Another one for the graveyard.',
+      'Hype cycle is a circle.',
+      'Every 2021 tool is a 404 now.'],
+    taco:['Your meetings needed a $1.5B breakfast.',
+      'Proof meetings could\'ve been emails.',
+      'VCs paying more for notes than the meeting.',
+      'Officer Calacanis, reporting for duty.']
+  };
+  function demo(){
+    rc(false);
+    var di={jamie:0,delinquent:0,cautious:0,taco:0},cy=0;
+    IDS.forEach(function(id,i){
+      setTimeout(function(){up(id,DM[id][0]);di[id]=1},1500+i*2200);
+    });
+    setTimeout(function(){setInterval(function(){
+      var id=IDS[cy%4],idx=di[id]%DM[id].length;
+      up(id,DM[id][idx]);di[id]=idx+1;cy++;
+    },3500)},1500+4*2200);
+  }
+
+  function init(){tick();if(isDemo)demo();else conn()}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
+</body>
+</html>
