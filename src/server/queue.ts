@@ -135,9 +135,9 @@ export async function processUtterance(
       response = sentenceMatch[1].trimEnd();
     }
 
-    // Hard cap at 160 chars, break at last word boundary
-    if (response.length > 160) {
-      const truncated = response.slice(0, 160);
+    // Hard cap at 220 chars, break at last word boundary
+    if (response.length > 220) {
+      const truncated = response.slice(0, 220);
       const lastSpace = truncated.lastIndexOf(' ');
       response = (lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated.trimEnd()) + '\u2026';
     }

@@ -72,15 +72,25 @@ body{
 .persona{
   position:absolute;
   right:14px;left:14px;
-  opacity:0;
+  opacity:0.3;
   will-change:transform,opacity;
-  transition:opacity 500ms ease;
+  transition:transform 300ms ease-out,opacity 300ms ease;
   pointer-events:none;
 }
 
-/* Visible once text arrives */
-.persona.has-text{opacity:0.5;pointer-events:auto}
-.persona.active{opacity:1}
+/* Dimmed when another persona is active */
+.persona.idle{opacity:0.5;pointer-events:auto}
+/* Spotlight — active persona at full opacity */
+.persona.active{opacity:1;pointer-events:auto}
+
+/* === PERSONA HEADER — icon + name row === */
+.persona-header{
+  display:flex;align-items:center;gap:8px;
+  margin-bottom:4px;padding-left:2px;
+}
+.persona-icon{
+  flex-shrink:0;width:32px;height:32px;
+}
 
 /* Vertical positions — each persona owns a zone */
 .persona.jamie{top:200px}
@@ -109,7 +119,6 @@ body{
 .p-name{
   font-size:8px;font-weight:800;letter-spacing:0.12em;
   text-transform:uppercase;line-height:1;
-  margin-bottom:4px;padding-left:2px;
   color:rgba(255,255,255,0.6);
 }
 
@@ -119,7 +128,7 @@ body{
   color:rgba(255,255,255,0.92);
   will-change:opacity;transition:opacity 180ms ease;
   overflow:hidden;display:-webkit-box;
-  -webkit-line-clamp:2;-webkit-box-orient:vertical;
+  -webkit-line-clamp:4;-webkit-box-orient:vertical;
 }
 .reaction-text.fade-out{opacity:0}
 .reaction-text.waiting{
@@ -155,13 +164,6 @@ body{
 /* ============================================================
    ANIMATIONS — transform + opacity only, OBS safe
    ============================================================ */
-@keyframes pop{
-  0%{transform:scale(0.96);opacity:0}
-  50%{transform:scale(1.01)}
-  100%{transform:scale(1);opacity:1}
-}
-.persona.arrive{animation:pop 350ms cubic-bezier(0.34,1.56,0.64,1) forwards}
-
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -188,7 +190,10 @@ body.prod .status{display:none}
 
   <!-- Jamie — upper zone -->
   <div class="persona jamie" id="panel-jamie">
-    <div class="p-name">Not Jamie</div>
+    <div class="persona-header">
+      <svg class="persona-icon" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#2DD4BF"/><text x="16" y="21" text-anchor="middle" fill="white" font-family="system-ui" font-size="16" font-weight="800">J</text></svg>
+      <span class="p-name">Not Jamie</span>
+    </div>
     <div class="bubble">
       <div class="reaction-text waiting" id="text-jamie">...</div>
     </div>
@@ -196,7 +201,10 @@ body.prod .status{display:none}
 
   <!-- Delinquent -->
   <div class="persona delinquent" id="panel-delinquent">
-    <div class="p-name">Not Delinquent</div>
+    <div class="persona-header">
+      <svg class="persona-icon" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#F97316"/><text x="16" y="21" text-anchor="middle" fill="white" font-family="system-ui" font-size="16" font-weight="800">D</text></svg>
+      <span class="p-name">Not Delinquent</span>
+    </div>
     <div class="bubble">
       <div class="reaction-text waiting" id="text-delinquent">...</div>
     </div>
@@ -204,7 +212,10 @@ body.prod .status{display:none}
 
   <!-- Cautious -->
   <div class="persona cautious" id="panel-cautious">
-    <div class="p-name">Not Cautious</div>
+    <div class="persona-header">
+      <svg class="persona-icon" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#A78BFA"/><text x="16" y="21" text-anchor="middle" fill="white" font-family="system-ui" font-size="16" font-weight="800">C</text></svg>
+      <span class="p-name">Not Cautious</span>
+    </div>
     <div class="bubble">
       <div class="reaction-text waiting" id="text-cautious">...</div>
     </div>
@@ -212,7 +223,10 @@ body.prod .status{display:none}
 
   <!-- Taco — lower zone -->
   <div class="persona taco" id="panel-taco">
-    <div class="p-name">Not Taco</div>
+    <div class="persona-header">
+      <svg class="persona-icon" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" fill="#84CC16"/><text x="16" y="21" text-anchor="middle" fill="white" font-family="system-ui" font-size="16" font-weight="800">T</text></svg>
+      <span class="p-name">Not Taco</span>
+    </div>
     <div class="bubble">
       <div class="reaction-text waiting" id="text-taco">...</div>
     </div>
@@ -244,18 +258,18 @@ body.prod .status{display:none}
     setTimeout(function(){
       t.textContent=txt;
       t.classList.remove('fade-out');
-      // Mark as having content
-      p.classList.add('has-text');
-      // Pop animation
-      p.classList.remove('arrive');
-      void p.offsetWidth;
-      p.classList.add('arrive');
     },FO);
-    // Spotlight — active persona at full opacity, others dimmed
+    // Spotlight — active persona full opacity, others idle-dimmed
     IDS.forEach(function(x){
       var e=document.getElementById('panel-'+x);
-      if(e){if(x===id)e.classList.add('active');else e.classList.remove('active')}
+      if(e){
+        if(x===id){e.classList.remove('idle');e.classList.add('active')}
+        else{e.classList.remove('active');e.classList.add('idle')}
+      }
     });
+    // Scale pop — 1.03 then back
+    p.style.transform='scale(1.03)';
+    setTimeout(function(){p.style.transform='scale(1)'},300);
     lr=Date.now();
   }
 

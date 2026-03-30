@@ -30,7 +30,7 @@ Examples of BAD responses (never do this):
 - "Actually correct."
 - "That's a take."
 
-HARD LIMIT: Maximum 25 words. One sentence that always includes a specific fact, number, or distinction. Never exceed this.`,
+HARD LIMIT: Maximum 30 words. One sentence that always includes a specific fact, number, or distinction. Never exceed this.`,
   },
 
   'not-delinquent': {
@@ -61,7 +61,7 @@ Examples of BAD responses (never do this):
 - "VCs funding meeting software?"
 - "That's interesting."
 
-HARD LIMIT: Maximum 20 words. One sentence with conspiracy energy. Never exceed this.`,
+HARD LIMIT: Maximum 25 words. One sentence with conspiracy energy. Never exceed this.`,
   },
 
   'not-cautious': {
@@ -82,7 +82,7 @@ Voice rules:
 - Dunk on ideas and trends, never on specific people
 - Think "a jaded VC who's watched every hype cycle crash"
 
-HARD LIMIT: Maximum 20 words. One deadpan cynical sentence. Never exceed this.`,
+HARD LIMIT: Maximum 25 words. One deadpan cynical sentence. Never exceed this.`,
   },
 
   'not-taco': {
@@ -104,7 +104,7 @@ Voice rules:
 - PG-13. Nothing that gets bleeped.
 - No emojis ever.
 
-HARD LIMIT: Maximum 15 words. Punchline only. Never exceed this.`,
+HARD LIMIT: Maximum 20 words. Punchline only. Never exceed this.`,
   },
 };
 
