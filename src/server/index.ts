@@ -9,6 +9,7 @@ import { startWatcher } from './watcher.js';
 import { processUtterance, togglePersona, setCooldown, isProcessing } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
+import { checkForSponsor } from './sponsors.js';
 import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -104,7 +105,16 @@ wss.on('connection', (ws) => {
   });
 });
 
-function broadcast(message: TrollReaction | StatusMessage): void {
+interface SponsorMessage {
+  type: 'sponsor';
+  name: string;
+  url: string;
+  code: string | null;
+  copy: string;
+  timestamp: number;
+}
+
+function broadcast(message: TrollReaction | StatusMessage | SponsorMessage): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
@@ -141,6 +151,20 @@ async function main() {
       state: 'processing',
       session: watcher?.getCurrentSession() || undefined,
     });
+
+    // Check for sponsor keyword — bypasses cooldown, fires instantly
+    const sponsor = checkForSponsor(utterance.text);
+    if (sponsor) {
+      broadcast({
+        type: 'sponsor',
+        name: sponsor.name,
+        url: sponsor.url,
+        code: sponsor.code || null,
+        copy: sponsor.copy,
+        timestamp: Date.now(),
+      });
+      console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
+    }
 
     // Process through the 4-persona pipeline
     await processUtterance(utterance, (reaction) => {

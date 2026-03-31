@@ -142,6 +142,20 @@ export async function processUtterance(
       response = (lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated.trimEnd()) + '\u2026';
     }
 
+    // Filter flat non-responses from Not Jamie (and any persona)
+    const flatResponses = [
+      /^that'?s (opinion|vague|prediction)/i,
+      /^statement is vague/i,
+      /^no verifiable claim/i,
+      /^unclear (if|whether)/i,
+      /^not enough (context|data|information)/i,
+    ];
+    if (flatResponses.some((pat) => pat.test(response))) {
+      console.log(`[queue] ${persona.name} gave flat response, suppressing: "${response}"`);
+      processing = false;
+      return;
+    }
+
     const reaction: TrollReaction = {
       type: 'troll_comment',
       persona: personaId,
