@@ -24,7 +24,7 @@ const enabledPersonas = new Set<PersonaId>(ROTATION);
  * cloud:  cloud only (no fallback)
  * local:  ollama only
  */
-async function generate(
+export async function generate(
   model: string,
   systemPrompt: string,
   userMessage: string

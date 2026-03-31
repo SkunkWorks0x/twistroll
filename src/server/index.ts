@@ -6,11 +6,14 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
 import { startWatcher } from './watcher.js';
-import { processUtterance, togglePersona, setCooldown, isProcessing } from './queue.js';
+import { processUtterance, togglePersona, setCooldown, isProcessing, generate } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { checkForSponsor } from './sponsors.js';
+import { SNIPER_CONFIG } from './personas.js';
+import { getRecentUtterances } from './context.js';
 import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
+import { logReaction } from './logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -60,6 +63,13 @@ app.post('/api/cooldown', (req, res) => {
   res.json({ ok: true, cooldownMs: ms });
 });
 
+
+// API: Toggle sniper
+app.post('/api/sniper/toggle', (req, res) => {
+  const { enabled } = req.body as { enabled: boolean };
+  sniperEnabled = enabled;
+  res.json({ ok: true, enabled });
+});
 
 // API: Thumbs-up reaction
 app.post('/api/feedback/positive', (req, res) => {
@@ -127,6 +137,72 @@ function broadcast(message: TrollReaction | StatusMessage | SponsorMessage): voi
 
 let watcher: ReturnType<typeof startWatcher> | null = null;
 
+// ─── Question Sniper ───
+
+let sniperEnabled = true;
+let utterancesSinceSniper = 0;
+let sniperCount = 0;
+
+async function fireSniper(): Promise<void> {
+  if (!sniperEnabled) return;
+  if (utterancesSinceSniper < 2) return;
+
+  const recent = getRecentUtterances();
+  if (recent.length === 0) return;
+
+  utterancesSinceSniper = 0;
+  sniperCount++;
+
+  // Build context from recent utterances
+  let context = '[RECENT CONVERSATION]\n';
+  recent.forEach((u) => {
+    const label = u.speaker === 'you' ? 'Host' : 'Guest';
+    context += `${label}: "${u.text}"\n`;
+  });
+  context += '\n[SUGGEST ONE FOLLOW-UP QUESTION FOR THE HOST]\n';
+
+  try {
+    let { text: response, engine } = await generate(
+      SNIPER_CONFIG.model,
+      SNIPER_CONFIG.systemPrompt,
+      context
+    );
+
+    // Strip wrapping quotes and question marks
+    response = response.replace(/^["'"]+|["'"]+$/g, '');
+    response = response.replace(/\?+$/, '');
+
+    // Take first sentence only
+    const sentenceMatch = response.match(/^(.*?(?:\.\s|\." |[!?]))/);
+    if (sentenceMatch) {
+      response = sentenceMatch[1].trimEnd();
+      response = response.replace(/\?+$/, '');
+    }
+
+    // Hard cap at 120 chars
+    if (response.length > 120) {
+      const truncated = response.slice(0, 120);
+      const lastSpace = truncated.lastIndexOf(' ');
+      response = (lastSpace > 30 ? truncated.slice(0, lastSpace) : truncated.trimEnd());
+    }
+
+    const reaction: TrollReaction = {
+      type: 'troll_comment',
+      persona: 'sniper',
+      text: response,
+      timestamp: Date.now(),
+      utteranceId: `utt_sniper_${String(sniperCount).padStart(3, '0')}`,
+    };
+
+    broadcast(reaction);
+    logReaction('sniper' as any, response, recent[recent.length - 1].text, engine);
+    console.log(`[sniper] [${engine}]: "${response}"`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[sniper] Failed: ${msg}`);
+  }
+}
+
 async function main() {
   // Check Ollama on startup
   const ollamaOk = await checkOllama();
@@ -151,6 +227,9 @@ async function main() {
       state: 'processing',
       session: watcher?.getCurrentSession() || undefined,
     });
+
+    // Track utterances for sniper gate
+    utterancesSinceSniper++;
 
     // Check for sponsor keyword — bypasses cooldown, fires instantly
     const sponsor = checkForSponsor(utterance.text);
@@ -187,8 +266,14 @@ async function main() {
     console.log(`   Config:   http://localhost:${appConfig.overlayPort}/config`);
     console.log(`   WebSocket: ws://localhost:${appConfig.wsPort}`);
     console.log(`   Watching: ${appConfig.transcriptDir}`);
+    console.log(`   Sniper:  every 75s (enabled=${sniperEnabled})`);
     console.log('');
   });
+
+  // Question Sniper timer — fires every 75s independently of troll rotation
+  setInterval(() => {
+    fireSniper().catch((err) => console.error('[sniper] Timer error:', err));
+  }, 75000);
 
   // Periodic Ollama health check
   setInterval(async () => {
@@ -238,6 +323,11 @@ function configPanelHTML(): string {
   <label><input type="checkbox" checked data-persona="not-taco"> Not Taco (Comedy)</label>
 </div>
 <div class="card">
+  <h2>Question Sniper</h2>
+  <label><input type="checkbox" checked id="sniper-toggle"> Question Sniper (fires every 75s)</label>
+  <div id="sniper-latest" style="font-size:12px;color:#94A3B8;margin-top:8px;font-style:italic;"></div>
+</div>
+<div class="card">
   <h2>Timing</h2>
   <label>Cooldown: <span id="cd-val">15</span>s <input type="range" min="5" max="60" value="15" id="cooldown"></label>
 </div>
@@ -272,6 +362,11 @@ function configPanelHTML(): string {
     const v=e.target.value;
     document.getElementById('cd-val').textContent=v;
     await fetch('/api/cooldown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ms:v*1000})});
+  });
+
+  // Sniper toggle
+  document.getElementById('sniper-toggle').addEventListener('change',async(e)=>{
+    await fetch('/api/sniper/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e.target.checked})});
   });
 
   // Copy URL

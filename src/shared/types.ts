@@ -15,6 +15,7 @@ export interface OpenOatsUtterance {
 // ─── Internal Types ───
 
 export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-cautious' | 'not-taco';
+export type AgentId = PersonaId | 'sniper';
 
 export interface ParsedUtterance {
   speaker: string;
@@ -25,7 +26,7 @@ export interface ParsedUtterance {
 
 export interface TrollReaction {
   type: 'troll_comment';
-  persona: PersonaId;
+  persona: AgentId;
   text: string;
   timestamp: number;
   utteranceId: string;
