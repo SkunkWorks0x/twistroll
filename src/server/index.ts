@@ -6,7 +6,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
 import { startWatcher } from './watcher.js';
-import { processUtterance, togglePersona, setCooldown, isProcessing, generate } from './queue.js';
+import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { checkForSponsor } from './sponsors.js';
@@ -139,7 +139,7 @@ let watcher: ReturnType<typeof startWatcher> | null = null;
 
 // ─── Question Sniper ───
 
-let sniperEnabled = true;
+let sniperEnabled = false;
 let utterancesSinceSniper = 0;
 let sniperCount = 0;
 
@@ -243,6 +243,7 @@ async function main() {
         timestamp: Date.now(),
       });
       console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
+      startSponsorSuppression();
     }
 
     // Process through the 4-persona pipeline
@@ -324,7 +325,7 @@ function configPanelHTML(): string {
 </div>
 <div class="card">
   <h2>Question Sniper</h2>
-  <label><input type="checkbox" checked id="sniper-toggle"> Question Sniper (fires every 75s)</label>
+  <label><input type="checkbox" id="sniper-toggle"> Question Sniper (fires every 75s)</label>
   <div id="sniper-latest" style="font-size:12px;color:#94A3B8;margin-top:8px;font-style:italic;"></div>
 </div>
 <div class="card">
