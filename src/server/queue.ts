@@ -180,9 +180,9 @@ export async function processUtterance(
       response = sentenceMatch[1].trimEnd();
     }
 
-    // Hard cap at 220 chars, break at last word boundary
-    if (response.length > 220) {
-      const truncated = response.slice(0, 220);
+    // Hard cap at 200 chars, break at last word boundary
+    if (response.length > 200) {
+      const truncated = response.slice(0, 200);
       const lastSpace = truncated.lastIndexOf(' ');
       response = (lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated.trimEnd()) + '\u2026';
     }
@@ -244,6 +244,8 @@ export async function processUtterance(
       /no concrete claim/i,
       /doesn'?t contain.*claim/i,
       /no specific.*to (check|verify)/i,
+      /couldn'?t finish/i,
+      /couldn'?t complete/i,
     ];
     if (flatResponses.some((pat) => pat.test(response))) {
       console.log(`[queue] ${persona.name} gave flat response, suppressing: "${response}"`);

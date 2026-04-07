@@ -68,12 +68,15 @@ body{
 /* All bubbles share one centered position (pop-and-vanish: only one visible at a time) */
 .persona{top:400px}
 
-/* === BUBBLE — naked flex row, no card === */
+/* === BUBBLE — dark fog behind content, no visible edges === */
 .bubble{
   display:flex;
   align-items:flex-start;
   gap:10px;
   max-width:260px;
+  background:rgba(0,0,0,0.45);
+  border-radius:16px;
+  padding:12px 16px;
 }
 
 /* === AVATAR === */
