@@ -210,22 +210,6 @@ Next:
 
 ---
 
-## Sidecast vs TWiSTroll
-
-Both products were inspired by the same March 27, 2026 TWiST bounty. They solve different problems:
-
-| | Sidecast | TWiSTroll |
-|---|----------|-----------|
-| **Built for** | Hosts and producers | Viewers |
-| **Surface** | Mac app sidebar | OBS browser source |
-| **Visibility** | Hidden from screen share by design | On the broadcast, visible to all |
-| **Use case** | Host's private cockpit during the show | The "second feed" enhanced viewer stream |
-| **Memory** | Cross-episode archive | Within-episode rolling summary + callbacks |
-
-These are complementary products. Sidecast lives in the host's private window. TWiSTroll lives on the stream.
-
----
-
 ## Built with
 
 - [OpenOats](https://github.com/yazinsai/openoats) — real-time speech transcription
