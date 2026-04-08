@@ -1,183 +1,166 @@
-# 🔴 TWiSTroll
+# TWiSTroll
 
-**AI troll sidebar for live podcasts — built on OpenOats**
+**The viewer-facing AI commentary layer for live podcasts.**
 
-4 AI personas deliver live trailing commentary on your podcast — fact-checker, chaotic troll, cynical troll, comedian. Reactions pop up every ~15 seconds as floating bubbles over your video feed (think VH1 Pop Up Video, not live captions). Runs on a MacBook with cloud AI for speed.
+Four AI personas react to your show in real time, displayed as floating bubbles over the broadcast. Built as an OBS browser source — drag, drop, on air. Tested live against multiple TWiST episodes including the one where Sidecast v2 was demoed.
 
-48-hour proof of concept built for the [March 27, 2026 TWiST bounty](https://x.com/TWiStartups). Fully working today. Producer moderation layer is next.
+Built for the [March 27, 2026 TWiST bounty](https://x.com/TWiStartups). Released under MIT for any podcast to use.
 
 ![TWiSTroll Demo](https://github.com/SkunkWorks0x/twistroll/raw/main/demo/twistroll-demo.gif)
 
----
-
-## Production Controls
-
-Toggle personas on/off, adjust cooldown timing, thumbs-up/down reactions, connection status — all at `localhost:3000/config`. Never visible in OBS. One-click "Copy OBS URL" button for the production team.
-
-![Config Panel](https://github.com/SkunkWorks0x/twistroll/raw/main/demo/config-panel.png)
+[**Watch the 7-minute uncut demo →**](https://github.com/SkunkWorks0x/twistroll/raw/main/demo/twistroll-live-demo.mov)
 
 ---
 
-## Quick Start
+## What it does
 
-```bash
-# 1. Clone and install
-git clone https://github.com/SkunkWorks0x/twistroll.git
-cd twistroll
-npm install
+TWiSTroll watches your live transcript via OpenOats and generates live AI reactions from four persona agents. Reactions appear as floating overlay bubbles on your stream — visible to viewers, not hidden in a host window. One reaction every ~15 seconds in round-robin rotation. Each reaction uses ~200 characters max so the bubble never overwhelms the frame.
 
-# 2. Configure
-cp .env.example .env
-# Add your Anthropic API key to .env (for Claude Haiku reactions)
-# Or set LLM_MODE=ollama for fully local inference
-
-# 3. Run
-npm run dev
-
-# 4. Quick test (no OpenOats needed)
-./scripts/simulate-session.sh    # In a second terminal
-# Open localhost:3000 to see reactions
-```
-
-For live use: install [OpenOats](https://github.com/yazinsai/openoats), start a session, play audio. TWiSTroll watches the transcript and reacts automatically.
+This is the **viewer-side** companion to host-facing tools. Sidecast and similar tools live in a producer's private app window. TWiSTroll lives on the broadcast itself — the second feed Jason described on the March 27 stream.
 
 ---
 
-## OBS Setup
+## Live memory (the part Jason was drooling over)
+
+TWiSTroll maintains episode-level memory in three layers — addressing the archive concern from a different angle than cross-episode tools:
+
+**Rolling episode summary.** A background Claude Haiku call regenerates a 3-sentence episode summary every 10 utterances or 5 minutes. Every persona sees this summary in their context, so reactions stay aware of the full conversation arc, not just the last few seconds.
+
+**Callback Engine.** Personas can reference earlier moments from the same episode. In live testing, Not Taco caught Jason saying "no bueno" twenty minutes apart — "'No bueno' — you literally just said it two minutes ago." That's within-episode callback memory firing on unscripted natural conversation.
+
+**Contradiction Catcher.** Not Jamie scans the rolling episode summary for conflicting claims and surfaces them. In live testing against today's TWiST episode: "Guest claims these are suggestions 'you provided Jason' — but the episode summary shows Jason created the initial agent configurations, not provided them to the guest." Continuity-checking in real time.
+
+This is episode-scoped memory, not cross-episode archive. Different approach, real teeth. The cross-episode archive layer is roadmap (see below).
+
+---
+
+## Production features (live tested)
+
+- **Sponsor Guardian.** Detects sponsor mentions and instantly fires a sponsor-styled bubble with the promo URL. Bypasses cooldown. 45-second ad break suppression after firing so the personas don't talk over the read. 12 TWiST sponsors pre-loaded.
+- **Jason-ism Detector.** Server-side detection of Jason Calacanis catchphrases. When Jason says one of his signature lines, Not Taco gets forced into the next slot to roast it.
+- **Flat reaction filter.** 30+ regex patterns suppress meta-commentary, "I can't fact-check this" leaks, transcription complaints, and out-of-character outputs before they ever reach the WebSocket.
+- **Hybrid LLM with three fallbacks.** Claude Haiku primary, Groq llama-3.3-70b fallback, Ollama qwen2.5:7b last resort. The pipeline never dies.
+- **Server-side truncation.** Hard 200-character ceiling, first-sentence cut, word-boundary aware. Reactions stay tight, bubbles stay legible.
+
+---
+
+## Production controls
+
+A config panel at `localhost:3000/config` (never visible in OBS) lets the production team:
+
+- Toggle personas on/off mid-stream
+- Adjust cooldown timing in real time
+- Thumbs-up / thumbs-down on each reaction
+- Monitor connection status and current session
+- Copy production OBS URL to clipboard with one click
+
+---
+
+## OBS setup (5 minutes)
 
 1. Add a **Browser** source → URL: `http://localhost:3000?mode=prod`
 2. Set width: **340**, height: **1080**
 3. Position on the right edge of your canvas, layered above your video source
 4. Uncheck "Shutdown source when not visible" and "Refresh browser when scene becomes active"
+5. Set FPS to **30**
 
-The overlay background is fully transparent — bubbles float directly over your video feed.
-
----
-
-## Known Limitations
-
-This is a weekend proof of concept. Transparency about what it doesn't do yet:
-
-- **No live moderation.** Reactions go straight to the overlay. A producer approval queue (approve/reject before reactions hit stream) is the first production upgrade — see From Demo to Air below.
-- **Occasional flat or off-target reactions.** Prompt constraints and cooldowns prevent most wild outputs, but the AI occasionally misreads context — especially on vague statements. Producer approval queue is the live safeguard.
-- **Transcription accuracy.** OpenOats uses Whisper, which occasionally mishears words. The personas work around imperfect input, but some reactions may reference misheard content.
+The overlay background is fully transparent. Bubbles float directly over your video feed.
 
 ---
 
-## The 4 Personas
+## Quick start
 
-| | Persona | Role | Voice |
-|---|---------|------|-------|
-| 🔍 | **Not Jamie** | Fact-checker | Dry, deadpan. Always includes a specific fact, number, or correction. |
-| 🔥 | **Not Delinquent** | Chaotic troll | Conspiracy-comedy. ALL CAPS emphasis. Excited about insane theories. |
-| 😑 | **Not Cautious** | Cynical troll | Everything is a bubble. Every success is temporary. Deadpan doom. |
-| 😂 | **Not Taco** | Comedian | Punchlines only. Callbacks, roasts, one-liners. No setup. |
+```bash
+git clone https://github.com/SkunkWorks0x/twistroll.git
+cd twistroll
+npm install
+
+cp .env.example .env
+# Add your Anthropic API key (or set LLM_MODE=ollama for fully local)
+
+npm run dev
+```
+
+For live use: install [OpenOats](https://github.com/yazinsai/openoats), start a session, play audio. TWiSTroll watches the transcript automatically.
+
+For testing without OpenOats:
+```bash
+./scripts/simulate-session.sh
+```
+
+---
+
+## The 4 personas
 
 Each persona reacts once per minute in round-robin rotation. One fresh pop-up every ~15 seconds.
 
----
+| | Persona | Role | Voice |
+|---|---------|------|-------|
+| 🔍 | **Not Jamie** | Fact-checker | Dry, deadpan. Always cites a specific fact, number, or correction. |
+| 🔥 | **Not Delinquent** | Chaotic troll | Conspiracy-comedy. ALL CAPS emphasis. Excited about insane connections. |
+| 😑 | **Not Cautious** | Cynical analyst | Names a specific historical parallel for every hype cycle. Doom-pattern detection. |
+| 😂 | **Not Taco** | Comedian | Punchlines only. Callbacks, roasts, one-liners. No setup, no buddy/bro. |
 
-## Why These Names?
+### Why these names?
 
-The names aren't random. Each one references the hosts — Jason's world, Lon's history, Alex's brand.
-
-**Not Jamie** — Every great podcast has a fact-checker. Jamie Vernon runs the board for Joe Rogan. Not Jamie runs the facts for TWiST.
+**Not Jamie** — Jamie Vernon runs the board for Joe Rogan. Every great podcast has a fact-checker.
 
 **Not Delinquent** — Lon Harris played a heel character called "The Delinquent" on Movie Trivia Schmoedown. Our Not Delinquent channels that energy into conspiracy-adjacent takes about startup culture.
 
-**Not Cautious** — Alex Wilhelm publishes "Cautious Optimism," his newsletter on startups and markets. Our most recklessly pessimistic persona is the direct inversion. Where Alex is cautiously optimistic, Not Cautious sees bubbles everywhere.
+**Not Cautious** — Alex Wilhelm publishes "Cautious Optimism," his newsletter on startups and markets. Our most recklessly pessimistic persona is the direct inversion.
 
 **Not Taco** — Lon's foster chihuahua. The funniest persona in the sidebar is named after a tiny rescue dog.
 
-*Jason said "not Jackie, not Bob, not Fred — so we don't get in trouble." We took that literally and made every name an Easter egg.*
+Jason said "not Jackie, not Bob, not Fred — so we don't get in trouble." We took that literally and made every name an Easter egg for the show's actual world.
 
 ---
 
-## Architecture
-
-```
-Audio → OpenOats (Whisper) → JSONL transcript
-                                    ↓
-                            chokidar watcher
-                                    ↓
-                          parser (10-word min filter)
-                                    ↓
-                        cooldown gate (15s minimum)
-                                    ↓
-                    rotation selector (round-robin: 1 of 4)
-                                    ↓
-                context builder (last 4 utterances + system prompt)
-                                    ↓
-              LLM call (Claude Haiku → Groq fallback → Ollama fallback)
-                                    ↓
-                  truncation (first sentence, 160 char max)
-                                    ↓
-                        WebSocket broadcast
-                                    ↓
-                    OBS browser source overlay
-                      (floating transparent bubbles)
-```
-
-One persona fires per utterance in round-robin order: Jamie → Delinquent → Cautious → Taco → repeat. Each reaction takes ~2-4 seconds with Claude Haiku, ~8-15 seconds with local Ollama.
+## Architecture Audio → OpenOats (Whisper) → JSONL transcript
+↓
+chokidar watcher
+↓
+parser (10-word min filter)
+↓
+cooldown gate (15s minimum)
+↓
+Sponsor Guardian check (instant fire if matched)
+↓
+rotation selector (round-robin: 1 of 4)
+↓
+context builder (8 utterances + rolling episode summary)
+↓
+LLM call (Claude Haiku → Groq → Ollama)
+↓
+truncation (first sentence, 200 char max)
+↓
+flat reaction filter (30+ patterns)
+↓
+WebSocket broadcast
+↓
+OBS browser source overlay
+(floating transparent bubbles) One persona fires per utterance in round-robin order: Jamie → Delinquent → Cautious → Taco → repeat. Each reaction takes ~2-4 seconds with Claude Haiku.
 
 ---
 
-## LLM Modes
-
-TWiSTroll supports three LLM backends, configurable via `LLM_MODE` in `.env`:
+## LLM modes
 
 | Mode | Speed | Cost | Quality |
 |------|-------|------|---------|
 | `hybrid` (default) | ~2-4s | ~$0.01/reaction | Best — Claude Haiku |
-| `groq` | ~1-2s | Free tier | Good — Llama 3 |
+| `groq` | ~1-2s | Free tier | Good — llama-3.3-70b |
 | `ollama` | ~8-15s | Free | Good — qwen2.5:7b, runs 100% local |
 
 Hybrid mode tries Claude Haiku first, falls back to Groq, then Ollama. The pipeline never dies — if cloud is down, local catches it.
 
 ---
 
-## From Demo to Air
+## System requirements
 
-This is a working proof of concept built in a weekend. Here's what a production deployment for live broadcast needs:
-
-**Producer moderation layer.** Before any reaction hits the stream, a producer sees it first with approve/reject/edit controls. 2-3 second buffer. Non-negotiable for live TV. The config panel is the foundation — the approval queue is a weekend of work on top of it.
-
-**Kill switch.** One button to blank all bubbles instantly. Already possible by disabling all personas in the config panel, but a dedicated panic button is cleaner.
-
-**Faster models.** Claude Haiku keeps reactions under 4 seconds. For sub-second latency, Groq with Llama 3 is the path. Pipeline is model-agnostic — one `.env` change.
-
----
-
-## Project Structure
-
-```
-twistroll/
-├── src/
-│   ├── server/
-│   │   ├── index.ts          # Express + WebSocket server
-│   │   ├── watcher.ts        # chokidar file watcher, byte offset tracking
-│   │   ├── parser.ts         # OpenOats JSONL parser
-│   │   ├── queue.ts          # Round-robin persona rotation, single LLM call
-│   │   ├── ollama.ts         # Ollama API client
-│   │   ├── context.ts        # Rolling buffer of last 4 utterances
-│   │   ├── feedback.ts       # JSON feedback store (thumbs-up/down)
-│   │   ├── logger.ts         # Timestamped reaction log for editors
-│   │   ├── personas.ts       # 4 persona system prompts
-│   │   └── kb/
-│   │       └── factcheck.md  # Static knowledge base for Not Jamie
-│   ├── overlay/
-│   │   └── index.html        # OBS browser source (floating popup bubbles)
-│   └── config/
-│       └── config.ts         # .env loading
-├── data/
-│   ├── feedback.json         # Thumbs-up/down storage. Persists across sessions.
-│   └── reactions.log         # Timestamped log for editors.
-├── scripts/
-│   └── simulate-session.sh   # Test without OpenOats
-├── .env.example
-├── package.json
-└── LICENSE (MIT)
-```
+- **macOS** with Apple Silicon recommended (M1/M2/M3/M4/M5)
+- Node.js 20+
+- OBS Studio 30+
+- For hybrid mode: Anthropic API key
+- For local mode: Ollama with `qwen2.5:7b` pulled, 32GB RAM recommended
 
 ---
 
@@ -196,38 +179,58 @@ Copy `.env.example` to `.env`. Defaults work out of the box with a Claude API ke
 | `WS_PORT` | `3001` | WebSocket broadcast port |
 | `OVERLAY_PORT` | `3000` | Overlay + config panel port |
 | `COOLDOWN_MS` | `15000` | Minimum ms between reactions |
-| `CONTEXT_BUFFER_SIZE` | `4` | Recent utterances in context |
-
----
-
-## System Requirements
-
-- **macOS** with Apple Silicon recommended (M1/M2/M3/M4/M5)
-- Node.js 20+
-- OBS Studio 30+
-- For hybrid mode: Anthropic API key
-- For local mode: Ollama with `qwen2.5:7b` pulled, 32GB RAM recommended
+| `CONTEXT_BUFFER_SIZE` | `8` | Recent utterances in context |
 
 ---
 
 ## Roadmap
 
+Built and shipping:
+
 - [x] 4-persona overlay with live reactions
 - [x] Round-robin rotation (one pop-up at a time)
-- [x] Hybrid LLM (Claude Haiku + Groq + Ollama fallback)
+- [x] Hybrid LLM with three-tier fallback
+- [x] Rolling episode summary memory
+- [x] Callback Engine (within-episode memory)
+- [x] Contradiction Catcher
+- [x] Sponsor Guardian with ad break suppression
+- [x] Jason-ism Detector
+- [x] 30+ pattern flat reaction filter
 - [x] Production config panel with feedback controls
 - [x] Timestamped reaction log for editors
-- [ ] Producer approval queue (approve/reject before air)
-- [ ] Audience participation — viewers submit troll reactions via chat
-- [ ] Sponsor integration — "This fact-check brought to you by..."
-- [ ] Multi-podcast support — package for any creator
+- [x] Server-side truncation (200 char ceiling)
+
+Next:
+
+- [ ] Producer approval queue (approve/reject before air, 2-3s buffer)
+- [ ] Cross-episode archive memory (the Sidecast complement)
+- [ ] Audience participation — viewers submit reactions via chat
+- [ ] Sponsor integration with custom URLs per show
+- [ ] Multi-podcast support — package as "Green Room" for any creator
 
 ---
 
-## Built With
+## Sidecast vs TWiSTroll
+
+Both products were inspired by the same March 27, 2026 TWiST bounty. They solve different problems:
+
+| | Sidecast | TWiSTroll |
+|---|----------|-----------|
+| **Built for** | Hosts and producers | Viewers |
+| **Surface** | Mac app sidebar | OBS browser source |
+| **Visibility** | Hidden from screen share by design | On the broadcast, visible to all |
+| **Use case** | Host's private cockpit during the show | The "second feed" enhanced viewer stream |
+| **Memory** | Cross-episode archive | Within-episode rolling summary + callbacks |
+
+These are complementary products. Sidecast lives in the host's private window. TWiSTroll lives on the stream.
+
+---
+
+## Built with
 
 - [OpenOats](https://github.com/yazinsai/openoats) — real-time speech transcription
 - [Claude Haiku](https://anthropic.com) — fast, high-quality AI reactions (primary)
+- [Groq](https://groq.com) — llama-3.3-70b fallback
 - [Ollama](https://ollama.com) — local LLM fallback, zero cloud costs
 - Node.js + TypeScript — server pipeline
 - WebSocket — real-time reaction broadcast
@@ -243,4 +246,4 @@ MIT — do whatever you want with it.
 
 Built by [@SkunkWorks0x](https://x.com/SkunkWorks0x)
 
-*Built as a love letter to TWiST and proof that one builder + local AI can ship broadcast tools in a weekend.*
+*Built for the show. Released for everyone.*
