@@ -2,7 +2,7 @@
 
 **The viewer-facing AI commentary layer for live podcasts.**
 
-Four AI personas react to your show in real time, displayed as floating bubbles over the broadcast. Built as an OBS browser source — drag, drop, on air. Tested live against multiple TWiST episodes including the one where Sidecast v2 was demoed.
+Four AI personas react to your show in real time, displayed as floating bubbles over the broadcast. Built as an OBS browser source — drag, drop, on air. Tested live against multiple TWiST episodes.
 
 Built for the [March 27, 2026 TWiST bounty](https://x.com/TWiStartups). Released under MIT for any podcast to use.
 
@@ -16,7 +16,7 @@ Built for the [March 27, 2026 TWiST bounty](https://x.com/TWiStartups). Released
 
 TWiSTroll watches your live transcript via OpenOats and generates live AI reactions from four persona agents. Reactions appear as floating overlay bubbles on your stream — visible to viewers, not hidden in a host window. One reaction every ~15 seconds in round-robin rotation. Each reaction uses ~200 characters max so the bubble never overwhelms the frame.
 
-This is the **viewer-side** companion to host-facing tools. Sidecast and similar tools live in a producer's private app window. TWiSTroll lives on the broadcast itself — the second feed Jason described on the March 27 stream.
+This is the **viewer-side** layer. Host-facing tools live in a producer's private app window. TWiSTroll lives on the broadcast itself — the second feed Jason described on the March 27 stream.
 
 ---
 
@@ -115,30 +115,35 @@ Jason said "not Jackie, not Bob, not Fred — so we don't get in trouble." We to
 
 ---
 
-## Architecture Audio → OpenOats (Whisper) → JSONL transcript
-↓
+## Architecture
+
+```
+Audio → OpenOats (Whisper) → JSONL transcript
+  ↓
 chokidar watcher
-↓
+  ↓
 parser (10-word min filter)
-↓
+  ↓
 cooldown gate (15s minimum)
-↓
+  ↓
 Sponsor Guardian check (instant fire if matched)
-↓
+  ↓
 rotation selector (round-robin: 1 of 4)
-↓
+  ↓
 context builder (8 utterances + rolling episode summary)
-↓
+  ↓
 LLM call (Claude Haiku → Groq → Ollama)
-↓
+  ↓
 truncation (first sentence, 200 char max)
-↓
+  ↓
 flat reaction filter (30+ patterns)
-↓
+  ↓
 WebSocket broadcast
-↓
-OBS browser source overlay
-(floating transparent bubbles) One persona fires per utterance in round-robin order: Jamie → Delinquent → Cautious → Taco → repeat. Each reaction takes ~2-4 seconds with Claude Haiku.
+  ↓
+OBS browser source overlay (floating transparent bubbles)
+```
+
+One persona fires per utterance in round-robin order: Jamie → Delinquent → Cautious → Taco → repeat. Each reaction takes ~2-4 seconds with Claude Haiku.
 
 ---
 
@@ -203,7 +208,7 @@ Built and shipping:
 Next:
 
 - [ ] Producer approval queue (approve/reject before air, 2-3s buffer)
-- [ ] Cross-episode archive memory (the Sidecast complement)
+- [ ] Cross-episode archive memory
 - [ ] Audience participation — viewers submit reactions via chat
 - [ ] Sponsor integration with custom URLs per show
 - [ ] Multi-podcast support — package as "Green Room" for any creator
