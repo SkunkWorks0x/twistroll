@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
   <!-- Option 1: Tilted megaphone, pointed downward.
        The visual joke — the ad guy who's too cool to actually shill. -->
-  <circle cx="20" cy="20" r="19" fill="#2a1f08" stroke="#B8860B" stroke-width="2"/>
   <!-- megaphone body, tilted ~25° down -->
   <path d="M11 22 L11 18 L22 14 L22 26 Z" stroke="#B8860B" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
   <!-- megaphone neck/handle -->
