@@ -16,6 +16,7 @@
   --delinquent: #F97316;
   --cautious: #A78BFA;
   --taco: #84CC16;
+  --notad: #B8860B;
   --bg: #000000;
   --glass: rgba(255, 255, 255, 0.04);
   --glass-strong: rgba(255, 255, 255, 0.08);
@@ -776,6 +777,137 @@ body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
 .kb-panel.open { display: block; }
 .kb-panel b { color: var(--cyan); display: inline-block; width: 70px; }
 
+/* ─── Plug Opportunities (left rail) ──────────────────────────────── */
+.plug-rail {
+  position: fixed;
+  top: 64px; left: 0;
+  width: 320px;
+  height: calc(100vh - 64px);
+  background: rgba(8, 8, 12, 0.85);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid var(--stroke);
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+}
+.plug-rail-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--stroke);
+}
+.plug-rail-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--notad);
+  text-shadow: 0 0 10px rgba(184, 134, 11, 0.5);
+}
+.brief-status {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 6px;
+  letter-spacing: 0.05em;
+}
+.brief-status.loaded { color: var(--lime); }
+.plug-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.plug-card {
+  background: rgba(184, 134, 11, 0.06);
+  border: 1px solid rgba(184, 134, 11, 0.4);
+  border-radius: 10px;
+  padding: 12px 14px;
+  position: relative;
+  box-shadow: 0 0 14px rgba(184, 134, 11, 0.1);
+}
+.plug-card.taken { border-color: var(--lime); background: rgba(132, 204, 22, 0.08); }
+.plug-card.passed { opacity: 0.5; border-color: var(--text-dim); }
+.plug-sponsor {
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--notad);
+  margin-bottom: 4px;
+}
+.plug-trigger {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+}
+.plug-pivot {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.35;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border-left: 2px solid var(--notad);
+  border-radius: 4px;
+}
+.plug-angle {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.plug-copy {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.plug-also {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  font-family: var(--mono);
+}
+.plug-actions {
+  display: flex;
+  gap: 6px;
+}
+.plug-btn {
+  flex: 1;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  cursor: pointer;
+}
+.plug-btn-take { background: var(--lime); color: #000; }
+.plug-btn-pass { background: var(--glass-strong); color: var(--text-dim); }
+.plug-btn:disabled { opacity: 0.4; cursor: default; }
+.plug-time {
+  position: absolute;
+  top: 10px; right: 12px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+}
+.plug-empty {
+  text-align: center;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 30px 16px;
+}
+/* Push the filmstrip right to make room for the plug rail */
+body.has-plug-rail .filmstrip-wrap { margin-left: 320px; }
+
 /* ─── Reject modal ────────────────────────────────────────────────── */
 .modal-bg {
   position: fixed; inset: 0;
@@ -894,6 +1026,17 @@ body.wildcard .logo {
     <div class="replay-badge">REPLAY INTRO</div>
   </div>
 </header>
+
+<!-- Plug Opportunities rail (left side) -->
+<aside class="plug-rail" id="plug-rail">
+  <div class="plug-rail-header">
+    <div class="plug-rail-title">⟐ PLUG OPPORTUNITIES</div>
+    <div class="brief-status" id="brief-status">BRIEF: checking…</div>
+  </div>
+  <div class="plug-cards" id="plug-cards">
+    <div class="plug-empty">Waiting for triggers…</div>
+  </div>
+</aside>
 
 <div class="filmstrip-wrap">
   <div class="filmstrip" id="filmstrip">
@@ -1704,6 +1847,116 @@ async function load() {
 
 load();
 setInterval(load, 5000);
+
+// ═══════════════════════════════════════════════════════════════════
+// Plug Opportunities rail
+// ═══════════════════════════════════════════════════════════════════
+document.body.classList.add('has-plug-rail');
+const plugCards = []; // newest first, capped at 20
+const PLUG_LS_KEY = 'plug-decisions';
+const plugDecisions = JSON.parse(localStorage.getItem(PLUG_LS_KEY) || '{}');
+
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 5) return 'now';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  return Math.floor(s / 3600) + 'h ago';
+}
+
+function renderPlugCards() {
+  const root = document.getElementById('plug-cards');
+  if (plugCards.length === 0) {
+    root.innerHTML = '<div class="plug-empty">No triggers yet — load a brief and start the show.</div>';
+    return;
+  }
+  root.innerHTML = plugCards.map((p, idx) => {
+    const decision = plugDecisions[p.id] || '';
+    const cls = decision === 'taken' ? 'taken' : decision === 'passed' ? 'passed' : '';
+    const also = (p.also_matched || []).length
+      ? `<div class="plug-also">also matched: ${esc(p.also_matched.join(', '))} (skipped — first-match-wins)</div>`
+      : '';
+    return `<div class="plug-card ${cls}" data-id="${esc(p.id)}">
+      <div class="plug-time">${timeAgo(p.timestamp)}</div>
+      <div class="plug-sponsor">${esc(p.sponsor)}</div>
+      <div class="plug-trigger">fired on: "${esc(p.matched_trigger)}"</div>
+      <div class="plug-pivot">${esc(p.neutral_pivot)}</div>
+      <div class="plug-angle">today's angle: ${esc(p.angle)}</div>
+      <div class="plug-copy">${esc(p.copy)}${p.code ? ' · code: ' + esc(p.code) : ''}</div>
+      ${also}
+      <div class="plug-actions">
+        <button class="plug-btn plug-btn-take" data-decision="taken" ${decision ? 'disabled' : ''}>TAKEN</button>
+        <button class="plug-btn plug-btn-pass" data-decision="passed" ${decision ? 'disabled' : ''}>PASSED</button>
+      </div>
+    </div>`;
+  }).join('');
+  root.querySelectorAll('.plug-card').forEach(el => {
+    el.querySelectorAll('.plug-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = el.dataset.id;
+        const dec = btn.dataset.decision;
+        plugDecisions[id] = dec;
+        localStorage.setItem(PLUG_LS_KEY, JSON.stringify(plugDecisions));
+        renderPlugCards();
+      });
+    });
+  });
+}
+
+// Auto-refresh times every 5s
+setInterval(renderPlugCards, 5000);
+
+// WebSocket connection to main TWiSTroll WS for plug-opportunity messages
+function connectPlugWs() {
+  let ws;
+  try { ws = new WebSocket('ws://localhost:3001'); } catch { return; }
+  ws.onmessage = (e) => {
+    try {
+      const m = JSON.parse(e.data);
+      if (m.type === 'plug-opportunity') {
+        const card = {
+          id: `plug_${m.timestamp}_${m.sponsor}`,
+          sponsor: m.sponsor,
+          copy: m.copy,
+          url: m.url,
+          code: m.code,
+          angle: m.angle,
+          matched_trigger: m.matched_trigger,
+          neutral_pivot: m.neutral_pivot,
+          also_matched: m.also_matched || [],
+          timestamp: m.timestamp,
+        };
+        plugCards.unshift(card);
+        while (plugCards.length > 20) plugCards.pop();
+        renderPlugCards();
+      }
+    } catch {}
+  };
+  ws.onclose = () => setTimeout(connectPlugWs, 2000);
+  ws.onerror = () => {};
+}
+connectPlugWs();
+
+// Brief status polling
+async function refreshBriefStatus() {
+  try {
+    const r = await fetch('http://localhost:3000/api/brief/current');
+    const brief = await r.json();
+    const el = document.getElementById('brief-status');
+    if (brief && brief.episode) {
+      el.textContent = `BRIEF: Episode ${brief.episode} · ${brief.ads.length} ads loaded`;
+      el.classList.add('loaded');
+    } else {
+      el.textContent = 'BRIEF: none loaded — Not Ad is silent';
+      el.classList.remove('loaded');
+    }
+  } catch {
+    document.getElementById('brief-status').textContent = 'BRIEF: server unreachable';
+  }
+}
+refreshBriefStatus();
+setInterval(refreshBriefStatus, 5000);
 </script>
 </body>
 </html>

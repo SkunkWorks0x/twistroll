@@ -14,7 +14,23 @@ let processing = false;
 let rotationIndex = 0;
 let viewerRotationIndex = 0;
 
-const ROTATION: PersonaId[] = ['not-jamie', 'not-delinquent', 'not-cautious', 'not-taco'];
+// Slot 5 ('not-ad') is a visual-pacing yield, not a generated persona.
+// When the rotation lands on it AND a real Not Ad bubble has fired in the
+// recent window, this slot is left empty so the bubble has breathing room.
+// Otherwise the slot is skipped immediately and the next persona fires.
+type RotationSlot = PersonaId | 'not-ad';
+const ROTATION: RotationSlot[] = [
+  'not-jamie',
+  'not-delinquent',
+  'not-cautious',
+  'not-taco',
+  'not-ad',
+];
+const NOT_AD_PACE_WINDOW_MS = 30_000;
+let lastNotAdFireMs = 0;
+export function recordNotAdFire(): void {
+  lastNotAdFireMs = Date.now();
+}
 
 // Viewer comments only rotate through the chaos twins.
 const VIEWER_ROTATION: PersonaId[] = ['not-delinquent', 'not-taco'];
@@ -45,8 +61,11 @@ const JASON_ISMS = [
   "that's just insane"
 ];
 
-// Personas that are toggled on (all by default)
-const enabledPersonas = new Set<PersonaId>(ROTATION);
+// Personas that are toggled on (all by default). Filter out 'not-ad' since
+// it isn't a generated persona — it's a visual-pacing slot.
+const enabledPersonas = new Set<PersonaId>(
+  ROTATION.filter((r): r is PersonaId => r !== 'not-ad')
+);
 
 // Sponsor suppression — suppress troll reactions during ad reads
 let sponsorSuppressUntil: number = 0;
@@ -97,9 +116,21 @@ export async function generate(
  * Skips disabled personas, wraps around.
  */
 function nextPersona(): PersonaId | null {
-  for (let i = 0; i < ROTATION.length; i++) {
+  // Loop up to 2× length so a recent-not-ad-yield can pass through and
+  // the next real persona is reached on the same call.
+  for (let i = 0; i < ROTATION.length * 2; i++) {
     const id = ROTATION[rotationIndex % ROTATION.length];
     rotationIndex++;
+    if (id === 'not-ad') {
+      // Slot 5 — Not Ad is fired by index.ts on detection events, not here.
+      // Yield this slot (return null to leave the utterance unanswered) ONLY
+      // if Not Ad has fired recently — gives the Not Ad bubble visual space.
+      // Otherwise skip immediately so we don't waste a turn on an empty slot.
+      if (Date.now() - lastNotAdFireMs < NOT_AD_PACE_WINDOW_MS) {
+        return null;
+      }
+      continue;
+    }
     if (enabledPersonas.has(id)) return id;
   }
   return null; // all disabled

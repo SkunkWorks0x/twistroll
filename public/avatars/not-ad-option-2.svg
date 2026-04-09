@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" fill="none">
+  <!-- Option 2: Price tag with a wink mark.
+       Cheeky about being commercial. -->
+  <circle cx="20" cy="20" r="19" fill="#2a1f08" stroke="#B8860B" stroke-width="2"/>
+  <!-- price tag pentagon -->
+  <path d="M9 14 L24 14 L31 21 L24 28 L9 28 Z" stroke="#B8860B" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+  <!-- tag hole -->
+  <circle cx="26" cy="21" r="1.6" stroke="#B8860B" stroke-width="1.5" fill="none"/>
+  <!-- wink (closed eye = curved line) -->
+  <path d="M13 19 Q15 21, 17 19" stroke="#B8860B" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <!-- open eye -->
+  <circle cx="20.5" cy="19.5" r="0.9" fill="#B8860B"/>
+  <!-- smirk -->
+  <path d="M14 24 Q17 26, 21 24.5" stroke="#B8860B" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>

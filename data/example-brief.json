@@ -1,0 +1,38 @@
+{
+  "episode": 2274,
+  "date": "2026-04-09",
+  "ads": [
+    {
+      "sponsor": "Vanta",
+      "url": "twist.ly/vanta",
+      "code": null,
+      "copy": "$1000 off → twist.ly/vanta",
+      "triggers": ["soc2", "soc 2", "compliance", "audit", "security questionnaire", "framework"],
+      "angle": "Vanta just shipped a new AI risk module. Lean into that angle if guest mentions AI compliance specifically."
+    },
+    {
+      "sponsor": "Gusto",
+      "url": "twist.ly/gusto",
+      "code": null,
+      "copy": "3 months free → twist.ly/gusto",
+      "triggers": ["payroll", "401k", "hiring overhead", "contractor paperwork", "employees"],
+      "angle": "Standard read. Push if guest mentions early-stage hiring pain or paying contractors."
+    },
+    {
+      "sponsor": "Squarespace",
+      "url": "twist.ly/squarespace",
+      "code": "TWIST",
+      "copy": "Use code TWIST for 10% off → twist.ly/squarespace",
+      "triggers": ["website", "landing page", "domain", "online presence", "launching"],
+      "angle": "Cleanest pivot is when a founder mentions they need to launch something fast."
+    },
+    {
+      "sponsor": "Mercury",
+      "url": "twist.ly/mercury",
+      "code": null,
+      "copy": "Banking for startups → twist.ly/mercury",
+      "triggers": ["runway", "burn rate", "banking", "wire transfer", "cash flow"],
+      "angle": "Best moment is when a guest talks about cash management or moving money between accounts."
+    }
+  ]
+}

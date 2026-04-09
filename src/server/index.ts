@@ -6,7 +6,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
 import { startWatcher } from './watcher.js';
-import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression } from './queue.js';
+import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression, recordNotAdFire } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { checkForSponsor } from './sponsors.js';
@@ -14,6 +14,14 @@ import { SNIPER_CONFIG } from './personas.js';
 import { getRecentUtterances, setCurrentDossier } from './context.js';
 import { loadDossier } from './dossier.js';
 import { startAudiencePulseWatcher, appendViewerComment } from './audiencePulse.js';
+import {
+  loadBrief,
+  clearBrief,
+  checkBrief,
+  generateNotAdOutput,
+  getCurrentBrief,
+  getLastAlsoMatched,
+} from './dailyBrief.js';
 import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
 import { logReaction } from './logger.js';
 
@@ -88,6 +96,25 @@ app.post('/api/dossier/load', (req, res) => {
   res.json(dossier);
 });
 
+// API: Daily brief — load, clear, get current
+app.post('/api/brief/load', (req, res) => {
+  const brief = req.body;
+  if (!brief || !brief.episode || !Array.isArray(brief.ads)) {
+    return res.status(400).json({ error: 'Invalid brief format' });
+  }
+  loadBrief(brief);
+  res.json({ status: 'loaded', episode: brief.episode, ads: brief.ads.length });
+});
+
+app.post('/api/brief/clear', (_req, res) => {
+  clearBrief();
+  res.json({ status: 'cleared' });
+});
+
+app.get('/api/brief/current', (_req, res) => {
+  res.json(getCurrentBrief());
+});
+
 // API: Inject a viewer comment (manual / external integrations)
 app.post('/api/viewer-comment', (req, res) => {
   const { username, text, platform } = req.body as {
@@ -157,7 +184,22 @@ interface SponsorMessage {
   timestamp: number;
 }
 
-function broadcast(message: TrollReaction | StatusMessage | SponsorMessage): void {
+interface PlugOpportunityMessage {
+  type: 'plug-opportunity';
+  sponsor: string;
+  copy: string;
+  url: string;
+  code: string | null;
+  angle: string;
+  matched_trigger: string;
+  neutral_pivot: string;
+  also_matched: string[];
+  timestamp: number;
+}
+
+function broadcast(
+  message: TrollReaction | StatusMessage | SponsorMessage | PlugOpportunityMessage
+): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
@@ -276,6 +318,51 @@ async function main() {
         });
         console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
         startSponsorSuppression();
+      }
+
+      // Not Ad — daily-brief contextual ad insertion. Runs in parallel to
+      // the sponsor guardian above; both can fire on the same utterance.
+      const matchedAd = checkBrief(utterance.text);
+      if (matchedAd) {
+        const recent = getRecentUtterances().slice(-4);
+        const alsoMatched = getLastAlsoMatched();
+        generateNotAdOutput(matchedAd, recent, alsoMatched)
+          .then((output) => {
+            if (!output) return;
+
+            // Mode 1 — viewer overlay: identical render path to the four trolls
+            broadcast({
+              type: 'troll_comment',
+              persona: 'not-ad' as PersonaId,
+              text: output.personality_bubble,
+              timestamp: Date.now(),
+              utteranceId: utterance.id,
+            });
+
+            // Mode 2 — producer panel on Launch Bay
+            broadcast({
+              type: 'plug-opportunity',
+              sponsor: output.matched_ad.sponsor,
+              copy: output.matched_ad.copy,
+              url: output.matched_ad.url,
+              code: output.matched_ad.code,
+              angle: output.matched_ad.angle,
+              matched_trigger: output.matched_trigger,
+              neutral_pivot: output.neutral_pivot,
+              also_matched: output.also_matched.map((a) => a.sponsor),
+              timestamp: Date.now(),
+            });
+
+            recordNotAdFire();
+            console.log(
+              `[not-ad] Fired ${matchedAd.sponsor} on trigger "${output.matched_trigger}"`
+            );
+          })
+          .catch((err) => {
+            console.warn(
+              `[not-ad] generation error: ${err instanceof Error ? err.message : String(err)}`
+            );
+          });
       }
     }
 

@@ -9,6 +9,7 @@
   --del:#F97316;
   --caut:#A78BFA;
   --taco:#84CC16;
+  --notad:#B8860B;
   --tw:#FF4D00;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -113,6 +114,7 @@ body{
 .persona.delinquent .p-name{color:var(--del)}
 .persona.cautious .p-name{color:var(--caut)}
 .persona.taco .p-name{color:var(--taco)}
+.persona.notad .p-name{color:var(--notad)}
 
 /* === ANIMATIONS — transform + opacity only, OBS safe === */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
@@ -231,6 +233,20 @@ body.prod .status{display:none}
     </div>
   </div>
 
+  <!-- Not Ad — daily-brief contextual sponsor reads -->
+  <div class="persona notad" id="panel-notad">
+    <div class="bubble">
+      <div class="persona-avatar">
+        <!-- AVATAR SLOT — currently Option 1 (tilted megaphone). Swap inner <svg>... to switch. -->
+        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="19" fill="#2a1f08" stroke="#B8860B" stroke-width="2"/><path d="M11 22 L11 18 L22 14 L22 26 Z" stroke="#B8860B" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M22 17 L26 16 L26 24 L22 23" stroke="#B8860B" stroke-width="1.5" stroke-linejoin="round" fill="none"/><line x1="14" y1="26" x2="13" y2="30" stroke="#B8860B" stroke-width="1.5" stroke-linecap="round"/><circle cx="29" cy="14" r="1.2" fill="#B8860B" opacity="0.6"/><circle cx="31" cy="17" r="0.9" fill="#B8860B" opacity="0.4"/></svg>
+      </div>
+      <div class="persona-info">
+        <span class="p-name">Not Ad</span>
+        <div class="reaction-text" id="text-notad"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Sniper — question agent, no avatar -->
   <div class="persona sniper" id="panel-sniper">
     <div class="bubble">
@@ -255,9 +271,9 @@ body.prod .status{display:none}
   var P=new URLSearchParams(location.search);
   if(P.get('mode')==='prod')document.body.classList.add('prod');
   var isDemo=P.get('demo')==='true';
-  var IDS=['jamie','delinquent','cautious','taco','sniper'];
-  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco',
-           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco'};
+  var IDS=['jamie','delinquent','cautious','taco','notad','sniper'];
+  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco','not-ad':'notad',
+           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco',notad:'notad'};
 
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;
