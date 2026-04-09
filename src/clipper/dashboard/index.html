@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TWiSTroll Launch Bay</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+/* ─── Foundations ─────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+:root {
+  --cyan: #00F0FF;
+  --magenta: #FF006E;
+  --lime: #84CC16;
+  --amber: #FBBF24;
+  --jamie: #2DD4BF;
+  --delinquent: #F97316;
+  --cautious: #A78BFA;
+  --taco: #84CC16;
+  --bg: #000000;
+  --glass: rgba(255, 255, 255, 0.04);
+  --glass-strong: rgba(255, 255, 255, 0.08);
+  --stroke: rgba(255, 255, 255, 0.10);
+  --text: #e8e8ec;
+  --text-dim: #7a7e8a;
+  --mono: 'SF Mono', 'JetBrains Mono', 'Monaco', 'Menlo', ui-monospace, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+}
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(0, 240, 255, 0.04), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(255, 0, 110, 0.03), transparent 60%),
+    #000;
+}
+button { font-family: inherit; cursor: pointer; }
+button:focus-visible { outline: 1px solid var(--cyan); outline-offset: 2px; }
+
+/* ─── Header bar ──────────────────────────────────────────────────── */
+header.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--stroke);
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 10;
+}
+.logo {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--cyan);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+}
+.episode-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wildcard-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--glass);
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  transition: transform 150ms;
+}
+.wildcard-toggle:hover { transform: translateY(-1px); }
+.wildcard-dial {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--cyan);
+  position: relative;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+}
+.wildcard-dial::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background 200ms;
+}
+body.wildcard .wildcard-dial { border-color: var(--cautious); box-shadow: 0 0 14px rgba(167, 139, 250, 0.8); }
+body.wildcard .wildcard-dial::after { background: var(--cautious); }
+.gut-counter {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  background: var(--glass);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+}
+.gut-counter span { color: var(--lime); }
+
+/* Persistent radar (top-right) */
+.radar-dock {
+  position: relative;
+  width: 60px; height: 60px;
+  cursor: pointer;
+}
+.radar-dock svg { width: 100%; height: 100%; }
+.radar-dock .ring {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  opacity: 0.7;
+  animation: radarPulse 2s ease-in-out infinite;
+}
+.radar-dock.processing .ring { stroke: var(--lime); }
+.radar-dock.error .ring { stroke: var(--magenta); }
+body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
+@keyframes radarPulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+.radar-dock .replay-badge {
+  position: absolute;
+  top: -6px; left: -86px;
+  padding: 3px 8px;
+  background: var(--cyan);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 150ms;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.radar-dock:hover .replay-badge { opacity: 1; }
+
+/* ─── Film strip ──────────────────────────────────────────────────── */
+.filmstrip-wrap { flex: 1; overflow: hidden; position: relative; }
+.filmstrip {
+  display: flex;
+  gap: 22px;
+  padding: 32px 40px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+}
+.filmstrip::-webkit-scrollbar { height: 8px; }
+.filmstrip::-webkit-scrollbar-track { background: transparent; }
+.filmstrip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+}
+
+/* ─── Clip card ──────────────────────────────────────────────────── */
+.card {
+  flex: 0 0 320px;
+  height: 480px;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  scroll-snap-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 300ms, box-shadow 200ms;
+  will-change: transform, opacity;
+  user-select: none;
+  cursor: grab;
+}
+.card:active { cursor: grabbing; }
+.card.focused {
+  box-shadow:
+    0 0 0 1px var(--cyan),
+    0 0 40px rgba(0, 240, 255, 0.25);
+  transform: translateY(-4px);
+}
+.card.wildcard {
+  border-color: var(--cautious);
+  box-shadow: 0 0 24px rgba(167, 139, 250, 0.2);
+}
+.card.new-enter {
+  animation: cardEnter 600ms ease-out;
+}
+@keyframes cardEnter {
+  from { transform: scale(0.6) translateY(20px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+.card.launching {
+  animation: launchUp 700ms cubic-bezier(0.5, -0.5, 0.75, 0.05) forwards;
+}
+@keyframes launchUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  30% { transform: translateY(-30px) scale(1.04); box-shadow: 0 0 60px var(--lime); }
+  100% { transform: translateY(-800px) scale(0.3); opacity: 0; }
+}
+.card.scrubbing {
+  animation: scrubDown 500ms ease-in forwards;
+}
+@keyframes scrubDown {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(60px) scale(0.85); opacity: 0; }
+}
+
+/* Video preview (top 55%) */
+.preview {
+  flex: 0 0 55%;
+  position: relative;
+  background: linear-gradient(135deg, var(--delinquent) 0%, #000 100%);
+  overflow: hidden;
+}
+.preview.persona-jamie { background: linear-gradient(135deg, var(--jamie) 0%, #000 100%); }
+.preview.persona-delinquent { background: linear-gradient(135deg, var(--delinquent) 0%, #000 100%); }
+.preview.persona-cautious { background: linear-gradient(135deg, var(--cautious) 0%, #000 100%); }
+.preview.persona-taco { background: linear-gradient(135deg, var(--taco) 0%, #000 100%); }
+.preview::before {
+  /* Scanline texture */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,0) 0,
+      rgba(255,255,255,0) 2px,
+      rgba(0,0,0,0.18) 2px,
+      rgba(0,0,0,0.18) 3px
+    );
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.preview-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.5);
+  font-size: 48px;
+  pointer-events: none;
+}
+
+/* Score orb (top-right of preview) */
+.score-orb {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 64px; height: 64px;
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  z-index: 3;
+}
+.score-orb svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+}
+.score-orb circle.bg { fill: rgba(0,0,0,0.6); stroke: rgba(255,255,255,0.15); stroke-width: 3; }
+.score-orb circle.fg { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke-dashoffset 400ms; }
+.score-orb.high circle.fg { stroke: var(--lime); filter: drop-shadow(0 0 6px rgba(132, 204, 22, 0.8)); }
+.score-orb.mid circle.fg { stroke: var(--amber); filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6)); }
+.score-orb.low circle.fg { stroke: var(--magenta); filter: drop-shadow(0 0 6px rgba(255, 0, 110, 0.6)); }
+.score-orb .num { position: relative; z-index: 1; text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
+
+/* Driver badges (top-left of preview) */
+.drivers {
+  position: absolute;
+  top: 10px; left: 10px;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 170px;
+  z-index: 3;
+}
+.driver-badge {
+  font-size: 14px;
+  padding: 3px 7px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+
+/* Wildcard badge */
+.wildcard-badge {
+  position: absolute;
+  bottom: 10px; left: 10px;
+  padding: 3px 8px;
+  background: var(--cautious);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  border-radius: 3px;
+  z-index: 3;
+}
+
+/* Gut check ghost button */
+.gut-btn {
+  position: absolute;
+  bottom: 10px; right: 10px;
+  padding: 5px 10px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  border-radius: 999px;
+  opacity: 0.6;
+  backdrop-filter: blur(8px);
+  z-index: 3;
+  transition: opacity 150ms, transform 150ms;
+}
+.gut-btn:hover { opacity: 1; transform: scale(1.05); }
+
+/* Gut check mode */
+.card.gut-checking .preview .score-orb,
+.card.gut-checking .preview .drivers,
+.card.gut-checking .preview .gut-btn,
+.card.gut-checking .preview .wildcard-badge,
+.card.gut-checking .middle,
+.card.gut-checking .action-bar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms;
+}
+.card.gut-checking .preview { background: #000; }
+.card.gut-checking .preview::before { opacity: 0; }
+.gut-countdown {
+  position: absolute;
+  top: 12px; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 28px;
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(0, 240, 255, 0.8);
+  z-index: 5;
+  display: none;
+}
+.card.gut-checking .gut-countdown { display: block; }
+.gut-done-badge {
+  position: absolute;
+  top: 10px; left: 10px;
+  padding: 3px 8px;
+  background: rgba(132, 204, 22, 0.9);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  border-radius: 3px;
+  z-index: 4;
+}
+
+/* Middle section (hook + reactions + waveform) */
+.middle {
+  flex: 0 0 30%;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: opacity 200ms;
+}
+.hook {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-align: center;
+}
+.quotes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.quote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--text-dim);
+}
+.quote .dot {
+  flex: 0 0 6px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+.quote .txt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.waveform {
+  height: 18px;
+  position: relative;
+  margin-top: auto;
+}
+.waveform svg { width: 100%; height: 100%; display: block; }
+.waveform .bar { stroke: rgba(0, 240, 255, 0.4); stroke-width: 1.5; }
+.wf-dot {
+  position: absolute;
+  top: 50%;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* Action bar (bottom 15%) */
+.action-bar {
+  flex: 0 0 15%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--stroke);
+  background: rgba(0,0,0,0.3);
+  transition: opacity 200ms;
+}
+.duration-pills {
+  display: flex;
+  gap: 3px;
+}
+.dur-pill {
+  padding: 3px 6px;
+  background: transparent;
+  border: 1px solid var(--stroke);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  border-radius: 999px;
+}
+.dur-pill.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
+.aspect {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  padding: 2px 6px;
+  border: 1px solid var(--stroke);
+  border-radius: 4px;
+}
+.btn-copy, .btn-launch, .btn-scrub, .btn-chev {
+  border: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: #000;
+  transition: transform 150ms, box-shadow 150ms;
+}
+.btn-copy {
+  background: var(--glass-strong);
+  color: var(--text-dim);
+  font-size: 9px;
+  padding: 6px 8px;
+}
+.btn-launch {
+  background: var(--lime);
+  box-shadow: 0 0 14px rgba(132, 204, 22, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.btn-launch:hover { transform: translateY(-1px); box-shadow: 0 0 20px rgba(132, 204, 22, 0.7); }
+.btn-scrub {
+  background: var(--magenta);
+  color: #fff;
+  box-shadow: 0 0 14px rgba(255, 0, 110, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-scrub:hover { transform: translateY(-1px); box-shadow: 0 0 20px rgba(255, 0, 110, 0.7); }
+.btn-chev {
+  background: transparent;
+  color: var(--text-dim);
+  padding: 6px 8px;
+  font-size: 14px;
+}
+
+/* ─── Deep dive drawer ────────────────────────────────────────────── */
+.drawer-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0);
+  pointer-events: none;
+  transition: background 300ms;
+  z-index: 40;
+}
+.drawer-backdrop.open { background: rgba(0,0,0,0.5); pointer-events: auto; }
+.drawer {
+  position: fixed;
+  top: 0; right: 0;
+  width: 480px;
+  max-width: 95vw;
+  height: 100vh;
+  background: rgba(10, 10, 14, 0.95);
+  backdrop-filter: blur(24px);
+  border-left: 1px solid var(--stroke);
+  z-index: 50;
+  transform: translateX(100%);
+  transition: transform 300ms ease-out;
+  display: flex;
+  flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--stroke);
+}
+.drawer-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--cyan);
+  letter-spacing: 0.1em;
+}
+.drawer-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+}
+.drawer-body { flex: 1; overflow-y: auto; padding: 20px 22px; }
+.drawer-section { margin-bottom: 22px; }
+.drawer-section h3 {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.drawer-section p, .drawer-section li {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.drawer-section .platform {
+  display: flex; gap: 10px; margin-bottom: 4px;
+}
+.drawer-section .platform .lbl {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--cyan);
+  flex: 0 0 70px;
+  padding-top: 2px;
+}
+.drawer-section .hashtags { color: var(--jamie); font-size: 12px; }
+.drawer-actions {
+  display: flex;
+  gap: 8px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--stroke);
+}
+.drawer-actions button { flex: 1; }
+
+/* ─── Battle mode ─────────────────────────────────────────────────── */
+.battle-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0);
+  backdrop-filter: blur(0px);
+  z-index: 60;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  transition: background 300ms, backdrop-filter 300ms;
+}
+.battle-overlay.open {
+  display: flex;
+  background: rgba(0,0,0,0.88);
+  backdrop-filter: blur(8px);
+}
+.battle-title {
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 22px;
+  letter-spacing: 0.25em;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.7);
+}
+.battle-card {
+  width: 320px; height: 480px;
+  background: var(--glass);
+  border: 2px solid var(--cyan);
+  border-radius: 14px;
+  box-shadow: 0 0 40px rgba(0, 240, 255, 0.35);
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 200ms, box-shadow 200ms;
+}
+.battle-card:hover { transform: scale(1.03); box-shadow: 0 0 60px rgba(0, 240, 255, 0.6); }
+.battle-vs {
+  font-family: var(--mono);
+  font-size: 48px;
+  color: var(--magenta);
+  text-shadow: 0 0 24px rgba(255, 0, 110, 0.7);
+}
+
+/* ─── Intro overlay (on-demand only) ──────────────────────────────── */
+.intro-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0);
+  backdrop-filter: blur(0px);
+  z-index: 100;
+  display: none;
+  pointer-events: none;
+  transition: background 400ms, backdrop-filter 400ms;
+}
+.intro-overlay.open {
+  display: block;
+  background: rgba(0,0,0,0.95);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+.intro-title {
+  position: absolute;
+  top: 14%; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 24px;
+  color: var(--cyan);
+  text-shadow: 0 0 20px rgba(0, 240, 255, 0.8);
+  white-space: nowrap;
+}
+.intro-status {
+  position: absolute;
+  top: calc(14% + 42px); left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+}
+.intro-radar {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 280px; height: 280px;
+  margin: -140px 0 0 -140px;
+}
+.intro-radar svg { width: 100%; height: 100%; }
+.intro-radar .outer-ring {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2;
+  opacity: 0;
+  animation: radarPulse 2s ease-in-out infinite;
+}
+.intro-orb {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: #fff;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 400ms;
+}
+.intro-orb.top-orb {
+  box-shadow: 0 0 40px currentColor;
+  animation: topOrbPulse 1.6s ease-in-out infinite;
+}
+@keyframes topOrbPulse {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+}
+.intro-orb .orb-score {
+  font-size: 18px;
+  text-shadow: 0 0 6px currentColor;
+}
+.intro-tooltip {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, 180px);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--cyan);
+  opacity: 0;
+  transition: opacity 400ms;
+  letter-spacing: 0.1em;
+}
+.intro-tooltip.visible { opacity: 1; }
+
+/* ─── Keyboard hint ───────────────────────────────────────────────── */
+.kb-hint {
+  position: fixed;
+  bottom: 16px; left: 16px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--glass);
+  border: 1px solid var(--stroke);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.kb-hint:hover { color: var(--cyan); border-color: var(--cyan); }
+.kb-panel {
+  position: fixed;
+  bottom: 54px; left: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  line-height: 1.8;
+  z-index: 20;
+  display: none;
+  min-width: 220px;
+}
+.kb-panel.open { display: block; }
+.kb-panel b { color: var(--cyan); display: inline-block; width: 70px; }
+
+/* ─── Reject modal ────────────────────────────────────────────────── */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+  transition: background 250ms;
+}
+.modal-bg.open { display: flex; background: rgba(0,0,0,0.7); }
+.modal {
+  background: rgba(10,10,14,0.96);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--magenta);
+  border-radius: 12px;
+  padding: 22px;
+  width: 92%;
+  max-width: 460px;
+  box-shadow: 0 0 40px rgba(255, 0, 110, 0.3);
+}
+.modal h3 {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--magenta);
+  margin-bottom: 14px;
+}
+.reasons { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 12px; }
+.reason-chip {
+  padding: 9px;
+  background: var(--glass);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--mono);
+}
+.reason-chip:hover, .reason-chip.selected {
+  background: rgba(255, 0, 110, 0.15);
+  border-color: var(--magenta);
+  color: var(--magenta);
+}
+.modal textarea {
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--stroke);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 12px;
+  min-height: 60px;
+  margin-bottom: 12px;
+  resize: vertical;
+}
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-actions button { padding: 8px 16px; border-radius: 6px; font-family: var(--mono); font-size: 11px; border: none; cursor: pointer; }
+.modal-actions .cancel { background: var(--glass); color: var(--text); border: 1px solid var(--stroke); }
+.modal-actions .confirm { background: var(--magenta); color: #fff; }
+
+/* ─── Wildcard global effects ─────────────────────────────────────── */
+body.wildcard {
+  animation: wildcardHue 6s linear infinite;
+}
+@keyframes wildcardHue {
+  0%, 100% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(10deg); }
+}
+body.wildcard .logo {
+  animation: glitch 3s infinite;
+}
+@keyframes glitch {
+  0%, 90%, 100% { transform: translate(0, 0); }
+  92% { transform: translate(-1px, 1px); }
+  94% { transform: translate(1px, -1px); }
+  96% { transform: translate(-1px, 0); }
+}
+
+/* Particle boom (launch effect) */
+.boom {
+  position: fixed;
+  pointer-events: none;
+  z-index: 50;
+  font-family: var(--mono);
+  font-size: 24px;
+  color: var(--lime);
+  text-shadow: 0 0 20px var(--lime);
+  animation: boomFade 700ms ease-out forwards;
+}
+@keyframes boomFade {
+  0% { transform: scale(0.5); opacity: 0; }
+  30% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">⟐ TWiSTroll LAUNCH BAY</div>
+  <div class="episode-title" id="ep-title">Loading mission…</div>
+  <button class="wildcard-toggle" id="wildcard-toggle" title="Press W">
+    <div class="wildcard-dial"></div>
+    <span id="wildcard-label">WILD CARD: OFF</span>
+  </button>
+  <div class="gut-counter">GUT CHECKS: <span id="gut-count">0</span></div>
+  <div class="radar-dock" id="radar-dock" title="Replay intro">
+    <svg viewBox="0 0 60 60">
+      <circle class="ring" cx="30" cy="30" r="24"/>
+      <circle class="ring" cx="30" cy="30" r="14" opacity="0.4"/>
+      <circle cx="30" cy="30" r="2" fill="#00F0FF"/>
+    </svg>
+    <div class="replay-badge">REPLAY INTRO</div>
+  </div>
+</header>
+
+<div class="filmstrip-wrap">
+  <div class="filmstrip" id="filmstrip">
+    <div class="empty-state">WAITING FOR CANDIDATES…</div>
+  </div>
+</div>
+
+<!-- Intro overlay (on-demand) -->
+<div class="intro-overlay" id="intro-overlay">
+  <div class="intro-title" id="intro-title"></div>
+  <div class="intro-status" id="intro-status"></div>
+  <div class="intro-radar" id="intro-radar">
+    <svg viewBox="0 0 280 280">
+      <circle class="outer-ring" cx="140" cy="140" r="130"/>
+      <circle class="outer-ring" cx="140" cy="140" r="90" opacity="0.5"/>
+      <circle class="outer-ring" cx="140" cy="140" r="50" opacity="0.3"/>
+    </svg>
+  </div>
+  <div class="intro-tooltip" id="intro-tooltip">CLICK ANYWHERE OR PRESS ESC TO DISMISS</div>
+</div>
+
+<!-- Deep Dive drawer -->
+<div class="drawer-backdrop" id="drawer-bg"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-header">
+    <div class="drawer-title">DEEP DIVE</div>
+    <button class="drawer-close" id="drawer-close">✕</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+  <div class="drawer-actions">
+    <button class="btn-launch" id="drawer-approve">↑ LAUNCH</button>
+    <button class="btn-scrub" id="drawer-reject">↓ SCRUB</button>
+    <button class="btn-copy" id="drawer-gut">👁 GUT</button>
+  </div>
+</aside>
+
+<!-- Battle mode -->
+<div class="battle-overlay" id="battle-overlay">
+  <div class="battle-title">PICK THE WINNER</div>
+  <div id="battle-left"></div>
+  <div class="battle-vs">VS</div>
+  <div id="battle-right"></div>
+</div>
+
+<!-- Reject modal -->
+<div class="modal-bg" id="reject-modal">
+  <div class="modal">
+    <h3>SCRUB REASON</h3>
+    <div class="reasons">
+      <div class="reason-chip" data-reason="too obvious">too obvious</div>
+      <div class="reason-chip" data-reason="not viral">not viral</div>
+      <div class="reason-chip" data-reason="wrong tone">wrong tone</div>
+      <div class="reason-chip" data-reason="subtle gem missed">subtle gem missed</div>
+      <div class="reason-chip" data-reason="off brand">off brand</div>
+    </div>
+    <textarea id="reject-text" placeholder="Optional details…"></textarea>
+    <div class="modal-actions">
+      <button class="cancel" onclick="closeRejectModal()">CANCEL</button>
+      <button class="confirm" onclick="submitReject()">SCRUB</button>
+    </div>
+  </div>
+</div>
+
+<!-- Keyboard hint -->
+<button class="kb-hint" id="kb-hint">?</button>
+<div class="kb-panel" id="kb-panel">
+  <div><b>← →</b> navigate</div>
+  <div><b>A</b> launch</div>
+  <div><b>R</b> scrub</div>
+  <div><b>G</b> gut check</div>
+  <div><b>Space</b> play / pause</div>
+  <div><b>B</b> battle mode</div>
+  <div><b>W</b> wild card</div>
+  <div><b>⌘⇧I</b> replay intro</div>
+  <div><b>Esc</b> close</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════
+const state = {
+  clips: [],
+  episode: { episodeTitle: 'Live Session', episodeNumber: 0 },
+  focusedIdx: 0,
+  wildcard: false,
+  gutCount: Number(localStorage.getItem('gutCount') || 0),
+  rejectingId: null,
+  rejectReason: '',
+  battle: null,
+  activeDurations: {}, // id -> 'hook' | 'shorts' | 'extended'
+  seenIds: new Set(), // for new-card entry animation
+};
+document.getElementById('gut-count').textContent = state.gutCount;
+
+const PERSONA_COLOR = {
+  'not-jamie': '#2DD4BF',
+  'not-delinquent': '#F97316',
+  'not-cautious': '#A78BFA',
+  'not-taco': '#84CC16',
+};
+const PERSONA_SHORT = {
+  'not-jamie': 'jamie',
+  'not-delinquent': 'delinquent',
+  'not-cautious': 'cautious',
+  'not-taco': 'taco',
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+function parseJson(s, fallback) {
+  try { return JSON.parse(s); } catch { return fallback; }
+}
+function scoreClass(s) {
+  if (s >= 80) return 'high';
+  if (s >= 60) return 'mid';
+  return 'low';
+}
+function driverEmoji(driver) {
+  const d = String(driver).toLowerCase();
+  if (d.includes('laugh') || d.includes('humor')) return '🔥';
+  if (d.includes('hot take') || d.includes('spicy')) return '💥';
+  if (d.includes('insight')) return '📈';
+  if (d.includes('controversy') || d.includes('drama')) return '⚡';
+  if (d.includes('fraud') || d.includes('red-flag')) return '🚨';
+  if (d.includes('numbers')) return '🧮';
+  return '✨';
+}
+function topPersonaFor(clip) {
+  const reactions = parseJson(clip.scoreBreakdown, {})?.signals;
+  // Use the first persona alphabetically that reacted — just for gradient tint
+  const meta = parseJson(clip.metadata, {});
+  // crude: derive from transcript content signal
+  return 'delinquent';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Fake waveform (deterministic per-id)
+// ═══════════════════════════════════════════════════════════════════
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) & 0x7fffffff;
+  return h;
+}
+function waveformSVG(id) {
+  const seed = hashStr(id);
+  const bars = 40;
+  let path = '';
+  for (let i = 0; i < bars; i++) {
+    const x = (i / bars) * 100;
+    const h = 4 + ((seed * (i + 1) * 7919) % 16);
+    path += `M${x},${9 - h/2} L${x},${9 + h/2} `;
+  }
+  return `<svg viewBox="0 0 100 18" preserveAspectRatio="none">
+    <path class="bar" d="${path}"/>
+  </svg>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Render clip card
+// ═══════════════════════════════════════════════════════════════════
+function renderCard(clip, idx) {
+  const meta = parseJson(clip.metadata, {});
+  const breakdown = parseJson(clip.scoreBreakdown, {});
+  const title = meta.titles?.tiktok || '(untitled)';
+  const drivers = (meta.engagementDrivers || []).slice(0, 4);
+  const hashtags = meta.hashtags || [];
+  const aspect = meta.aspectRatio || '9:16';
+  const topPersona = topPersonaFor(clip);
+  const isWildcard = clip.score >= 50 && clip.score < 70;
+  const sc = scoreClass(clip.score);
+  const radius = 28;
+  const circ = 2 * Math.PI * radius;
+  const offset = circ * (1 - clip.score / 100);
+  const activeDur = state.activeDurations[clip.id] || 'hook';
+  const gutChecked = localStorage.getItem(`gut-${clip.id}`) === '1';
+
+  // Persona quote bubbles (fake — pick top 2-3 reactions from transcript signal)
+  // We only have reaction count, not full reactions, so use placeholder rows.
+  const reactionHtml = buildQuoteList(clip, meta);
+
+  // Waveform dots — 1 per reaction, evenly spaced
+  const n = Math.max(1, clip.reactionCount || 1);
+  const dots = [];
+  const personas = ['not-jamie', 'not-delinquent', 'not-cautious', 'not-taco'];
+  for (let i = 0; i < Math.min(n, 8); i++) {
+    const pct = ((i + 1) / (n + 1)) * 100;
+    const p = personas[i % 4];
+    dots.push(`<div class="wf-dot" style="left:${pct}%;background:${PERSONA_COLOR[p]};color:${PERSONA_COLOR[p]}"></div>`);
+  }
+
+  const isNew = !state.seenIds.has(clip.id);
+  state.seenIds.add(clip.id);
+
+  return `
+    <div class="card ${isWildcard ? 'wildcard' : ''} ${isNew ? 'new-enter' : ''} ${state.focusedIdx === idx ? 'focused' : ''}"
+         data-id="${esc(clip.id)}" data-idx="${idx}">
+      <div class="preview persona-${topPersona}">
+        <div class="preview-play">▶</div>
+        <div class="drivers">
+          ${drivers.map(d => `<div class="driver-badge">${driverEmoji(d)}</div>`).join('')}
+        </div>
+        <div class="score-orb ${sc}">
+          <svg viewBox="0 0 64 64">
+            <circle class="bg" cx="32" cy="32" r="${radius}"/>
+            <circle class="fg" cx="32" cy="32" r="${radius}"
+                    stroke-dasharray="${circ}" stroke-dashoffset="${offset}"/>
+          </svg>
+          <div class="num">${clip.score}</div>
+        </div>
+        ${isWildcard ? '<div class="wildcard-badge">WILDCARD</div>' : ''}
+        ${gutChecked ? '<div class="gut-done-badge">✓ GUT-CHECKED</div>' : ''}
+        <div class="gut-countdown" data-countdown="8">8</div>
+        <button class="gut-btn" data-action="gut">👁 GUT CHECK</button>
+      </div>
+      <div class="middle">
+        <div class="hook">${esc(title)}</div>
+        ${reactionHtml}
+        <div class="waveform">
+          ${waveformSVG(clip.id)}
+          ${dots.join('')}
+        </div>
+      </div>
+      <div class="action-bar">
+        <div class="duration-pills">
+          <button class="dur-pill ${activeDur === 'hook' ? 'active' : ''}" data-dur="hook">HOOK</button>
+          <button class="dur-pill ${activeDur === 'shorts' ? 'active' : ''}" data-dur="shorts">SHORT</button>
+          <button class="dur-pill ${activeDur === 'extended' ? 'active' : ''}" data-dur="extended">EXT</button>
+        </div>
+        <div class="aspect">${esc(aspect)}</div>
+        <button class="btn-launch" data-action="approve">🚀 LAUNCH</button>
+        <button class="btn-scrub" data-action="reject">🗑 SCRUB</button>
+        <button class="btn-chev" data-action="dive">›</button>
+      </div>
+    </div>
+  `;
+}
+
+function buildQuoteList(clip, meta) {
+  // We don't have raw persona reactions in the API payload — approximate
+  // from the transcript field + drivers. Show 2 lines max.
+  const t = (clip.transcript || '').slice(0, 120);
+  if (!t) return '';
+  return `
+    <div class="quotes">
+      <div class="quote">
+        <div class="dot" style="background:${PERSONA_COLOR['not-jamie']}"></div>
+        <div class="txt">${esc(t.slice(0, 70))}…</div>
+      </div>
+      <div class="quote">
+        <div class="dot" style="background:${PERSONA_COLOR['not-delinquent']}"></div>
+        <div class="txt">${clip.reactionCount} persona reactions in window</div>
+      </div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Render filmstrip
+// ═══════════════════════════════════════════════════════════════════
+function renderFilmstrip() {
+  const strip = document.getElementById('filmstrip');
+  let visible = state.clips.filter(c => c.status === 'pending');
+  if (!state.wildcard) {
+    visible = visible.filter(c => c.score >= 60);
+  }
+  visible.sort((a, b) => b.score - a.score);
+
+  if (visible.length === 0) {
+    strip.innerHTML = '<div class="empty-state">NO PENDING CANDIDATES ABOVE THRESHOLD</div>';
+    return;
+  }
+
+  if (state.focusedIdx >= visible.length) state.focusedIdx = 0;
+  strip.innerHTML = visible.map((c, i) => renderCard(c, i)).join('');
+  wireCardEvents();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Card interactions (click + drag)
+// ═══════════════════════════════════════════════════════════════════
+function wireCardEvents() {
+  document.querySelectorAll('.card').forEach(el => {
+    const id = el.dataset.id;
+
+    el.querySelector('[data-action="approve"]')?.addEventListener('click', e => {
+      e.stopPropagation();
+      launchCard(el, id);
+    });
+    el.querySelector('[data-action="reject"]')?.addEventListener('click', e => {
+      e.stopPropagation();
+      openRejectModal(id);
+    });
+    el.querySelector('[data-action="dive"]')?.addEventListener('click', e => {
+      e.stopPropagation();
+      openDrawer(id);
+    });
+    el.querySelector('[data-action="gut"]')?.addEventListener('click', e => {
+      e.stopPropagation();
+      gutCheckCard(el, id);
+    });
+    el.querySelectorAll('.dur-pill').forEach(p => {
+      p.addEventListener('click', e => {
+        e.stopPropagation();
+        state.activeDurations[id] = p.dataset.dur;
+        el.querySelectorAll('.dur-pill').forEach(x => x.classList.toggle('active', x === p));
+      });
+    });
+    el.addEventListener('dblclick', () => openDrawer(id));
+
+    // Click on focus
+    el.addEventListener('click', () => {
+      state.focusedIdx = Number(el.dataset.idx);
+      document.querySelectorAll('.card').forEach(c => c.classList.remove('focused'));
+      el.classList.add('focused');
+    });
+
+    // Drag mechanics (vertical only)
+    enableDrag(el, id);
+  });
+}
+
+function enableDrag(el, id) {
+  let startY = 0, currentY = 0, dragging = false;
+  const onDown = e => {
+    // Don't start drag if the click is on a button
+    if (e.target.closest('button')) return;
+    dragging = true;
+    startY = e.clientY ?? e.touches?.[0]?.clientY;
+    el.style.transition = 'none';
+  };
+  const onMove = e => {
+    if (!dragging) return;
+    currentY = (e.clientY ?? e.touches?.[0]?.clientY) - startY;
+    el.style.transform = `translateY(${currentY}px) rotate(${currentY * 0.03}deg)`;
+    el.style.opacity = 1 - Math.min(0.4, Math.abs(currentY) / 300);
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    el.style.transition = '';
+    if (currentY < -120) {
+      launchCard(el, id);
+    } else if (currentY > 120) {
+      openRejectModal(id);
+      el.style.transform = '';
+      el.style.opacity = '';
+    } else {
+      el.style.transform = '';
+      el.style.opacity = '';
+    }
+    currentY = 0;
+  };
+  el.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Actions: approve, reject, gut check
+// ═══════════════════════════════════════════════════════════════════
+function launchCard(el, id) {
+  el.classList.add('launching');
+  // copy metadata to clipboard
+  const clip = state.clips.find(c => c.id === id);
+  if (clip) copyMetadata(parseJson(clip.metadata, {}));
+  // boom particle
+  const rect = el.getBoundingClientRect();
+  const boom = document.createElement('div');
+  boom.className = 'boom';
+  boom.textContent = '🚀 LAUNCHED';
+  boom.style.left = `${rect.left + rect.width / 2 - 60}px`;
+  boom.style.top = `${rect.top + 40}px`;
+  document.body.appendChild(boom);
+  setTimeout(() => boom.remove(), 700);
+
+  fetch(`/api/clips/${id}/approve`, { method: 'POST' })
+    .finally(() => setTimeout(load, 700));
+}
+
+function gutCheckCard(el, id) {
+  el.classList.add('gut-checking');
+  let remaining = 8;
+  const counter = el.querySelector('.gut-countdown');
+  counter.textContent = remaining;
+  const interval = setInterval(() => {
+    remaining--;
+    counter.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(interval);
+      el.classList.remove('gut-checking');
+      localStorage.setItem(`gut-${id}`, '1');
+      state.gutCount++;
+      localStorage.setItem('gutCount', state.gutCount);
+      document.getElementById('gut-count').textContent = state.gutCount;
+      fetch(`/api/clips/${id}/gut-check`, { method: 'POST' }).catch(() => {});
+      renderFilmstrip();
+    }
+  }, 1000);
+  // early-exit on space
+  const earlyExit = e => {
+    if (e.code === 'Space') {
+      clearInterval(interval);
+      el.classList.remove('gut-checking');
+      localStorage.setItem(`gut-${id}`, '1');
+      state.gutCount++;
+      localStorage.setItem('gutCount', state.gutCount);
+      document.getElementById('gut-count').textContent = state.gutCount;
+      window.removeEventListener('keydown', earlyExit);
+      renderFilmstrip();
+    }
+  };
+  window.addEventListener('keydown', earlyExit);
+}
+
+function openRejectModal(id) {
+  state.rejectingId = id;
+  state.rejectReason = '';
+  document.getElementById('reject-modal').classList.add('open');
+}
+function closeRejectModal() {
+  document.getElementById('reject-modal').classList.remove('open');
+  document.querySelectorAll('.reason-chip').forEach(c => c.classList.remove('selected'));
+  document.getElementById('reject-text').value = '';
+}
+async function submitReject() {
+  const id = state.rejectingId;
+  const text = document.getElementById('reject-text').value.trim();
+  const reason = [state.rejectReason, text].filter(Boolean).join(' — ') || 'unspecified';
+  await fetch(`/api/clips/${id}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  closeRejectModal();
+  load();
+}
+document.querySelectorAll('.reason-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.reason-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    state.rejectReason = chip.dataset.reason;
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Copy metadata
+// ═══════════════════════════════════════════════════════════════════
+function copyMetadata(m) {
+  if (!m || !m.titles) return;
+  const text = [
+    `TikTok: ${m.titles.tiktok || ''}`,
+    `YT Shorts: ${m.titles.youtubeShorts || ''}`,
+    `X: ${m.titles.x || ''}`,
+    '',
+    m.descriptions?.long || m.descriptions?.short || '',
+    '',
+    (m.hashtags || []).join(' '),
+  ].join('\n');
+  navigator.clipboard?.writeText(text).catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Deep Dive drawer
+// ═══════════════════════════════════════════════════════════════════
+function openDrawer(id) {
+  const clip = state.clips.find(c => c.id === id);
+  if (!clip) return;
+  const m = parseJson(clip.metadata, {});
+  const b = parseJson(clip.scoreBreakdown, {});
+  const body = document.getElementById('drawer-body');
+  body.innerHTML = `
+    <div class="drawer-section">
+      <h3>Platform Titles</h3>
+      <div class="platform"><div class="lbl">TikTok</div><p>${esc(m.titles?.tiktok || '')}</p></div>
+      <div class="platform"><div class="lbl">YT Shorts</div><p>${esc(m.titles?.youtubeShorts || '')}</p></div>
+      <div class="platform"><div class="lbl">X</div><p>${esc(m.titles?.x || '')}</p></div>
+    </div>
+    <div class="drawer-section">
+      <h3>Hook</h3>
+      <p>${esc(m.hook?.text || '')}</p>
+      <p style="color: var(--text-dim); font-style: italic; font-size: 11px; margin-top: 4px;">${esc(m.hook?.why || '')}</p>
+    </div>
+    <div class="drawer-section">
+      <h3>Descriptions</h3>
+      <p><strong>Short:</strong> ${esc(m.descriptions?.short || '')}</p>
+      <p style="margin-top: 6px;"><strong>Long:</strong> ${esc(m.descriptions?.long || '')}</p>
+    </div>
+    <div class="drawer-section">
+      <h3>Hashtags</h3>
+      <p class="hashtags">${esc((m.hashtags || []).join(' '))}</p>
+    </div>
+    <div class="drawer-section">
+      <h3>Engagement Drivers</h3>
+      <p>${esc((m.engagementDrivers || []).join(' · '))}</p>
+    </div>
+    <div class="drawer-section">
+      <h3>Suggested Captions</h3>
+      <ul style="list-style: none; padding: 0;">
+        ${(m.suggestedCaptions || []).map(c => `<li style="padding: 4px 0; border-bottom: 1px solid var(--stroke);">${esc(c)}</li>`).join('')}
+      </ul>
+    </div>
+    <div class="drawer-section">
+      <h3>Score Breakdown</h3>
+      <p>consensus: <b>${b.signals?.personaConsensus ?? 0}</b> / 40</p>
+      <p>memory: <b>${b.signals?.memoryMatch ?? 0}</b> / 25</p>
+      <p>thumbs: <b>${b.signals?.explicitThumbs ?? 0}</b> / 15</p>
+      <p>heuristics: <b>${b.signals?.transcriptHeuristics ?? 0}</b> / 15</p>
+      <p>manual: <b>${b.signals?.manualOverride ?? 0}</b> / 5</p>
+      <p style="margin-top: 6px; color: var(--cyan);"><strong>TOTAL: ${clip.score}</strong></p>
+    </div>
+    <div class="drawer-section">
+      <h3>Why This Clip</h3>
+      <p style="color: var(--text-dim); font-size: 12px;">${esc(m.viralityExplanation || b.explanation || '')}</p>
+    </div>
+    <div class="drawer-section">
+      <h3>Transcript</h3>
+      <p style="color: var(--text-dim); font-size: 12px; font-family: var(--mono);">${esc((clip.transcript || '').slice(0, 800))}</p>
+    </div>
+  `;
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-bg').classList.add('open');
+  document.getElementById('drawer').dataset.clipId = id;
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-bg').classList.remove('open');
+}
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+document.getElementById('drawer-bg').addEventListener('click', closeDrawer);
+document.getElementById('drawer-approve').addEventListener('click', () => {
+  const id = document.getElementById('drawer').dataset.clipId;
+  const el = document.querySelector(`.card[data-id="${id}"]`);
+  if (el) launchCard(el, id);
+  closeDrawer();
+});
+document.getElementById('drawer-reject').addEventListener('click', () => {
+  const id = document.getElementById('drawer').dataset.clipId;
+  openRejectModal(id);
+  closeDrawer();
+});
+document.getElementById('drawer-gut').addEventListener('click', () => {
+  const id = document.getElementById('drawer').dataset.clipId;
+  const el = document.querySelector(`.card[data-id="${id}"]`);
+  if (el) gutCheckCard(el, id);
+  closeDrawer();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Wild Card Mode
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('wildcard-toggle').addEventListener('click', toggleWildcard);
+function toggleWildcard() {
+  state.wildcard = !state.wildcard;
+  document.body.classList.toggle('wildcard', state.wildcard);
+  document.getElementById('wildcard-label').textContent =
+    state.wildcard ? 'WILD CARD: ON' : 'WILD CARD: OFF';
+  renderFilmstrip();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Battle Mode
+// ═══════════════════════════════════════════════════════════════════
+function startBattle() {
+  const pending = state.clips.filter(c => c.status === 'pending');
+  if (pending.length < 2) return;
+  const a = pending[Math.floor(Math.random() * pending.length)];
+  let b;
+  do { b = pending[Math.floor(Math.random() * pending.length)]; } while (b.id === a.id);
+  state.battle = { a, b };
+  const overlay = document.getElementById('battle-overlay');
+  overlay.classList.add('open');
+  document.getElementById('battle-left').innerHTML = battleCardHtml(a);
+  document.getElementById('battle-right').innerHTML = battleCardHtml(b);
+  document.getElementById('battle-left').onclick = () => resolveBattle(a.id, b.id);
+  document.getElementById('battle-right').onclick = () => resolveBattle(b.id, a.id);
+}
+function battleCardHtml(clip) {
+  const meta = parseJson(clip.metadata, {});
+  const sc = scoreClass(clip.score);
+  return `<div class="battle-card">
+    <div class="preview persona-delinquent">
+      <div class="score-orb ${sc}"><div class="num">${clip.score}</div></div>
+      <div class="preview-play">▶</div>
+    </div>
+    <div class="middle">
+      <div class="hook">${esc(meta.titles?.tiktok || '')}</div>
+      <div class="quotes"><div class="quote"><div class="txt">${clip.reactionCount} reactions</div></div></div>
+    </div>
+    <div class="action-bar" style="justify-content: center;">
+      <span style="font-family: var(--mono); font-size: 10px; color: var(--cyan);">CLICK TO PICK</span>
+    </div>
+  </div>`;
+}
+async function resolveBattle(winnerId, loserId) {
+  await fetch(`/api/clips/${winnerId}/battle-win`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ loserId }),
+  });
+  await load();
+  // Immediately start next battle if enough candidates remain
+  const pending = state.clips.filter(c => c.status === 'pending');
+  if (pending.length >= 2) {
+    setTimeout(startBattle, 300);
+  } else {
+    exitBattle();
+  }
+}
+function exitBattle() {
+  document.getElementById('battle-overlay').classList.remove('open');
+  state.battle = null;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Keyboard
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('keydown', e => {
+  // Allow typing in modal textarea
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+
+  if (e.key === 'Escape') {
+    if (document.getElementById('intro-overlay').classList.contains('open')) return closeIntro();
+    if (state.battle) return exitBattle();
+    if (document.getElementById('drawer').classList.contains('open')) return closeDrawer();
+    if (document.getElementById('reject-modal').classList.contains('open')) return closeRejectModal();
+    return;
+  }
+
+  // Cmd/Ctrl + Shift + I → replay intro
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'i' || e.key === 'I')) {
+    e.preventDefault();
+    playIntro();
+    return;
+  }
+
+  if (state.battle) {
+    if (e.key === 'ArrowLeft') { resolveBattle(state.battle.a.id, state.battle.b.id); return; }
+    if (e.key === 'ArrowRight') { resolveBattle(state.battle.b.id, state.battle.a.id); return; }
+    return;
+  }
+
+  const cards = document.querySelectorAll('.card');
+  if (cards.length === 0) return;
+
+  if (e.key === 'ArrowLeft') { state.focusedIdx = Math.max(0, state.focusedIdx - 1); updateFocus(); }
+  if (e.key === 'ArrowRight') { state.focusedIdx = Math.min(cards.length - 1, state.focusedIdx + 1); updateFocus(); }
+
+  const focusedEl = cards[state.focusedIdx];
+  if (!focusedEl) return;
+  const id = focusedEl.dataset.id;
+
+  if (e.key === 'a' || e.key === 'A') launchCard(focusedEl, id);
+  if (e.key === 'r' || e.key === 'R') openRejectModal(id);
+  if (e.key === 'g' || e.key === 'G') gutCheckCard(focusedEl, id);
+  if (e.code === 'Space' && !focusedEl.classList.contains('gut-checking')) {
+    e.preventDefault();
+    // play/pause is decorative — just animate pulse
+    focusedEl.querySelector('.preview').animate(
+      [{ filter: 'brightness(1)' }, { filter: 'brightness(1.3)' }, { filter: 'brightness(1)' }],
+      { duration: 300 }
+    );
+  }
+  if (e.key === 'b' || e.key === 'B') startBattle();
+  if (e.key === 'w' || e.key === 'W') toggleWildcard();
+});
+
+function updateFocus() {
+  document.querySelectorAll('.card').forEach((c, i) => {
+    c.classList.toggle('focused', i === state.focusedIdx);
+    if (i === state.focusedIdx) c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Intro sequence (on-demand only)
+// ═══════════════════════════════════════════════════════════════════
+function playIntro() {
+  const overlay = document.getElementById('intro-overlay');
+  const titleEl = document.getElementById('intro-title');
+  const statusEl = document.getElementById('intro-status');
+  const radar = document.getElementById('intro-radar');
+  const tooltip = document.getElementById('intro-tooltip');
+
+  overlay.classList.add('open');
+  titleEl.textContent = '';
+  statusEl.textContent = '';
+  tooltip.classList.remove('visible');
+  radar.querySelectorAll('.outer-ring').forEach(r => r.style.opacity = '0');
+  overlay.querySelectorAll('.intro-orb').forEach(o => o.remove());
+
+  const title = `MISSION BRIEFING: ${state.episode.episodeTitle}`;
+  const clipsForIntro = [...state.clips].sort((a, b) => b.score - a.score).slice(0, 8);
+  const status = `Scanning for viral candidates… Found ${clipsForIntro.length} clips.`;
+
+  // Typewriter
+  let i = 0;
+  const typeTitle = () => {
+    if (i <= title.length) {
+      titleEl.textContent = title.slice(0, i);
+      i++;
+      setTimeout(typeTitle, 30);
+    } else {
+      let j = 0;
+      const typeStatus = () => {
+        if (j <= status.length) {
+          statusEl.textContent = status.slice(0, j);
+          j++;
+          setTimeout(typeStatus, 20);
+        } else {
+          // Pulse radar rings in
+          radar.querySelectorAll('.outer-ring').forEach((r, idx) => {
+            setTimeout(() => { r.style.opacity = ''; }, idx * 120);
+          });
+          // Detonate orbs
+          setTimeout(() => detonateOrbs(clipsForIntro), 800);
+        }
+      };
+      typeStatus();
+    }
+  };
+  typeTitle();
+}
+
+function detonateOrbs(clipsForIntro) {
+  const overlay = document.getElementById('intro-overlay');
+  const tooltip = document.getElementById('intro-tooltip');
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight / 2;
+  const radius = 220;
+
+  clipsForIntro.forEach((clip, idx) => {
+    const angle = (idx / Math.max(clipsForIntro.length, 1)) * Math.PI * 2 - Math.PI / 2;
+    const size = 60 + Math.min(60, (clip.score - 50) * 1.5);
+    const color = clip.score >= 80 ? '#84CC16' : clip.score >= 60 ? '#FBBF24' : '#FF006E';
+    const orb = document.createElement('div');
+    orb.className = 'intro-orb' + (idx === 0 ? ' top-orb' : '');
+    orb.style.width = `${size}px`;
+    orb.style.height = `${size}px`;
+    orb.style.left = `${cx}px`;
+    orb.style.top = `${cy}px`;
+    orb.style.color = color;
+    orb.style.borderColor = color;
+    orb.innerHTML = `<div class="orb-score">${clip.score}</div>`;
+    overlay.appendChild(orb);
+    // Force reflow then animate to orbital position
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const tx = cx + Math.cos(angle) * radius;
+        const ty = cy + Math.sin(angle) * radius;
+        orb.style.left = `${tx}px`;
+        orb.style.top = `${ty}px`;
+        orb.style.transform = `translate(-50%, -50%) scale(${idx === 0 ? 1.15 : 1})`;
+        orb.style.opacity = '1';
+      }, idx * 60);
+    });
+  });
+
+  // Show tooltip after orbits land
+  setTimeout(() => {
+    tooltip.classList.add('visible');
+    const topOrb = overlay.querySelector('.top-orb');
+    if (topOrb) {
+      setTimeout(() => {
+        topOrb.style.transform = 'translate(-50%, -50%) scale(1.5)';
+      }, 500);
+    }
+  }, 1400);
+}
+
+function closeIntro() {
+  document.getElementById('intro-overlay').classList.remove('open');
+}
+document.getElementById('radar-dock').addEventListener('click', playIntro);
+document.getElementById('intro-overlay').addEventListener('click', closeIntro);
+
+// ═══════════════════════════════════════════════════════════════════
+// Keyboard hint panel
+// ═══════════════════════════════════════════════════════════════════
+document.getElementById('kb-hint').addEventListener('click', () => {
+  document.getElementById('kb-panel').classList.toggle('open');
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Data loading
+// ═══════════════════════════════════════════════════════════════════
+async function load() {
+  try {
+    const [clipsRes, epRes] = await Promise.all([
+      fetch('/api/clips').then(r => r.json()),
+      fetch('/api/clips/episode-info').then(r => r.json()).catch(() => ({})),
+    ]);
+    state.clips = clipsRes || [];
+    state.episode = epRes || state.episode;
+    document.getElementById('ep-title').textContent =
+      `${state.episode.episodeTitle} · ${state.clips.length} candidates`;
+    renderFilmstrip();
+  } catch (err) {
+    console.error('[dashboard] load failed:', err);
+  }
+}
+
+load();
+setInterval(load, 5000);
+</script>
+</body>
+</html>
