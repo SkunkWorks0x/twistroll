@@ -11,7 +11,9 @@ import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { checkForSponsor } from './sponsors.js';
 import { SNIPER_CONFIG } from './personas.js';
-import { getRecentUtterances } from './context.js';
+import { getRecentUtterances, setCurrentDossier } from './context.js';
+import { loadDossier } from './dossier.js';
+import { startAudiencePulseWatcher, appendViewerComment } from './audiencePulse.js';
 import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
 import { logReaction } from './logger.js';
 
@@ -69,6 +71,37 @@ app.post('/api/sniper/toggle', (req, res) => {
   const { enabled } = req.body as { enabled: boolean };
   sniperEnabled = enabled;
   res.json({ ok: true, enabled });
+});
+
+// API: Load guest dossier
+app.post('/api/dossier/load', (req, res) => {
+  const { guestName } = req.body as { guestName: string };
+  if (!guestName || typeof guestName !== 'string') {
+    return res.status(400).json({ error: 'guestName required' });
+  }
+  const dossier = loadDossier(guestName);
+  if (!dossier) {
+    return res.status(404).json({ error: `No dossier found for "${guestName}"` });
+  }
+  setCurrentDossier(dossier);
+  console.log(`[dossier] Loaded dossier for "${dossier.name}"`);
+  res.json(dossier);
+});
+
+// API: Inject a viewer comment (manual / external integrations)
+app.post('/api/viewer-comment', (req, res) => {
+  const { username, text, platform } = req.body as {
+    username?: string;
+    text?: string;
+    platform?: 'youtube' | 'x' | 'manual';
+  };
+  if (!username || !text) {
+    return res.status(400).json({ error: 'username and text required' });
+  }
+  const p: 'youtube' | 'x' | 'manual' =
+    platform === 'youtube' || platform === 'x' || platform === 'manual' ? platform : 'manual';
+  const comment = appendViewerComment({ username, text, platform: p });
+  res.json({ ok: true, comment });
 });
 
 // API: Thumbs-up reaction
@@ -214,50 +247,54 @@ async function main() {
     console.log('✅ Ollama connected');
   }
 
-  // Start file watcher
-  watcher = startWatcher(async (utterance) => {
+  const handleUtterance = async (utterance: Parameters<Parameters<typeof startWatcher>[0]>[0]) => {
     // Re-check Ollama if it was down
     if (!isOllamaAvailable()) {
       await checkOllama();
     }
 
-    // Broadcast processing status
     broadcast({
       type: 'status',
       state: 'processing',
       session: watcher?.getCurrentSession() || undefined,
     });
 
-    // Track utterances for sniper gate
-    utterancesSinceSniper++;
+    // Track utterances for sniper gate (show utterances only, not viewer chat)
+    if (utterance.speaker !== 'viewer') {
+      utterancesSinceSniper++;
 
-    // Check for sponsor keyword — bypasses cooldown, fires instantly
-    const sponsor = checkForSponsor(utterance.text);
-    if (sponsor) {
-      broadcast({
-        type: 'sponsor',
-        name: sponsor.name,
-        url: sponsor.url,
-        code: sponsor.code || null,
-        copy: sponsor.copy,
-        timestamp: Date.now(),
-      });
-      console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
-      startSponsorSuppression();
+      // Sponsor keyword — only runs on show audio, never on viewer chat
+      const sponsor = checkForSponsor(utterance.text);
+      if (sponsor) {
+        broadcast({
+          type: 'sponsor',
+          name: sponsor.name,
+          url: sponsor.url,
+          code: sponsor.code || null,
+          copy: sponsor.copy,
+          timestamp: Date.now(),
+        });
+        console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
+        startSponsorSuppression();
+      }
     }
 
-    // Process through the 4-persona pipeline
     await processUtterance(utterance, (reaction) => {
       broadcast(reaction);
     });
 
-    // Broadcast idle status
     broadcast({
       type: 'status',
       state: 'idle',
       session: watcher?.getCurrentSession() || undefined,
     });
-  });
+  };
+
+  // Start file watcher (OpenOats transcripts)
+  watcher = startWatcher(handleUtterance);
+
+  // Start audience pulse watcher (viewer comments) — runs in parallel, same queue
+  startAudiencePulseWatcher(handleUtterance);
 
   // Start Express server
   server.listen(appConfig.overlayPort, () => {

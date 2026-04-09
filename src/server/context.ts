@@ -3,6 +3,35 @@ import { appConfig } from '../config/config.js';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import type { Dossier } from './dossier.js';
+import { formatDossierBlock } from './dossier.js';
+import { initMemory, queryMemory, formatMemoryBlock } from './episodeMemory.js';
+
+// Cross-episode memory state
+let currentMemoryBlock = '';
+let memoryLastUpdated = 0;
+let memoryAvailable = false;
+
+// Init LanceDB once at startup — if it fails, memory is disabled for the session.
+initMemory()
+  .then(() => {
+    memoryAvailable = true;
+    console.log('[memory] LanceDB initialized — cross-episode memory active');
+  })
+  .catch((err) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[memory] LanceDB init failed — cross-episode memory DISABLED: ${msg}`);
+  });
+
+let currentDossier: Dossier | null = null;
+
+export function setCurrentDossier(d: Dossier | null): void {
+  currentDossier = d;
+}
+
+export function getCurrentDossier(): Dossier | null {
+  return currentDossier;
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -97,6 +126,8 @@ Do not editorialize. Just report what was said.`;
       } else {
         episodeSummary = newSummary;
         console.log(`[summary] Updated episode summary: "${newSummary.substring(0, 120)}..."`);
+        // Piggyback a cross-episode memory query on the summary refresh.
+        refreshMemoryBlock(newSummary).catch(() => { /* already swallowed */ });
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -110,6 +141,40 @@ Do not editorialize. Just report what was said.`;
 }
 
 /**
+ * Fire-and-forget cross-episode memory query. Runs on the summary cadence,
+ * never on the per-utterance hot path. Failures are swallowed.
+ */
+async function refreshMemoryBlock(summary: string): Promise<void> {
+  if (!memoryAvailable) return;
+  const start = Date.now();
+  try {
+    const last2 = recentUtterances.slice(-2).map((u) => u.text).join(' ');
+    const queryStr = `${summary} ${last2}`.trim();
+    if (!queryStr) return;
+
+    const filter = currentDossier ? { guestName: currentDossier.name } : undefined;
+    const results = await queryMemory(queryStr, 5, filter);
+    const latencyMs = Date.now() - start;
+
+    // Empirically tuned: tech podcast embeddings cluster in 0.32-0.54 cosine range.
+    // 0.46 captures meaningful matches without injecting noise.
+    const STRONG_MATCH_THRESHOLD = 0.46;
+    const strongResults = results.filter((r) => r.score > STRONG_MATCH_THRESHOLD);
+    currentMemoryBlock = strongResults.length > 0 ? formatMemoryBlock(strongResults) : '';
+    memoryLastUpdated = Date.now();
+    console.log(`[memory] Query fired (${latencyMs}ms, ${results.length} results${filter ? `, filter guestName=${filter.guestName}` : ''})`);
+    console.log(`[memory] Filtered ${results.length} results to ${strongResults.length} strong matches (>${STRONG_MATCH_THRESHOLD})`);
+    if (strongResults.length > 0) {
+      console.log(`[memory] Top strong match: [Ep ${strongResults[0].episodeNumber}] score=${strongResults[0].score.toFixed(4)}`);
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[memory] Query failed (non-fatal): ${msg}`);
+    // Leave previous block in place so one bad query doesn't wipe context.
+  }
+}
+
+/**
  * Build the full context block for a persona's LLM call.
  */
 export function buildContext(
@@ -119,6 +184,16 @@ export function buildContext(
   const recent = getRecentUtterances();
 
   let context = '';
+
+  // Guest dossier (if loaded)
+  if (currentDossier) {
+    context += `${formatDossierBlock(currentDossier)}\n`;
+  }
+
+  // Cross-episode memory (populated on summary cadence, not per utterance)
+  if (currentMemoryBlock) {
+    context += `${currentMemoryBlock}\n\n`;
+  }
 
   // Episode summary (if available)
   if (episodeSummary) {

@@ -12,8 +12,15 @@ type ReactionCallback = (reaction: TrollReaction) => void;
 let lastProcessedTime = 0;
 let processing = false;
 let rotationIndex = 0;
+let viewerRotationIndex = 0;
 
 const ROTATION: PersonaId[] = ['not-jamie', 'not-delinquent', 'not-cautious', 'not-taco'];
+
+// Viewer comments only rotate through the chaos twins.
+const VIEWER_ROTATION: PersonaId[] = ['not-delinquent', 'not-taco'];
+
+// Viewer comments use a shorter cooldown so chat feels real-time.
+const VIEWER_COOLDOWN_MS = 5000;
 
 // Jason-ism phrases — when the host says these, force Taco next
 const JASON_ISMS = [
@@ -99,6 +106,19 @@ function nextPersona(): PersonaId | null {
 }
 
 /**
+ * Pick the next persona for a viewer comment — round-robin over
+ * [delinquent, taco] only. Skips disabled personas.
+ */
+function nextViewerPersona(): PersonaId | null {
+  for (let i = 0; i < VIEWER_ROTATION.length; i++) {
+    const id = VIEWER_ROTATION[viewerRotationIndex % VIEWER_ROTATION.length];
+    viewerRotationIndex++;
+    if (enabledPersonas.has(id)) return id;
+  }
+  return null;
+}
+
+/**
  * Process a new utterance — one persona per utterance, round-robin.
  */
 export async function processUtterance(
@@ -107,8 +127,10 @@ export async function processUtterance(
 ): Promise<void> {
   const now = Date.now();
   const timeSinceLast = now - lastProcessedTime;
+  const isViewer = utterance.speaker === 'viewer';
+  const activeCooldown = isViewer ? VIEWER_COOLDOWN_MS : appConfig.cooldownMs;
 
-  console.log(`[queue] Received utterance ${utterance.id}: cooldown=${timeSinceLast}ms / ${appConfig.cooldownMs}ms, processing=${processing}`);
+  console.log(`[queue] Received utterance ${utterance.id} (speaker=${utterance.speaker}): cooldown=${timeSinceLast}ms / ${activeCooldown}ms, processing=${processing}`);
 
   // Sponsor suppression gate
   if (Date.now() < sponsorSuppressUntil) {
@@ -117,8 +139,8 @@ export async function processUtterance(
   }
 
   // Cooldown gate
-  if (timeSinceLast < appConfig.cooldownMs) {
-    console.log(`[queue] DROPPED by cooldown gate: ${timeSinceLast}ms < ${appConfig.cooldownMs}ms (${Math.round((appConfig.cooldownMs - timeSinceLast) / 1000)}s remaining)`);
+  if (timeSinceLast < activeCooldown) {
+    console.log(`[queue] DROPPED by cooldown gate: ${timeSinceLast}ms < ${activeCooldown}ms (${Math.round((activeCooldown - timeSinceLast) / 1000)}s remaining)`);
     return;
   }
 
@@ -140,7 +162,12 @@ export async function processUtterance(
   const hasJasonIsm = isHost && JASON_ISMS.some(ism => latestLower.includes(ism));
 
   let personaId: PersonaId | null;
-  if (hasJasonIsm && enabledPersonas.has('not-taco')) {
+  if (isViewer) {
+    personaId = nextViewerPersona();
+    if (personaId) {
+      console.log(`[queue] Viewer comment → ${personaId}`);
+    }
+  } else if (hasJasonIsm && enabledPersonas.has('not-taco')) {
     console.log(`[queue] Jason-ism detected: "${utterance.text.substring(0, 50)}..." → forcing Not Taco`);
     personaId = 'not-taco';
     // Don't advance rotationIndex — resume normal rotation next time
