@@ -112,6 +112,7 @@ app.post('/api/brief/clear', (_req, res) => {
 });
 
 app.get('/api/brief/current', (_req, res) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3002');
   res.json(getCurrentBrief());
 });
 

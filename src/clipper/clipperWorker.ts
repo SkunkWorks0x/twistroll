@@ -17,11 +17,9 @@ import type { PersonaReaction, MomentCandidate, ClipCandidate } from './types.js
 const SCAN_INTERVAL_MS = 30_000;          // Scan every 30s
 const WINDOW_SECONDS = 60;                // Look at last 60s of reactions
 const MIN_REACTIONS_IN_WINDOW = 2;        // Need at least 2 persona reactions
-// Spec says 70, but transcript heuristics LLM strict 200ms budget nearly
-// always times out (network RTT > 200ms), reducing the effective ceiling by
-// 15 points. Lowering to 60 keeps demo-grade sensitivity; raise when the
-// heuristic is swapped for a local model or has a longer timeout.
-const LIVE_SCORE_THRESHOLD = 60;
+// Raised from 60 to 70 after fixing heuristics timeout (was 200ms, now 3000ms).
+// 15% heuristics signal now contributes real points instead of always 0.
+const LIVE_SCORE_THRESHOLD = 70;
 const POST_EPISODE_THRESHOLD = 55;        // Post-episode re-scan threshold
 const EPISODE_END_SILENCE_MS = 5 * 60_000; // 5min of silence = episode end
 

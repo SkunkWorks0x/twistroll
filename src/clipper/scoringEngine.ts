@@ -9,7 +9,7 @@ const ROOT = resolve(__dirname, '..', '..');
 const FEEDBACK_PATH = resolve(ROOT, 'data', 'feedback.json');
 const HOTKEYS_PATH = resolve(ROOT, 'data', 'clipper', 'hotkeys.jsonl');
 
-const HEURISTIC_LLM_TIMEOUT_MS = 200;
+const HEURISTIC_LLM_TIMEOUT_MS = 3000;
 
 // ─── Persona consensus (40 points max) ────────────────────────────────
 function scorePersonaConsensus(reactions: PersonaReaction[]): { score: number; explanation: string } {

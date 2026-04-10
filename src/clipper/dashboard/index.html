@@ -482,6 +482,23 @@ body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
   padding: 2px 6px;
   border: 1px solid var(--stroke);
   border-radius: 4px;
+  opacity: 0.5;
+  cursor: default;
+  user-select: none;
+}
+.preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-align: center;
+  z-index: 2;
+  background: rgba(0,0,0,0.5);
 }
 .btn-copy, .btn-launch, .btn-scrub, .btn-chev {
   border: none;
@@ -729,15 +746,16 @@ body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
   text-shadow: 0 0 6px currentColor;
 }
 .intro-tooltip {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, 180px);
+  position: fixed;
+  bottom: 48px; left: 50%;
+  transform: translateX(-50%);
   font-family: var(--mono);
   font-size: 12px;
   color: var(--cyan);
   opacity: 0;
   transition: opacity 400ms;
   letter-spacing: 0.1em;
+  z-index: 110;
 }
 .intro-tooltip.visible { opacity: 1; }
 
@@ -1347,8 +1365,26 @@ function wireCardEvents() {
     el.querySelectorAll('.dur-pill').forEach(p => {
       p.addEventListener('click', e => {
         e.stopPropagation();
-        state.activeDurations[id] = p.dataset.dur;
+        const dur = p.dataset.dur;
+        state.activeDurations[id] = dur;
         el.querySelectorAll('.dur-pill').forEach(x => x.classList.toggle('active', x === p));
+        // Show placeholder if no video variant exists for this duration
+        const clip = state.clips.find(c => c.id === id);
+        const variantMap = { hook: 'videoHook', shorts: 'videoShorts', extended: 'videoExtended' };
+        const hasVariant = clip && clip[variantMap[dur]];
+        const preview = el.querySelector('.preview');
+        let ph = preview.querySelector('.preview-placeholder');
+        if (!hasVariant) {
+          if (!ph) {
+            ph = document.createElement('div');
+            ph.className = 'preview-placeholder';
+            ph.textContent = 'No source video · clip pending render';
+            preview.appendChild(ph);
+          }
+          ph.style.display = 'flex';
+        } else if (ph) {
+          ph.style.display = 'none';
+        }
       });
     });
     el.addEventListener('dblclick', () => openDrawer(id));
@@ -1787,6 +1823,8 @@ function detonateOrbs(clipsForIntro) {
     orb.style.color = color;
     orb.style.borderColor = color;
     orb.innerHTML = `<div class="orb-score">${clip.score}</div>`;
+    orb.style.cursor = 'pointer';
+    orb.addEventListener('click', (e) => { e.stopPropagation(); closeIntro(); });
     overlay.appendChild(orb);
     // Force reflow then animate to orbital position
     requestAnimationFrame(() => {
