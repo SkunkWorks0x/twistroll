@@ -17,7 +17,7 @@ export async function cloudGenerate(
     personaId === 'not-jamie' &&
     process.env.NOT_JAMIE_ADVISOR_ENABLED === 'true';
 
-  const timeoutMs = useAdvisor ? 10_000 : 5_000;
+  const timeoutMs = useAdvisor ? 30_000 : 5_000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -66,6 +66,10 @@ export async function cloudGenerate(
 
     const data = await res.json();
 
+    if (useAdvisor) {
+      console.log(`[advisor] API response: stop_reason=${data.stop_reason} content_types=${(data.content || []).map((c: any) => c.type).join(',')}`);
+    }
+
     // Log advisor token usage if present
     if (useAdvisor && data.usage) {
       const u = data.usage;
@@ -76,7 +80,11 @@ export async function cloudGenerate(
       }
     }
 
-    const text = data.content?.[0]?.text?.trim();
+    // Advisor responses have multiple content blocks (server_tool_use, advisor_tool_result, text).
+    // Extract the last text block — that's Jamie's final in-character response.
+    const contentBlocks: Array<{ type: string; text?: string }> = data.content ?? [];
+    const textBlock = contentBlocks.filter(b => b.type === 'text' && b.text?.trim()).pop();
+    const text = textBlock?.text?.trim();
     if (!text) throw new Error('Empty response from Cloud API');
 
     return text;
