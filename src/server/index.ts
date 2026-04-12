@@ -327,8 +327,11 @@ async function main() {
       if (matchedAd) {
         const recent = getRecentUtterances().slice(-4);
         const alsoMatched = getLastAlsoMatched();
+        const notAdTimerLabel = `notAd-${utterance.id}`;
+        console.time(notAdTimerLabel);
         generateNotAdOutput(matchedAd, recent, alsoMatched)
           .then((output) => {
+            console.timeEnd(notAdTimerLabel);
             if (!output) return;
 
             // Mode 1 — viewer overlay: identical render path to the four trolls
@@ -360,6 +363,7 @@ async function main() {
             );
           })
           .catch((err) => {
+            console.timeEnd(notAdTimerLabel);
             console.warn(
               `[not-ad] generation error: ${err instanceof Error ? err.message : String(err)}`
             );
