@@ -79,7 +79,8 @@ let sponsorSuppressUntil: number = 0;
 export async function generate(
   model: string,
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  personaId?: string
 ): Promise<{ text: string; engine: LlmEngine }> {
   const mode = appConfig.llmMode;
 
@@ -88,12 +89,12 @@ export async function generate(
   }
 
   if (mode === 'cloud') {
-    return { text: await cloudGenerate(systemPrompt, userMessage), engine: 'cloud' };
+    return { text: await cloudGenerate(systemPrompt, userMessage, personaId), engine: 'cloud' };
   }
 
   // hybrid: cloud → groq → ollama
   try {
-    const text = await cloudGenerate(systemPrompt, userMessage);
+    const text = await cloudGenerate(systemPrompt, userMessage, personaId);
     return { text, engine: 'cloud' };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -226,7 +227,8 @@ export async function processUtterance(
     let { text: response, engine } = await generate(
       persona.model,
       persona.systemPrompt,
-      context
+      context,
+      personaId
     );
 
     // Strip wrapping quotes

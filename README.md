@@ -39,6 +39,7 @@ This is episode-scoped memory, not cross-episode archive. Different approach, re
 - **Sponsor Guardian.** Detects sponsor mentions and instantly fires a sponsor-styled bubble with the promo URL. Bypasses cooldown. 45-second ad break suppression after firing so the personas don't talk over the read. 12 TWiST sponsors pre-loaded.
 - **Jason-ism Detector.** Server-side detection of Jason Calacanis catchphrases. When Jason says one of his signature lines, Not Taco gets forced into the next slot to roast it.
 - **Flat reaction filter.** 30+ regex patterns suppress meta-commentary, "I can't fact-check this" leaks, transcription complaints, and out-of-character outputs before they ever reach the WebSocket.
+- **Advisor escalation (Not Jamie).** Flag-gated (`NOT_JAMIE_ADVISOR_ENABLED`). When Jamie encounters a claim requiring specific facts beyond his confidence threshold, he escalates to Claude Opus via Anthropic's advisor tool for verification, then delivers the correction in-character.
 - **Hybrid LLM with three fallbacks.** Claude Haiku primary, Groq llama-3.3-70b fallback, Ollama qwen2.5:7b last resort. The pipeline never dies.
 - **Server-side truncation.** Hard 200-character ceiling, first-sentence cut, word-boundary aware. Reactions stay tight, bubbles stay legible.
 
