@@ -8,15 +8,15 @@ export interface Sponsor {
 const SPONSORS: Record<string, Sponsor> = {
   plaud: {
     name: 'Plaud',
-    url: 'twist.ly/plaud',
-    copy: 'Try Plaud Notes free \u2192 twist.ly/plaud',
+    url: 'https://plaud.ai/twist',
+    copy: 'Try Plaud Notes free \u2192 plaud.ai/twist',
   },
-  linkedin: {
+  linkedin: { // TODO: verify URL — twist.ly domain is down
     name: 'LinkedIn',
     url: 'twist.ly/linkedin',
     copy: 'Post your first job free \u2192 twist.ly/linkedin',
   },
-  squarespace: {
+  squarespace: { // TODO: verify URL — twist.ly domain is down
     name: 'Squarespace',
     url: 'twist.ly/squarespace',
     code: 'TWIST',
@@ -24,45 +24,45 @@ const SPONSORS: Record<string, Sponsor> = {
   },
   northwest: {
     name: 'Northwest Registered Agent',
-    url: 'twist.ly/northwest',
-    copy: 'Form your LLC \u2192 twist.ly/northwest',
+    url: 'https://northwestregisteredagent.com/twist',
+    copy: 'Form your LLC \u2192 northwestregisteredagent.com/twist',
   },
-  vanta: {
+  vanta: { // TODO: verify URL — twist.ly domain is down
     name: 'Vanta',
     url: 'twist.ly/vanta',
     copy: '$1000 off \u2192 twist.ly/vanta',
   },
   gusto: {
     name: 'Gusto',
-    url: 'twist.ly/gusto',
-    copy: '3 months free \u2192 twist.ly/gusto',
+    url: 'https://gusto.com/twist',
+    copy: '3 months free \u2192 gusto.com/twist',
   },
-  hubspot: {
+  hubspot: { // TODO: verify URL — twist.ly domain is down
     name: 'HubSpot',
     url: 'twist.ly/hubspot',
     copy: 'Free CRM \u2192 twist.ly/hubspot',
   },
-  mercury: {
+  mercury: { // TODO: verify URL — twist.ly domain is down
     name: 'Mercury',
     url: 'twist.ly/mercury',
     copy: 'Banking for startups \u2192 twist.ly/mercury',
   },
-  netsuite: {
+  netsuite: { // TODO: verify URL — twist.ly domain is down
     name: 'NetSuite',
     url: 'twist.ly/netsuite',
     copy: 'Free product tour \u2192 twist.ly/netsuite',
   },
-  gamma: {
+  gamma: { // TODO: verify URL — twist.ly domain is down
     name: 'Gamma',
     url: 'twist.ly/gamma',
     copy: 'Create presentations \u2192 twist.ly/gamma',
   },
-  lemon: {
+  lemon: { // TODO: verify URL — twist.ly domain is down
     name: 'Lemon.io',
     url: 'twist.ly/lemon',
     copy: 'Hire developers \u2192 twist.ly/lemon',
   },
-  circle: {
+  circle: { // TODO: verify URL — twist.ly domain is down
     name: 'Circle',
     url: 'twist.ly/circle',
     copy: 'Community platform \u2192 twist.ly/circle',
