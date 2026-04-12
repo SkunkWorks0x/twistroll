@@ -168,16 +168,25 @@ function cleanVtt(vttPath: string): string {
 }
 
 // ─── Metadata extraction ───────────────────────────────────────────────
-function extractEpisodeNumber(title: string, videoId: string): number {
+function extractEpisodeNumber(title: string, videoId: string, description: string): number {
   const patterns = [/E(\d{2,5})\b/i, /Episode (\d{2,5})/i, /#(\d{2,5})/, /\b(\d{4})\b/];
+  // Try title first
   for (const pat of patterns) {
     const m = title.match(pat);
     if (m) return parseInt(m[1], 10);
   }
-  // Fallback: stable hash of videoId
-  let h = 0;
-  for (const c of videoId) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff;
-  return h;
+  // Fallback: check YouTube description (TWiST descriptions reliably contain E####)
+  for (const pat of patterns) {
+    const m = description.match(pat);
+    if (m) return parseInt(m[1], 10);
+  }
+  // No silent hashing — halt ingestion for this video
+  throw new Error(
+    `[backfill] Cannot extract episode number.\n` +
+    `  title:   "${title}"\n` +
+    `  videoId: ${videoId}\n` +
+    `  Add an episode number to the title or description, or skip this URL.`
+  );
 }
 
 function extractGuestName(title: string): string {
@@ -268,7 +277,7 @@ async function main() {
     try {
       const meta = ytMeta(url);
       r.title = meta.title;
-      r.episodeNumber = extractEpisodeNumber(meta.title, meta.videoId);
+      r.episodeNumber = extractEpisodeNumber(meta.title, meta.videoId, meta.description);
       r.guestName = extractGuestName(meta.title);
       r.date = parseUploadDate(meta.uploadDate);
       console.log(`[backfill]   title:   ${meta.title}`);
