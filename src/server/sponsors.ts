@@ -11,26 +11,26 @@ const SPONSORS: Record<string, Sponsor> = {
     url: 'https://plaud.ai/twist',
     copy: 'Try Plaud Notes free \u2192 plaud.ai/twist',
   },
-  linkedin: { // TODO: verify URL — twist.ly domain is down
+  linkedin: {
     name: 'LinkedIn',
-    url: 'twist.ly/linkedin',
-    copy: 'Post your first job free \u2192 twist.ly/linkedin',
+    url: 'https://linkedin.com/twist',
+    copy: 'Post your first job free \u2192 linkedin.com/twist',
   },
-  squarespace: { // TODO: verify URL — twist.ly domain is down
+  squarespace: {
     name: 'Squarespace',
-    url: 'twist.ly/squarespace',
+    url: 'https://squarespace.com/twist',
     code: 'TWIST',
-    copy: 'Use code TWIST for 10% off \u2192 twist.ly/squarespace',
+    copy: 'Use code TWIST for 10% off \u2192 squarespace.com/twist',
   },
   northwest: {
     name: 'Northwest Registered Agent',
     url: 'https://northwestregisteredagent.com/twist',
     copy: 'Form your LLC \u2192 northwestregisteredagent.com/twist',
   },
-  vanta: { // TODO: verify URL — twist.ly domain is down
+  vanta: {
     name: 'Vanta',
-    url: 'twist.ly/vanta',
-    copy: '$1000 off \u2192 twist.ly/vanta',
+    url: 'https://vanta.com/twist',
+    copy: '$1000 off \u2192 vanta.com/twist',
   },
   gusto: {
     name: 'Gusto',
