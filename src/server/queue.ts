@@ -245,7 +245,9 @@ export async function processUtterance(
       response = (lastSpace > 40 ? truncated.slice(0, lastSpace) : truncated.trimEnd()) + '\u2026';
     }
 
-    // Filter flat non-responses from Not Jamie (and any persona)
+    // Filter flat non-responses from Not Jamie (and any persona).
+    // Categories: trailing/incomplete speech, meta fact-check refusals,
+    // vague/unverifiable classifications, transcription quality complaints.
     const flatResponses = [
       /^that'?s (opinion|vague|prediction)/i,
       /^statement is vague/i,
@@ -272,7 +274,7 @@ export async function processUtterance(
       /can't parse/i,
       /garbled transmission/i,
       /design pattern issue/i,
-      /not a fact to check/i,
+      /not a fact.?check/i,
       /no new claim/i,
       /repeats the previous/i,
       /transcription error/i,
@@ -304,6 +306,13 @@ export async function processUtterance(
       /no specific.*to (check|verify)/i,
       /couldn'?t finish/i,
       /couldn'?t complete/i,
+      // ep 2275 live test — trailing speech, testability refusals
+      /trails mid-sentence/i,
+      /trails off mid-thought/i,
+      /no specific claim/i,
+      /loops without a testable claim/i,
+      /hard to isolate a falsifiable claim/i,
+      /generic principle/i,
     ];
     if (flatResponses.some((pat) => pat.test(response))) {
       console.log(`[queue] ${persona.name} gave flat response, suppressing: "${response}"`);
