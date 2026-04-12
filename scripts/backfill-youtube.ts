@@ -189,19 +189,44 @@ function extractEpisodeNumber(title: string, videoId: string, description: strin
   );
 }
 
-function extractGuestName(title: string): string {
-  const patterns: RegExp[] = [
+// Reject extracted names that are obviously company/firm names, not people
+const FIRM_SUFFIXES = /\b(Fund|Ventures|Capital|Partners|Labs|Inc|Corp|Group|Holdings|Foundation)\s*$/i;
+
+function extractGuestName(title: string, description: string, videoId: string, url: string): string {
+  const titlePatterns: RegExp[] = [
     /with ([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s*:/,
     /with ([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s*[—–-]/,
     /with ([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)(?:\s*,|\s*$)/,
+    /w\/\s*([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/,
     /([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s+on\s/,
     /feat\.?\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/i,
     /ft\.?\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/i,
   ];
-  for (const pat of patterns) {
+  for (const pat of titlePatterns) {
     const m = title.match(pat);
-    if (m) return m[1].trim();
+    if (m && !FIRM_SUFFIXES.test(m[1])) return m[1].trim();
   }
+
+  // Fallback: check description
+  const descPatterns: RegExp[] = [
+    /we welcome ([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/,
+    /joined by (?:.*?\s)?([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/,
+    /we've got ([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/,
+  ];
+  for (const pat of descPatterns) {
+    const m = description.match(pat);
+    if (m && !FIRM_SUFFIXES.test(m[1])) {
+      console.warn(`[backfill] Guest from description (low confidence): "${m[1]}" — verify manually`);
+      return m[1].trim();
+    }
+  }
+
+  console.warn(
+    `[backfill] No guest extractable.\n` +
+    `  title:   "${title}"\n` +
+    `  videoId: ${videoId}\n` +
+    `  url:     ${url}`
+  );
   return '';
 }
 
@@ -278,7 +303,7 @@ async function main() {
       const meta = ytMeta(url);
       r.title = meta.title;
       r.episodeNumber = extractEpisodeNumber(meta.title, meta.videoId, meta.description);
-      r.guestName = extractGuestName(meta.title);
+      r.guestName = extractGuestName(meta.title, meta.description, meta.videoId, url);
       r.date = parseUploadDate(meta.uploadDate);
       console.log(`[backfill]   title:   ${meta.title}`);
       console.log(`[backfill]   ep #:    ${r.episodeNumber}`);
