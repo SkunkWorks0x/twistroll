@@ -12,6 +12,7 @@ import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { checkForSponsor } from './sponsors.js';
 import { SNIPER_CONFIG } from './personas.js';
 import { getRecentUtterances, setCurrentDossier } from './context.js';
+import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import { startAudiencePulseWatcher, appendViewerComment } from './audiencePulse.js';
 import {
@@ -79,6 +80,20 @@ app.post('/api/sniper/toggle', (req, res) => {
   const { enabled } = req.body as { enabled: boolean };
   sniperEnabled = enabled;
   res.json({ ok: true, enabled });
+});
+
+// API: Commit episode — flip provisional chunks to committed
+app.post('/api/commit-episode', async (req, res) => {
+  const { sessionFile } = req.body as { sessionFile: string };
+  if (!sessionFile) return res.status(400).json({ error: 'sessionFile required' });
+  try {
+    const count = await commitEpisode(sessionFile);
+    res.json({ success: true, count });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[commit-episode] Failed: ${msg}`);
+    res.status(500).json({ error: msg });
+  }
 });
 
 // API: Load guest dossier
@@ -444,6 +459,10 @@ function configPanelHTML(): string {
   <h2>Connection</h2>
   <div id="ollama-status" class="status">Checking Ollama...</div>
   <div id="session-status" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
+  <div style="margin-top:8px;">
+    <button id="commit-episode-btn" disabled style="opacity:0.5;">Commit episode to memory</button>
+    <div id="commit-result" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
+  </div>
 </div>
 <div class="card">
   <h2>Personas</h2>
@@ -468,6 +487,7 @@ function configPanelHTML(): string {
 </div>
 <script>
   // Status polling
+  let currentSession=null;
   setInterval(async()=>{
     try{
       const r=await fetch('/api/status');
@@ -476,6 +496,10 @@ function configPanelHTML(): string {
       el.textContent=d.ollama?'Ollama connected':'Ollama not detected';
       el.className=d.ollama?'status':'status down';
       document.getElementById('session-status').textContent=d.session?'Session: '+d.session:'No active session';
+      currentSession=d.session||null;
+      const btn=document.getElementById('commit-episode-btn');
+      btn.disabled=!currentSession;
+      btn.style.opacity=currentSession?'1':'0.5';
     }catch{}
   },3000);
 
@@ -504,6 +528,31 @@ function configPanelHTML(): string {
     navigator.clipboard.writeText('http://localhost:${appConfig.overlayPort}?mode=prod');
     document.getElementById('copy-url').textContent='Copied!';
     setTimeout(()=>document.getElementById('copy-url').textContent='Copy OBS URL',2000);
+  });
+
+  // Commit episode to memory
+  document.getElementById('commit-episode-btn').addEventListener('click',async()=>{
+    if(!currentSession) return;
+    const btn=document.getElementById('commit-episode-btn');
+    const result=document.getElementById('commit-result');
+    btn.disabled=true;
+    btn.textContent='Committing...';
+    try{
+      const r=await fetch('/api/commit-episode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionFile:currentSession})});
+      const d=await r.json();
+      if(d.success){
+        result.textContent='Committed '+d.count+' chunks to memory';
+        result.style.color='#84CC16';
+      }else{
+        result.textContent='Error: '+(d.error||'unknown');
+        result.style.color='#ef4444';
+      }
+    }catch(e){
+      result.textContent='Error: '+e.message;
+      result.style.color='#ef4444';
+    }
+    btn.disabled=false;
+    btn.textContent='Commit episode to memory';
   });
 </script></body></html>`;
 }

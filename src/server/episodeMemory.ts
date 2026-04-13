@@ -14,23 +14,27 @@ export interface EpisodeChunk {
   id: string;
   vector: number[];
   text: string;
-  episodeNumber: number;
+  episodeNumber: number | null;
   episodeDate: string;
   episodeTitle: string;
   guestName: string;
   topicTags: string[];
   startTimestamp: number;
   chunkIndex: number;
+  provisional: boolean;
+  sessionFile: string | null;
 }
 
 export interface IngestMetadata {
-  episodeNumber: number;
+  episodeNumber: number | null;
   episodeDate: string;
   episodeTitle: string;
   guestName: string;
   topicTags: string[];
   transcriptText: string;
   startTimestamp: number;
+  provisional?: boolean;
+  sessionFile?: string | null;
 }
 
 export interface MemoryQueryResult {
@@ -66,6 +70,7 @@ export async function initMemory(): Promise<lancedb.Table> {
 
   // Probe embedding dim so the vector column is correctly sized.
   const probe = await embedText('probe');
+  // sessionFile uses empty string as null sentinel — LanceDB can't infer type from null.
   const seed: EpisodeChunk = {
     id: '__seed__',
     vector: probe,
@@ -77,6 +82,8 @@ export async function initMemory(): Promise<lancedb.Table> {
     topicTags: ['__seed__'],
     startTimestamp: 0,
     chunkIndex: 0,
+    provisional: true,
+    sessionFile: '' as any,
   };
 
   table = await connection.createTable(TABLE_NAME, [seed] as unknown as Record<string, unknown>[], { mode: 'create' });
@@ -135,23 +142,30 @@ export async function ingestEpisode(metadata: IngestMetadata): Promise<number> {
   const chunks = chunkTranscript(metadata.transcriptText);
   if (chunks.length === 0) return 0;
 
-  // Upsert: delete any existing chunks for this episode first.
-  const existing = await tbl
-    .query()
-    .where(`episodeNumber = ${metadata.episodeNumber}`)
-    .limit(100000)
-    .toArray()
-    .catch(() => [] as unknown[]);
-  if (existing.length > 0) {
-    await tbl.delete(`episodeNumber = ${metadata.episodeNumber}`);
-    console.log(`[ingest] Replaced ${existing.length} existing chunks for Ep ${metadata.episodeNumber}`);
+  // Upsert: delete any existing chunks for this episode first (backfill path only).
+  if (metadata.episodeNumber != null) {
+    const existing = await tbl
+      .query()
+      .where(`episodeNumber = ${metadata.episodeNumber}`)
+      .limit(100000)
+      .toArray()
+      .catch(() => [] as unknown[]);
+    if (existing.length > 0) {
+      await tbl.delete(`episodeNumber = ${metadata.episodeNumber}`);
+      console.log(`[ingest] Replaced ${existing.length} existing chunks for Ep ${metadata.episodeNumber}`);
+    }
   }
+
+  const provisional = metadata.provisional ?? true;
+  // Empty string as null sentinel — LanceDB can't store typed nulls without explicit Arrow schema.
+  const sessionFile = metadata.sessionFile || '';
 
   const rows: EpisodeChunk[] = [];
   for (let i = 0; i < chunks.length; i++) {
     const vector = await embedText(chunks[i]);
+    const idPrefix = metadata.episodeNumber != null ? `ep_${metadata.episodeNumber}` : `live_${(sessionFile || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
     rows.push({
-      id: `ep_${metadata.episodeNumber}_chunk_${i}`,
+      id: `${idPrefix}_chunk_${i}`,
       vector,
       text: chunks[i],
       episodeNumber: metadata.episodeNumber,
@@ -161,6 +175,8 @@ export async function ingestEpisode(metadata: IngestMetadata): Promise<number> {
       topicTags: metadata.topicTags,
       startTimestamp: metadata.startTimestamp,
       chunkIndex: i,
+      provisional,
+      sessionFile,
     });
   }
 
@@ -184,16 +200,14 @@ export async function queryMemory(
   // gives us cosine similarity in a clean 0..1 range (higher = better).
   let q = (tbl.search(qVec) as lancedb.VectorQuery).distanceType('dot').limit(topK);
 
-  const clauses: string[] = [];
+  const clauses: string[] = ['provisional = false'];
   if (filter?.guestName) {
     clauses.push(`guestName = '${filter.guestName.replace(/'/g, "''")}'`);
   }
   if (filter?.sinceDate) {
     clauses.push(`episodeDate >= '${filter.sinceDate.replace(/'/g, "''")}'`);
   }
-  if (clauses.length > 0) {
-    q = q.where(clauses.join(' AND '));
-  }
+  q = q.where(clauses.join(' AND '));
 
   const raw = await q.toArray();
   const scored: MemoryQueryResult[] = raw.map((r: any) => ({
@@ -241,6 +255,51 @@ export function findRelevantResults(
     `[memory] ${aboveFloor.length} results above floor, ${cut.length} after gap detection (largest gap=${largestGap.toFixed(4)}, threshold=${gapThreshold.toFixed(4)})`
   );
   return cut;
+}
+
+/**
+ * Flip all provisional chunks for a given session to committed (provisional=false).
+ * Returns the number of chunks flipped.
+ */
+export async function commitEpisode(sessionFile: string): Promise<number> {
+  // TODO: #4 quality filter — strip fabricated callbacks before flipping provisional=false
+  // For now: flip all provisional chunks matching this sessionFile to provisional=false
+  const tbl = await initMemory();
+
+  const rows = await tbl
+    .query()
+    .where(`provisional = true AND sessionFile = '${sessionFile.replace(/'/g, "''")}'`)
+    .limit(1_000_000)
+    .toArray();
+
+  if (rows.length === 0) {
+    console.log(`[memory] commitEpisode: 0 provisional chunks found for session "${sessionFile}"`);
+    return 0;
+  }
+
+  // LanceDB doesn't support UPDATE — read, delete, re-insert with provisional=false.
+  // Arrow proxy objects carry internal fields (vector.isValid) — deep-copy to plain JS.
+  const updated = rows.map((r: any) => ({
+    id: r.id,
+    vector: Array.from(r.vector) as number[],
+    text: r.text,
+    episodeNumber: r.episodeNumber,
+    episodeDate: r.episodeDate,
+    episodeTitle: r.episodeTitle,
+    guestName: r.guestName,
+    topicTags: Array.from(r.topicTags).map((t: any) => String(t)),
+    startTimestamp: r.startTimestamp,
+    chunkIndex: r.chunkIndex,
+    provisional: false,
+    sessionFile: r.sessionFile,
+  }));
+  // Add new rows FIRST — if this fails, originals are still intact.
+  await tbl.add(updated as unknown as Record<string, unknown>[]);
+  const whereClause = `provisional = true AND sessionFile = '${sessionFile.replace(/'/g, "''")}'`;
+  await tbl.delete(whereClause);
+
+  console.log(`[memory] commitEpisode: flipped ${updated.length} chunks to committed for session "${sessionFile}"`);
+  return updated.length;
 }
 
 /**
