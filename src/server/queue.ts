@@ -83,6 +83,19 @@ let consecutiveRobinSkips = 0;
 // Fred's SKIP is signaled by {"sound": "none", "text": "SKIP"} JSON payload.
 let consecutiveFredSkips = 0;
 
+// Per-session Robin headline dedup. Grok paraphrases the same brief headline
+// multiple ways; we fingerprint the first 8 significant words of each Robin
+// broadcast and suppress matches. In-memory only — resets on server restart.
+const firedRobinHeadlines = new Set<string>();
+function robinFingerprint(text: string): string {
+  return text.toLowerCase().replace(/^news:\s*/i, '').split(/\s+/).slice(0, 8).join(' ');
+}
+
+// Fred threshold injected from env (default 9/10 — battle-tested across 5 anti-fabrication rounds).
+// Override with FRED_TRIGGER_THRESHOLD=7 npm run dev for demo recording. Do not lower the default.
+const FRED_TRIGGER_THRESHOLD = process.env.FRED_TRIGGER_THRESHOLD || '9';
+console.log(`[fred] Trigger threshold: ${FRED_TRIGGER_THRESHOLD}/10`);
+
 /**
  * Generate a response using the configured LLM mode.
  * hybrid: cloud → groq → ollama
@@ -243,6 +256,9 @@ export async function processUtterance(
     if (personaId === 'not-robin') {
       systemPrompt = systemPrompt.replace('{{DAILY_BRIEF}}', getDailyBriefBlock());
     }
+    if (personaId === 'not-fred') {
+      systemPrompt = systemPrompt.replace(/\{\{FRED_THRESHOLD\}\}/g, FRED_TRIGGER_THRESHOLD);
+    }
 
     const { text: routerText, provider } = await callLLM(personaId, systemPrompt, context);
     let response = routerText;
@@ -261,9 +277,22 @@ export async function processUtterance(
         return;
       }
       if (isSkip && consecutiveRobinSkips >= 3) {
-        console.log('[queue] Robin forced through after 3 consecutive skips — broadcasting raw SKIP');
+        console.log('[queue] Robin force-through returned SKIP — suppressing bubble, resetting counter');
+        consecutiveRobinSkips = 0;
+        processing = false;
+        return;
       }
       consecutiveRobinSkips = 0;
+
+      // Per-session headline dedup — Grok paraphrases repeat sources.
+      const fp = robinFingerprint(trimmed);
+      if (fp && firedRobinHeadlines.has(fp)) {
+        consecutiveRobinSkips++;
+        console.log(`[queue] Robin headline already fired this session — suppressing (${consecutiveRobinSkips}/3)`);
+        processing = false;
+        return;
+      }
+      if (fp) firedRobinHeadlines.add(fp);
     }
 
     // Fred returns JSON: {"sound": "rimshot", "text": "🔊 RIMSHOT — ..."}.
@@ -296,7 +325,10 @@ export async function processUtterance(
           return;
         }
         if (isSkip && consecutiveFredSkips >= 3) {
-          console.log('[queue] Fred forced through after 3 consecutive skips — broadcasting raw SKIP');
+          console.log('[queue] Fred force-through returned SKIP — suppressing bubble, resetting counter');
+          consecutiveFredSkips = 0;
+          processing = false;
+          return;
         }
         consecutiveFredSkips = 0;
 
