@@ -21,10 +21,6 @@ let viewerRotationIndex = 0;
 // When the rotation lands on it AND a real Not Ad bubble has fired in the
 // recent window, this slot is left empty so the bubble has breathing room.
 // Otherwise the slot is skipped immediately and the next persona fires.
-//
-// Cautious was dropped from the active rotation on April 14 (per 05-personas.md);
-// Robin takes the slot. The PERSONAS['not-cautious'] entry remains so the
-// toggle / config API doesn't break.
 type RotationSlot = PersonaId | 'not-ad';
 const ROTATION: RotationSlot[] = [
   'not-jamie',
@@ -394,7 +390,7 @@ export async function processUtterance(
       /had a stroke/i,
       // Jamie non-reactions
       /no contradiction detected/i,
-      // Cautious/Taco meta-commentary
+      // Taco meta-commentary
       /can't land the dunk/i,
       // Character-breaking meta-commentary about content type
       /can'?t fact.?check/i,

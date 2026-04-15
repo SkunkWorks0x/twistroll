@@ -8,7 +8,7 @@ const SAMPLE_TRANSCRIPT = `
 Jason: Alright, alright, alright — welcome back to This Week in Startups. I'm Jason Calacanis and today we've got Yazin from Sidecast, this insane multi-persona AI sidebar that watches a live podcast and fires off fact-checks and jokes in real time. Yazin, welcome to the show. How you doing, buddy.
 Yazin: Thanks Jason, happy to be here. Big fan of the pod.
 Jason: Okay so let me push back right off the bat — every founder who walks in here tells me they built "the AI sidebar for podcasts." What's different about Sidecast, give me the thirty second pitch.
-Yazin: Sure. So we run four personas in parallel — Not Jamie the fact checker, Not Delinquent the conspiracy guy, Not Cautious the nihilist, and Not Taco the chihuahua comedian. They each get about 800 milliseconds of latency end-to-end from when you finish a sentence.
+Yazin: Sure. So we run five personas in round-robin — Not Jamie the fact checker, Not Delinquent the conspiracy guy, Not Taco the chihuahua comedian, Not Robin the news reader, and Not Fred the sound-effects producer. They each get about 800 milliseconds of latency end-to-end from when you finish a sentence.
 Jason: Eight hundred milliseconds. I gotta be honest, that sounds like marketing — every voice AI company says sub-second latency and then when you actually demo it it's three seconds. What's your P99.
 Yazin: P99 is one point four seconds. We're running a hybrid cloud plus local fallback — Claude on cloud for the hot path, Groq as the first fallback, then Ollama running locally as the safety net. We never go down even if the internet dies mid-show.
 Jason: No seriously, that's actually impressive. What model are you running locally.

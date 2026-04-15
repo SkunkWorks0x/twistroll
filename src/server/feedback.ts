@@ -13,7 +13,6 @@ const MAX_PATTERNS = 10;
 const DEFAULT_FEEDBACK: FeedbackData = {
   'not-jamie': { positive_reactions: [], discovered_patterns: [] },
   'not-delinquent': { positive_reactions: [], discovered_patterns: [] },
-  'not-cautious': { positive_reactions: [], discovered_patterns: [] },
   'not-taco': { positive_reactions: [], discovered_patterns: [] },
 };
 

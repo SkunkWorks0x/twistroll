@@ -27,7 +27,6 @@ import type { LlmProvider, PersonaId } from '../shared/types.js';
 const ROUTING: Record<string, LlmProvider[]> = {
   'not-jamie': ['haiku', 'groq', 'ollama'],
   'not-fred': ['haiku', 'groq', 'ollama'],
-  'not-cautious': ['haiku', 'groq', 'ollama'],
   'not-taco': ['grok', 'haiku', 'groq', 'ollama'],
   'not-robin': ['grok', 'haiku', 'groq', 'ollama'],
   'not-delinquent': ['grok', 'haiku', 'groq', 'ollama'],

@@ -14,7 +14,7 @@
   --amber: #FBBF24;
   --jamie: #2DD4BF;
   --delinquent: #F97316;
-  --cautious: #A78BFA;
+  --wildcard: #B794F4;
   --taco: #84CC16;
   --notad: #B8860B;
   --bg: #000000;
@@ -104,8 +104,8 @@ header.topbar {
   background: transparent;
   transition: background 200ms;
 }
-body.wildcard .wildcard-dial { border-color: var(--cautious); box-shadow: 0 0 14px rgba(167, 139, 250, 0.8); }
-body.wildcard .wildcard-dial::after { background: var(--cautious); }
+body.wildcard .wildcard-dial { border-color: var(--wildcard); box-shadow: 0 0 14px rgba(183, 148, 244, 0.8); }
+body.wildcard .wildcard-dial::after { background: var(--wildcard); }
 .gut-counter {
   font-family: var(--mono);
   font-size: 11px;
@@ -209,8 +209,8 @@ body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
   transform: translateY(-4px);
 }
 .card.wildcard {
-  border-color: var(--cautious);
-  box-shadow: 0 0 24px rgba(167, 139, 250, 0.2);
+  border-color: var(--wildcard);
+  box-shadow: 0 0 24px rgba(183, 148, 244, 0.2);
 }
 .card.new-enter {
   animation: cardEnter 600ms ease-out;
@@ -244,7 +244,6 @@ body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
 }
 .preview.persona-jamie { background: linear-gradient(135deg, var(--jamie) 0%, #000 100%); }
 .preview.persona-delinquent { background: linear-gradient(135deg, var(--delinquent) 0%, #000 100%); }
-.preview.persona-cautious { background: linear-gradient(135deg, var(--cautious) 0%, #000 100%); }
 .preview.persona-taco { background: linear-gradient(135deg, var(--taco) 0%, #000 100%); }
 .preview::before {
   /* Scanline texture */
@@ -322,7 +321,7 @@ body.wildcard .radar-dock .ring { animation-duration: 1.2s; }
   position: absolute;
   bottom: 10px; left: 10px;
   padding: 3px 8px;
-  background: var(--cautious);
+  background: var(--wildcard);
   color: #000;
   font-family: var(--mono);
   font-size: 9px;
@@ -1153,13 +1152,11 @@ document.getElementById('gut-count').textContent = state.gutCount;
 const PERSONA_COLOR = {
   'not-jamie': '#2DD4BF',
   'not-delinquent': '#F97316',
-  'not-cautious': '#A78BFA',
   'not-taco': '#84CC16',
 };
 const PERSONA_SHORT = {
   'not-jamie': 'jamie',
   'not-delinquent': 'delinquent',
-  'not-cautious': 'cautious',
   'not-taco': 'taco',
 };
 
@@ -1245,10 +1242,10 @@ function renderCard(clip, idx) {
   // Waveform dots — 1 per reaction, evenly spaced
   const n = Math.max(1, clip.reactionCount || 1);
   const dots = [];
-  const personas = ['not-jamie', 'not-delinquent', 'not-cautious', 'not-taco'];
+  const personas = ['not-jamie', 'not-delinquent', 'not-taco'];
   for (let i = 0; i < Math.min(n, 8); i++) {
     const pct = ((i + 1) / (n + 1)) * 100;
-    const p = personas[i % 4];
+    const p = personas[i % personas.length];
     dots.push(`<div class="wf-dot" style="left:${pct}%;background:${PERSONA_COLOR[p]};color:${PERSONA_COLOR[p]}"></div>`);
   }
 

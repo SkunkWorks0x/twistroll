@@ -7,7 +7,6 @@
 :root{
   --jamie:#2DD4BF;
   --del:#F97316;
-  --caut:#A78BFA;
   --taco:#84CC16;
   --robin:#F472B6;
   --fred:#EF4444;
@@ -115,14 +114,12 @@ body{
 /* === VOICES — name color + --persona-color for wave tinting === */
 .persona.jamie      {--persona-color:var(--jamie)}
 .persona.delinquent {--persona-color:var(--del)}
-.persona.cautious   {--persona-color:var(--caut)}
 .persona.taco       {--persona-color:var(--taco)}
 .persona.robin      {--persona-color:var(--robin)}
 .persona.fred       {--persona-color:var(--fred)}
 .persona.notad      {--persona-color:var(--notad)}
 .persona.jamie .p-name{color:var(--jamie)}
 .persona.delinquent .p-name{color:var(--del)}
-.persona.cautious .p-name{color:var(--caut)}
 .persona.taco .p-name{color:var(--taco)}
 .persona.robin .p-name{color:var(--robin)}
 .persona.fred .p-name{color:var(--fred)}
@@ -261,19 +258,6 @@ body.prod .status{display:none}
     </div>
   </div>
 
-  <!-- Cautious -->
-  <div class="persona cautious" id="panel-cautious">
-    <div class="bubble">
-      <div class="persona-avatar">
-        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><path d="M10 17 Q14 14, 18 17" stroke="#A78BFA" stroke-width="1.5" fill="none"/><path d="M22 17 Q26 14, 30 17" stroke="#A78BFA" stroke-width="1.5" fill="none"/><circle cx="14" cy="18" r="1.5" fill="#A78BFA" opacity="0.7"/><circle cx="26" cy="18" r="1.5" fill="#A78BFA" opacity="0.7"/><path d="M15 27 Q20 25, 25 27" stroke="#A78BFA" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
-      </div>
-      <div class="persona-info">
-        <span class="p-name">Not Cautious</span>
-        <div class="reaction-text" id="text-cautious"></div>
-      </div>
-    </div>
-  </div>
-
   <!-- Taco -->
   <div class="persona taco" id="panel-taco">
     <div class="bubble">
@@ -354,15 +338,15 @@ body.prod .status{display:none}
   var P=new URLSearchParams(location.search);
   if(P.get('mode')==='prod')document.body.classList.add('prod');
   var isDemo=P.get('demo')==='true';
-  var IDS=['jamie','delinquent','cautious','taco','robin','fred','notad','sniper'];
-  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco','not-robin':'robin','not-fred':'fred','not-ad':'notad',
-           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco',robin:'robin',fred:'fred',notad:'notad'};
+  var IDS=['jamie','delinquent','taco','robin','fred','notad','sniper'];
+  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-taco':'taco','not-robin':'robin','not-fred':'fred','not-ad':'notad',
+           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',taco:'taco',robin:'robin',fred:'fred',notad:'notad'};
 
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;
 
   // Wave helper — find the sine-wave element inside a persona panel.
-  // Returns null for panels that don't have a wave (Cautious, Not Ad, Sniper).
+  // Returns null for panels that don't have a wave (Not Ad, Sniper).
   function waveIn(panel){return panel?panel.querySelector('.sine-wave'):null}
 
   function showReaction(id,txt){
@@ -524,10 +508,6 @@ body.prod .status{display:none}
       'Every meeting note is a PROPHECY.',
       'They call it productivity. I call it SURVEILLANCE.',
       'This changes EVERYTHING.'],
-    cautious:['Won\'t exist in 3 years.',
-      'Another one for the graveyard.',
-      'Hype cycle is a circle.',
-      'Every 2021 tool is a 404 now.'],
     taco:['Your meetings needed a $1.5B breakfast.',
       'Proof meetings could\'ve been emails.',
       'VCs paying more for notes than the meeting.',
@@ -535,13 +515,13 @@ body.prod .status{display:none}
   };
   function demo(){
     rc(false);
-    var di={jamie:0,delinquent:0,cautious:0,taco:0},cy=0;
+    var di={jamie:0,delinquent:0,taco:0},cy=0;
     // Show one at a time — each bubble pops, stays 8s, vanishes
     setTimeout(function(){
       showReaction(IDS[0],DM[IDS[0]][0]);di[IDS[0]]=1;
       setTimeout(function(){setInterval(function(){
         cy++;
-        var id=IDS[cy%4],idx=di[id]%DM[id].length;
+        var id=IDS[cy%3],idx=di[id]%DM[id].length;
         showReaction(id,DM[id][idx]);di[id]=idx+1;
       },5000)},5000);
     },1500);

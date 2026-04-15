@@ -529,7 +529,6 @@ function configPanelHTML(): string {
   <h2>Personas</h2>
   <label><input type="checkbox" checked data-persona="not-jamie"> Not Jamie (Fact-checker)</label>
   <label><input type="checkbox" checked data-persona="not-delinquent"> Not Delinquent (Chaotic)</label>
-  <label><input type="checkbox" checked data-persona="not-cautious"> Not Cautious (Cynical)</label>
   <label><input type="checkbox" checked data-persona="not-taco"> Not Taco (Comedy)</label>
 </div>
 <div class="card">
