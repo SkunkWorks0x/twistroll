@@ -1,6 +1,6 @@
 import type { ParsedUtterance, PersonaId } from '../shared/types.js';
 import { appConfig } from '../config/config.js';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, promises as fsp } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import type { Dossier } from './dossier.js';
@@ -52,6 +52,47 @@ let factcheckKB = '';
 const kbPath = resolve(__dirname, 'kb', 'factcheck.md');
 if (existsSync(kbPath)) {
   factcheckKB = readFileSync(kbPath, 'utf-8');
+}
+
+// ───── Daily brief (Not Robin) ─────
+// Loaded from data/daily_brief.json at startup, refreshed every 60s.
+// Exposed via getDailyBriefBlock() so queue.ts can substitute {{DAILY_BRIEF}}
+// in Robin's system prompt before calling the LLM.
+const DAILY_BRIEF_PATH = resolve(__dirname, '..', '..', 'data', 'daily_brief.json');
+const DAILY_BRIEF_FALLBACK = 'No daily brief loaded. Use your training knowledge only.';
+let dailyBriefBlock = DAILY_BRIEF_FALLBACK;
+
+interface DailyBrief {
+  headlines?: string[];
+  updated?: string;
+}
+
+async function loadDailyBrief(): Promise<void> {
+  try {
+    const raw = await fsp.readFile(DAILY_BRIEF_PATH, 'utf-8');
+    const parsed = JSON.parse(raw) as DailyBrief;
+    const headlines = Array.isArray(parsed.headlines) ? parsed.headlines : [];
+    if (headlines.length === 0) {
+      dailyBriefBlock = DAILY_BRIEF_FALLBACK;
+      return;
+    }
+    dailyBriefBlock = headlines.map((h, i) => `${i + 1}. ${h}`).join('\n');
+    console.log(`[brief] Loaded ${headlines.length} headlines (updated ${parsed.updated ?? 'unknown'})`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[brief] Load failed: ${msg} — using fallback`);
+    dailyBriefBlock = DAILY_BRIEF_FALLBACK;
+  }
+}
+
+// Initial load + 60s refresh (simple setInterval per spec — not chokidar)
+loadDailyBrief();
+setInterval(() => {
+  loadDailyBrief().catch(() => { /* already swallowed inside */ });
+}, 60_000);
+
+export function getDailyBriefBlock(): string {
+  return dailyBriefBlock;
 }
 
 export function addUtterance(utterance: ParsedUtterance): void {

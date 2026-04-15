@@ -14,7 +14,7 @@ export interface OpenOatsUtterance {
 
 // ─── Internal Types ───
 
-export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-cautious' | 'not-taco';
+export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-cautious' | 'not-taco' | 'not-robin';
 export type AgentId = PersonaId | 'sniper';
 
 export interface ParsedUtterance {
@@ -57,7 +57,8 @@ export interface FeedbackData {
 }
 
 export type LlmMode = 'local' | 'cloud' | 'hybrid';
-export type LlmEngine = 'cloud' | 'groq' | 'ollama';
+export type LlmEngine = 'cloud' | 'groq' | 'ollama' | 'haiku' | 'grok';
+export type LlmProvider = 'haiku' | 'grok' | 'groq' | 'ollama';
 
 export interface AppConfig {
   transcriptDir: string;

@@ -9,6 +9,7 @@
   --del:#F97316;
   --caut:#A78BFA;
   --taco:#84CC16;
+  --robin:#F472B6;
   --notad:#B8860B;
   --tw:#FF4D00;
 }
@@ -110,11 +111,12 @@ body{
   will-change:opacity;transition:opacity 180ms ease;
 }
 
-/* === FOUR VOICES — name color only === */
+/* === VOICES — name color only === */
 .persona.jamie .p-name{color:var(--jamie)}
 .persona.delinquent .p-name{color:var(--del)}
 .persona.cautious .p-name{color:var(--caut)}
 .persona.taco .p-name{color:var(--taco)}
+.persona.robin .p-name{color:var(--robin)}
 .persona.notad .p-name{color:var(--notad)}
 
 /* === ANIMATIONS — transform + opacity only, OBS safe === */
@@ -234,6 +236,19 @@ body.prod .status{display:none}
     </div>
   </div>
 
+  <!-- Robin — news update persona. Placeholder "R" avatar; real SVG lands in Commit 4. -->
+  <div class="persona robin" id="panel-robin">
+    <div class="bubble">
+      <div class="persona-avatar">
+        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" fill="#F472B6"/><text x="20" y="27" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">R</text></svg>
+      </div>
+      <div class="persona-info">
+        <span class="p-name">Not Robin</span>
+        <div class="reaction-text" id="text-robin"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Not Ad — daily-brief contextual sponsor reads -->
   <div class="persona notad" id="panel-notad">
     <div class="bubble">
@@ -272,9 +287,9 @@ body.prod .status{display:none}
   var P=new URLSearchParams(location.search);
   if(P.get('mode')==='prod')document.body.classList.add('prod');
   var isDemo=P.get('demo')==='true';
-  var IDS=['jamie','delinquent','cautious','taco','notad','sniper'];
-  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco','not-ad':'notad',
-           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco',notad:'notad'};
+  var IDS=['jamie','delinquent','cautious','taco','robin','notad','sniper'];
+  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco','not-robin':'robin','not-ad':'notad',
+           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco',robin:'robin',notad:'notad'};
 
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;

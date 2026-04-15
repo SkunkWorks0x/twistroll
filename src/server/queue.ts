@@ -1,10 +1,11 @@
 import type { ParsedUtterance, PersonaId, TrollReaction, LlmEngine } from '../shared/types.js';
 import { appConfig } from '../config/config.js';
 import { PERSONAS } from './personas.js';
-import { buildContext, addUtterance } from './context.js';
+import { buildContext, addUtterance, getDailyBriefBlock } from './context.js';
 import { callOllama, isOllamaAvailable } from './ollama.js';
 import { cloudGenerate } from './cloud-llm.js';
 import { groqGenerate } from './groq-llm.js';
+import { callLLM } from './llm-router.js';
 import { logReaction } from './logger.js';
 
 type ReactionCallback = (reaction: TrollReaction) => void;
@@ -14,16 +15,20 @@ let processing = false;
 let rotationIndex = 0;
 let viewerRotationIndex = 0;
 
-// Slot 5 ('not-ad') is a visual-pacing yield, not a generated persona.
+// Slot 'not-ad' is a visual-pacing yield, not a generated persona.
 // When the rotation lands on it AND a real Not Ad bubble has fired in the
 // recent window, this slot is left empty so the bubble has breathing room.
 // Otherwise the slot is skipped immediately and the next persona fires.
+//
+// Cautious was dropped from the active rotation on April 14 (per 05-personas.md);
+// Robin takes the slot. The PERSONAS['not-cautious'] entry remains so the
+// toggle / config API doesn't break.
 type RotationSlot = PersonaId | 'not-ad';
 const ROTATION: RotationSlot[] = [
   'not-jamie',
   'not-delinquent',
-  'not-cautious',
   'not-taco',
+  'not-robin',
   'not-ad',
 ];
 const NOT_AD_PACE_WINDOW_MS = 30_000;
@@ -69,6 +74,11 @@ const enabledPersonas = new Set<PersonaId>(
 
 // Sponsor suppression — suppress troll reactions during ad reads
 let sponsorSuppressUntil: number = 0;
+
+// Robin consecutive-skip counter. If Robin says SKIP 3 times in a row, the
+// 4th rotation forces her output through regardless of content — keeps the
+// bubble visually alive even when no news angle exists for a stretch.
+let consecutiveRobinSkips = 0;
 
 /**
  * Generate a response using the configured LLM mode.
@@ -224,12 +234,42 @@ export async function processUtterance(
   try {
     const context = buildContext(personaId, utterance);
 
-    let { text: response, engine } = await generate(
-      persona.model,
-      persona.systemPrompt,
-      context,
-      personaId
-    );
+    // Robin gets her system prompt's {{DAILY_BRIEF}} placeholder substituted
+    // with the currently-loaded brief headlines before the LLM call.
+    let systemPrompt = persona.systemPrompt;
+    if (personaId === 'not-robin') {
+      systemPrompt = systemPrompt.replace('{{DAILY_BRIEF}}', getDailyBriefBlock());
+    }
+
+    const { text: routerText, provider } = await callLLM(personaId, systemPrompt, context);
+    let response = routerText;
+    const engine: string = provider;
+
+    // Robin SKIP handling. Trim + case-insensitive match on literal "SKIP".
+    // Count consecutive skips; on the 4th Robin rotation (3 skips, then a
+    // 4th call) force the output through even if she says SKIP again.
+    if (personaId === 'not-robin') {
+      const trimmed = response.trim();
+      const isSkip = trimmed.toUpperCase() === 'SKIP';
+      if (isSkip && consecutiveRobinSkips < 3) {
+        consecutiveRobinSkips++;
+        console.log(`[queue] Robin skipped — no news angle for this utterance (${consecutiveRobinSkips}/3)`);
+        processing = false;
+        return;
+      }
+      if (isSkip && consecutiveRobinSkips >= 3) {
+        console.log('[queue] Robin forced through after 3 consecutive skips — broadcasting raw SKIP');
+      }
+      consecutiveRobinSkips = 0;
+    }
+
+    // Empty response from router (all providers exhausted). Bail silently
+    // rather than broadcasting an empty bubble.
+    if (!response.trim()) {
+      console.warn(`[queue] ${persona.name} returned empty — all providers exhausted, skipping broadcast`);
+      processing = false;
+      return;
+    }
 
     // Strip wrapping quotes
     response = response.replace(/^["'"]+|["'"]+$/g, '');
