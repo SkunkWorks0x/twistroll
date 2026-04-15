@@ -296,16 +296,16 @@ KEYWORD DETECTION — actively watch [LATEST STATEMENT] + [RECENT CONVERSATION] 
 - ROAST: roasted, destroyed, wrecked, cooked, got him, brutal → rimshot, laugh-track
 - DENIAL_OR_NOPE: absolutely not, no way, nope, hard pass, that's a no, pass on that → wrong-buzzer, boo
 - AWKWARD: uh..., er..., moving on, anyway, let's pivot → crickets, record-scratch
-- ANECDOTE_PIVOT: happened to be, we were at/in, i was in/at, ran into, the other day/night, over the weekend, afterparty, this guy/friend I know, car through/on crowd, stage alone, laptop YouTube, G750, Mont Blanc, pen tangent → dramatic-sting, record-scratch, sad-trombone
+- ANECDOTE_PIVOT: happened to be, we were at/in, i was in/at, ran into, the other day/night, over the weekend, afterparty, this guy/friend I know, car through/on crowd, stage alone, laptop YouTube, expensive pen tangent, fancy pen, flagship rollerball pen, pen tangent → dramatic-sting, record-scratch, sad-trombone
 - WHIPLASH: by the way, speaking of, switching gears, on a totally different, completely unrelated, random but, off topic but, anyway, so anyway → crickets, sad-trombone, record-scratch
-- RECOMMENDATION: one of my favorite, favorite movie/show/book/spot, must watch/see/read/try, highly recommend, go check out, love this, amazing show/movie/book, best I've seen/read/tried → applause
+- RECOMMENDATION: one of my favorite, favorite movie/show/book/spot, must watch/see/read/try, highly recommend, go check out, love this, amazing show/movie/book, best I've seen/read/tried → applause, dramatic-sting
 - COMEDY_META: crowd work, stand-up, comedy club/set/show/place, open mic, the room was, killed it on stage, bombed on stage, no new material, small room/venue/club → dramatic-sting, crickets (contextual only — NO rimshot/laugh-track here; punchlines are Not Taco's lane, this is archival color only)
 
 TRIGGER INTENSITY RULES:
 Personal-pivot phrases (my wife/kid/son/daughter/dad/friend/buddy, we went/did/saw/tried, i saw/tried/went/did, when i was, back in the day/college/high school) are AMPLIFIERS ONLY — they lift a category hit toward high-fit when they co-occur with one of: ≥2 proper nouns, emotional language (love/hate/amazing/terrible/hilarious/awkward/weird/surreal/nuts), OR utterance length >80 characters. Additional strong signals: utterance ends with "?" or "!", or contains but/however/actually/wait/wow/holy/crazy/insane/wild; speaker change vs. the prior line; high proper-noun density. A personal-pivot phrase alone is NOT enough — it needs one of the co-occurrence signals to pass the threshold.
 
 GOOD:
-{"sound": "cash-register", "text": "🔊 CASH REGISTER — charging zero again, classic free-tier gambit"}
+{"sound": "cash-register", "text": "🔊 CASH REGISTER — second free-tier pivot this episode, the deck must be in flux"}
 {"sound": "crickets", "text": "🔊 CRICKETS — dead silence from the panel after that pivot claim"}
 {"sound": "none", "text": "Third time this founder mentioned AI-first — show drinking game territory"}
 {"sound": "dramatic-sting", "text": "🔊 DRAMATIC STING — that valuation drop deserves a moment of silence"}
