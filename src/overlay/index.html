@@ -366,8 +366,12 @@ body.prod .status{display:none}
 
 <script>
 (function(){
-  var WS='ws://localhost:3001',RB=1e3,RM=15e3;
-  var ws,ra=0,lr=null;
+  // WS endpoint + reconnect params. Production-grade:
+  //   RB = base delay (1s), RM = max cap (30s), MULT = expo multiplier (2x),
+  //   JITTER = ±30% randomization to avoid thundering herd on mass reconnect,
+  //   KEEPALIVE_MS = force-reconnect after this window of silence from server.
+  var WS='ws://localhost:3001',RB=1e3,RM=30e3,MULT=2,JITTER=0.3,KEEPALIVE_MS=45e3;
+  var ws,ra=0,lr=null,lastMsgMs=Date.now(),keepaliveTimer=null;
   var P=new URLSearchParams(location.search);
   if(P.get('mode')==='prod')document.body.classList.add('prod');
   var isDemo=P.get('demo')==='true';
@@ -493,13 +497,53 @@ body.prod .status{display:none}
 
   function conn(){
     if(ws&&(ws.readyState<2))return;
-    try{ws=new WebSocket(WS)}catch(e){sr();return}
-    ws.onopen=function(){ra=0;rc(false)};
-    ws.onmessage=function(e){try{hm(JSON.parse(e.data))}catch(x){}};
-    ws.onclose=function(){rc(true);sr()};
-    ws.onerror=function(){};
+    try{ws=new WebSocket(WS)}catch(e){console.warn('[ws] ctor threw, scheduling reconnect');sr();return}
+    ws.onopen=function(){
+      if(ra>0)console.log('[ws] reconnected after '+ra+' attempt'+(ra===1?'':'s'));
+      ra=0;rc(false);
+      lastMsgMs=Date.now();
+      startKeepalive();
+    };
+    ws.onmessage=function(e){
+      lastMsgMs=Date.now();
+      try{hm(JSON.parse(e.data))}catch(x){}
+    };
+    ws.onclose=function(ev){
+      console.warn('[ws] closed (code='+(ev&&ev.code)+' clean='+(ev&&ev.wasClean)+'), will reconnect');
+      stopKeepalive();
+      rc(true);
+      sr();
+    };
+    ws.onerror=function(){console.warn('[ws] error event fired')};
   }
-  function sr(){var d=Math.min(RB*Math.pow(1.5,ra),RM);ra++;setTimeout(conn,d)}
+
+  // Exponential backoff with jitter. delay = clamp(RB * MULT^ra, 0, RM)
+  // then multiplied by (1 ± JITTER) uniform. On mass-disconnect scenarios
+  // (server restart), this prevents every overlay from reconnecting on the
+  // exact same tick.
+  function sr(){
+    var base=Math.min(RB*Math.pow(MULT,ra),RM);
+    var jitter=1+(Math.random()*2-1)*JITTER;
+    var d=Math.round(base*jitter);
+    ra++;
+    console.warn('[ws] reconnect scheduled in '+d+'ms (attempt #'+ra+')');
+    setTimeout(conn,d);
+  }
+
+  // Keepalive watchdog — if the socket has gone silent for KEEPALIVE_MS,
+  // assume the TCP connection is dead-but-open (common when OBS sleeps or
+  // when network changes mid-session) and force a reconnect. The existing
+  // ws.onclose handler will pick it up via sr().
+  function startKeepalive(){
+    stopKeepalive();
+    keepaliveTimer=setInterval(function(){
+      if(Date.now()-lastMsgMs>KEEPALIVE_MS){
+        console.warn('[ws] keepalive timeout ('+Math.round((Date.now()-lastMsgMs)/1e3)+'s silence), forcing reconnect');
+        try{if(ws)ws.close(4000,'keepalive-timeout')}catch(e){}
+      }
+    },15e3);
+  }
+  function stopKeepalive(){if(keepaliveTimer){clearInterval(keepaliveTimer);keepaliveTimer=null}}
   function rc(s){var e=document.getElementById('recon');if(e){if(s)e.classList.add('show');else e.classList.remove('show')}}
   function showSponsor(copy){
     var sb=document.getElementById('sponsor-bubble'),st=document.getElementById('sponsor-text');
