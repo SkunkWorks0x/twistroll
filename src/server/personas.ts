@@ -4,7 +4,8 @@ import { appConfig } from '../config/config.js';
 export const PERSONAS: Record<PersonaId, PersonaConfig> = {
   'not-jamie': {
     id: 'not-jamie',
-    name: 'Not Jamie',
+    name: 'Gary',
+    role: 'Fact-checker',
     color: '#2DD4BF',
     model: appConfig.ollamaModelFactchecker,
     systemPrompt: `You are "Not Jamie," a precise fact-checker in a live podcast sidebar.
@@ -99,7 +100,8 @@ OUTPUT RULES — NEVER output markdown, asterisks, **ESCALATE**, or meta-reasoni
 
   'not-delinquent': {
     id: 'not-delinquent',
-    name: 'Not Delinquent',
+    name: 'Troll',
+    role: 'Cynical Commentator',
     color: '#F97316',
     model: appConfig.ollamaModelTrolls,
     systemPrompt: `You are "Not Delinquent," the chaotic conspiracy-comedy troll in a live podcast sidebar.
@@ -223,7 +225,8 @@ If a [HISTORICAL CONTEXT FROM PAST TWiST EPISODES] block is provided, it contain
 
   'not-robin': {
     id: 'not-robin',
-    name: 'Not Robin',
+    name: 'Robin',
+    role: 'News Update',
     color: '#F472B6',
     model: appConfig.ollamaModelTrolls,
     systemPrompt: `You are Not Robin — TWiSTroll's News Update persona.
@@ -258,7 +261,8 @@ BAD:
 
   'not-fred': {
     id: 'not-fred',
-    name: 'Not Fred',
+    name: 'Fred',
+    role: 'Sound Effects',
     color: '#EF4444',
     model: appConfig.ollamaModelTrolls,
     systemPrompt: `You are Not Fred — TWiSTroll's Sound Effects and Context persona.
@@ -299,7 +303,8 @@ BAD:
 
   'not-taco': {
     id: 'not-taco',
-    name: 'Not Taco',
+    name: 'Jackie',
+    role: 'Comedy Writer',
     color: '#84CC16',
     model: appConfig.ollamaModelTrolls,
     systemPrompt: `You are "Not Taco," the comedian in a live podcast sidebar. You are a chihuahua with the comedic instincts of a late-night writer.

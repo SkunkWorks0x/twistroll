@@ -99,8 +99,16 @@ body{
 .p-name{
   font-size:13px;font-weight:700;letter-spacing:-0.3px;
   text-transform:uppercase;
-  margin-bottom:3px;display:block;
+  margin-bottom:1px;display:block;
   text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,0 0 4px rgba(0,0,0,0.9);
+}
+
+/* === PERSONA ROLE (subtitle under name) === */
+.p-role{
+  font-size:10px;font-weight:500;letter-spacing:0.6px;
+  text-transform:uppercase;color:#F1F5F9;opacity:0.65;
+  margin-bottom:6px;display:block;
+  text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,0 0 3px rgba(0,0,0,0.9);
 }
 
 /* === REACTION TEXT === */
@@ -237,7 +245,8 @@ body.prod .status{display:none}
         <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="14" cy="17" r="5" stroke="#2DD4BF" stroke-width="1.5" fill="none"/><circle cx="26" cy="17" r="5" stroke="#2DD4BF" stroke-width="1.5" fill="none"/><line x1="19" y1="17" x2="21" y2="17" stroke="#2DD4BF" stroke-width="1.5"/><circle cx="14" cy="17" r="1.5" fill="#2DD4BF"/><circle cx="26" cy="17" r="1.5" fill="#2DD4BF"/><line x1="15" y1="27" x2="25" y2="27" stroke="#2DD4BF" stroke-width="1.5" stroke-linecap="round"/><path d="M10 12 Q15 4, 20 8 Q25 4, 30 12" stroke="#2DD4BF" stroke-width="1.5" fill="none"/></svg>
       </div>
       <div class="persona-info">
-        <span class="p-name">Not Jamie</span>
+        <span class="p-name">Gary</span>
+        <span class="p-role">Fact-checker</span>
         <div class="reaction-text" id="text-jamie"></div>
         <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
@@ -251,7 +260,8 @@ body.prod .status{display:none}
         <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="14" cy="18" r="3" stroke="#F97316" stroke-width="1.5" fill="none"/><circle cx="26" cy="18" r="3" stroke="#F97316" stroke-width="1.5" fill="none"/><circle cx="14" cy="18" r="1.5" fill="#F97316"/><circle cx="26" cy="18" r="1.5" fill="#F97316"/><ellipse cx="20" cy="28" rx="4" ry="3" stroke="#F97316" stroke-width="1.5" fill="none"/><path d="M12 8 Q14 2, 16 7 Q18 1, 20 6 Q22 0, 24 7 Q26 2, 28 8" stroke="#F97316" stroke-width="2" fill="none"/></svg>
       </div>
       <div class="persona-info">
-        <span class="p-name">Not Delinquent</span>
+        <span class="p-name">Troll</span>
+        <span class="p-role">Cynical Commentator</span>
         <div class="reaction-text" id="text-delinquent"></div>
         <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
@@ -265,7 +275,8 @@ body.prod .status{display:none}
         <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><path d="M9 14 L6 4 L14 11" stroke="#84CC16" stroke-width="1.5" fill="none"/><path d="M31 14 L34 4 L26 11" stroke="#84CC16" stroke-width="1.5" fill="none"/><circle cx="14" cy="18" r="3" fill="#84CC16" opacity="0.3"/><circle cx="26" cy="18" r="3" fill="#84CC16" opacity="0.3"/><circle cx="14" cy="18" r="1.5" fill="#84CC16"/><circle cx="26" cy="18" r="1.5" fill="#84CC16"/><ellipse cx="20" cy="23" rx="2" ry="1.5" fill="#84CC16" opacity="0.5"/><path d="M15 27 Q20 31, 25 27" stroke="#84CC16" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
       </div>
       <div class="persona-info">
-        <span class="p-name">Not Taco</span>
+        <span class="p-name">Jackie</span>
+        <span class="p-role">Comedy Writer</span>
         <div class="reaction-text" id="text-taco"></div>
         <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
@@ -279,7 +290,8 @@ body.prod .status{display:none}
         <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" fill="#F472B6"/><text x="20" y="27" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">R</text></svg>
       </div>
       <div class="persona-info">
-        <span class="p-name">Not Robin</span>
+        <span class="p-name">Robin</span>
+        <span class="p-role">News Update</span>
         <div class="reaction-text" id="text-robin"></div>
         <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
@@ -293,7 +305,8 @@ body.prod .status{display:none}
         <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" fill="#EF4444"/><text x="20" y="27" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">F</text></svg>
       </div>
       <div class="persona-info">
-        <span class="p-name">Not Fred</span>
+        <span class="p-name">Fred</span>
+        <span class="p-role">Sound Effects</span>
         <div class="reaction-text" id="text-fred"></div>
         <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>

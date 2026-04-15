@@ -527,9 +527,9 @@ function configPanelHTML(): string {
 </div>
 <div class="card">
   <h2>Personas</h2>
-  <label><input type="checkbox" checked data-persona="not-jamie"> Not Jamie (Fact-checker)</label>
-  <label><input type="checkbox" checked data-persona="not-delinquent"> Not Delinquent (Chaotic)</label>
-  <label><input type="checkbox" checked data-persona="not-taco"> Not Taco (Comedy)</label>
+  <label><input type="checkbox" checked data-persona="not-jamie"> Gary (Fact-checker)</label>
+  <label><input type="checkbox" checked data-persona="not-delinquent"> Troll (Cynical Commentator)</label>
+  <label><input type="checkbox" checked data-persona="not-taco"> Jackie (Comedy Writer)</label>
 </div>
 <div class="card">
   <h2>Question Sniper</h2>

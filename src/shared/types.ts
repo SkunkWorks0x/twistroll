@@ -66,6 +66,7 @@ export type WSMessage =
 export interface PersonaConfig {
   id: PersonaId;
   name: string;
+  role: string;
   color: string;
   systemPrompt: string;
   model: string;
