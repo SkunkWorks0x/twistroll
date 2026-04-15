@@ -19,7 +19,7 @@ export const appConfig: AppConfig = {
   ollamaModelTrolls: process.env.OLLAMA_MODEL_TROLLS || 'qwen2.5:7b',
   wsPort: parseInt(process.env.WS_PORT || '3001', 10),
   overlayPort: parseInt(process.env.OVERLAY_PORT || '3000', 10),
-  cooldownMs: parseInt(process.env.COOLDOWN_MS || '15000', 10),
+  cooldownMs: parseInt(process.env.COOLDOWN_MS || '18000', 10),
   contextBufferSize: parseInt(process.env.CONTEXT_BUFFER_SIZE || '8', 10),
   llmMode: (process.env.LLM_MODE as LlmMode) || 'hybrid',
   cloudModel: process.env.CLOUD_MODEL || 'claude-haiku-4-5-20251001',
