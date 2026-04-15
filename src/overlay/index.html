@@ -216,6 +216,28 @@ body{
 }
 .status span{font-size:6px;font-weight:500;color:rgba(255,255,255,0.5)}
 body.prod .status{display:none}
+
+/* === AUDIO UNLOCK PROMPT === */
+#audio-unlock-prompt{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.85);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;z-index:9999;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+}
+.unlock-content{
+  text-align:center;color:#F1F5F9;
+  font-family:'Inter','system-ui',sans-serif;
+  padding:32px 40px;
+  border:2px solid var(--tw);
+  border-radius:16px;
+  background:rgba(30,30,34,0.95);
+  transition:background 150ms ease;
+}
+#audio-unlock-prompt:hover .unlock-content{background:rgba(40,40,44,0.95)}
+.unlock-icon{font-size:48px;margin-bottom:12px;line-height:1}
+.unlock-text{font-size:18px;font-weight:600;margin-bottom:6px}
+.unlock-subtext{font-size:12px;opacity:0.6}
 </style>
 </head>
 <body>
@@ -298,11 +320,11 @@ body.prod .status{display:none}
     </div>
   </div>
 
-  <!-- Fred — sound effects persona. Placeholder "F" avatar; real SVG lands in Commit 4. -->
+  <!-- Fred — sound effects persona. Headphones + face + outbound sound waves. -->
   <div class="persona fred" id="panel-fred">
     <div class="bubble">
       <div class="persona-avatar">
-        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" fill="#EF4444"/><text x="20" y="27" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">F</text></svg>
+        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><path d="M10 20 Q10 8, 20 8 Q30 8, 30 20" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="10" cy="22" r="3.5" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="30" cy="22" r="3.5" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="16" cy="19" r="1.5" fill="#EF4444"/><circle cx="24" cy="19" r="1.5" fill="#EF4444"/><path d="M17 27 Q20 29, 23 27" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M35 18 Q37.5 22, 35 26" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M37 14 Q40 22, 37 30" stroke="#EF4444" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.55"/></svg>
       </div>
       <div class="persona-info">
         <span class="p-name">Fred</span>
@@ -357,6 +379,59 @@ body.prod .status{display:none}
 
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;
+
+  // ───────── Audio autoplay unlock ─────────
+  // Chrome (and OBS's headless Chromium) silently suppress Audio.play() until the
+  // user interacts with the page. Three-layer defense:
+  //   A. Try a silent AudioContext unlock on DOMContentLoaded.
+  //   B. If A fails, show a centered "Click to enable audio" prompt.
+  //   C. If a sound_cue arrives while still locked, re-show the prompt and skip.
+  var audioUnlocked=false;
+  var audioCtx=null;
+
+  async function attemptAudioUnlock(){
+    try{
+      if(!audioCtx){
+        var AC=window.AudioContext||window.webkitAudioContext;
+        if(!AC)return false;
+        audioCtx=new AC();
+      }
+      if(audioCtx.state==='suspended')await audioCtx.resume();
+      var buf=audioCtx.createBuffer(1,1,22050);
+      var src=audioCtx.createBufferSource();
+      src.buffer=buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+      audioUnlocked=true;
+      console.log('[audio] Unlocked successfully');
+      hideUnlockPrompt();
+      return true;
+    }catch(err){
+      console.warn('[audio] Unlock failed, prompt required:',err);
+      return false;
+    }
+  }
+
+  function showUnlockPrompt(){
+    if(document.getElementById('audio-unlock-prompt'))return;
+    var prompt=document.createElement('div');
+    prompt.id='audio-unlock-prompt';
+    prompt.innerHTML='<div class="unlock-content">'+
+      '<div class="unlock-icon">🔊</div>'+
+      '<div class="unlock-text">Click to enable Fred audio</div>'+
+      '<div class="unlock-subtext">Required by browser autoplay policy</div>'+
+      '</div>';
+    prompt.addEventListener('click',async function(){
+      var ok=await attemptAudioUnlock();
+      if(ok)hideUnlockPrompt();
+    });
+    document.body.appendChild(prompt);
+  }
+
+  function hideUnlockPrompt(){
+    var p=document.getElementById('audio-unlock-prompt');
+    if(p)p.remove();
+  }
 
   // Wave helper — find the sine-wave element inside a persona panel.
   // Returns null for panels that don't have a wave (Not Ad, Sniper).
@@ -447,6 +522,11 @@ body.prod .status{display:none}
 
   function playCue(name){
     if(!fredAudioEnabled)return;
+    if(!audioUnlocked){
+      console.warn('[audio] sound_cue received but audio not unlocked, prompting');
+      showUnlockPrompt();
+      return;
+    }
     var a=soundMap[name];
     if(!a){console.warn('[fred] unknown sound:',name);return}
     // Ignore if already playing — no stacking
@@ -540,7 +620,12 @@ body.prod .status{display:none}
     },1500);
   }
 
-  function init(){tick();if(isDemo)demo();else conn()}
+  function init(){
+    tick();
+    // Fire-and-forget silent unlock attempt; show prompt if it fails.
+    attemptAudioUnlock().then(function(ok){if(!ok)showUnlockPrompt()});
+    if(isDemo)demo();else conn();
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
 </script>
