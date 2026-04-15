@@ -2,9 +2,11 @@
 
 **The viewer-facing AI commentary layer for live podcasts.**
 
-Four AI personas react to your show in real time, displayed as floating bubbles over the broadcast. Built as an OBS browser source — drag, drop, on air. Tested live against multiple TWiST episodes.
+**Status: 8/8 spec compliance against the bounty brief.**
 
-Built for the [March 27, 2026 TWiST bounty](https://x.com/TWiStartups). Released under MIT for any podcast to use.
+Five AI personas react to your show in real time, displayed as floating bubbles over the broadcast. Built as an OBS browser source — drag, drop, on air. Tested live against multiple TWiST episodes.
+
+Built for the [April 15, 2026 TWiST bounty](https://x.com/twistartups/status/2044437861668171974). Released under MIT for any podcast to use.
 
 ![TWiSTroll Demo](https://github.com/SkunkWorks0x/twistroll/raw/main/demo/twistroll-demo.gif)
 
@@ -12,11 +14,28 @@ Built for the [March 27, 2026 TWiST bounty](https://x.com/TWiStartups). Released
 
 ---
 
+## Spec compliance
+
+All 8 requirements from the [@twistartups April 15, 2026 bounty post](https://x.com/twistartups/status/2044437861668171974) are shipped and live-tested.
+
+- [x] **Real-time capabilities** — Listens to the show in real time and provides live feedback through a sidebar
+- [x] **Gary (Fact-checker)** → *Not Jamie* — Monitors conversation for factual claims and provides corrections or background data
+- [x] **Fred (Sound Effects/Context)** → *Not Fred* — Supplies background context and sound effects (12-sound library, 0.25 volume cap, producer kill switch)
+- [x] **Jackie (Comedy Writer)** → *Not Taco* — Generates one-liners or jokes related to the current discussion
+- [x] **Troll (Cynical Commentator)** → *Not Delinquent* — Chaotic / negative cynical persona providing troll feedback
+- [x] **Bubble UI with profile picture** — Pop-and-vanish bubbles with character SVG avatars per persona
+- [x] **Visual sine wave** — Animates per-persona color when speaking/active
+- [x] **Two-stream output** — OBS scene structure produces both regular and enhanced streams
+
+**Bonus 5th persona shipped beyond spec:** Robin (News Update) → *Not Robin* — wry news anchor with daily brief loader, 60s refresh, NEWS-SHAPE rule.
+
+---
+
 ## What it does
 
 TWiSTroll watches your live transcript via OpenOats and generates live AI reactions from four persona agents. Reactions appear as floating overlay bubbles on your stream — visible to viewers, not hidden in a host window. One reaction every ~15 seconds in round-robin rotation. Each reaction uses ~200 characters max so the bubble never overwhelms the frame.
 
-This is the **viewer-side** layer. Host-facing tools live in a producer's private app window. TWiSTroll lives on the broadcast itself — the second feed Jason described on the March 27 stream.
+This is the **viewer-side** layer. Host-facing tools live in a producer's private app window. TWiSTroll lives on the broadcast itself — the second feed Jason described on the bounty stream.
 
 ---
 
@@ -64,8 +83,22 @@ A config panel at `localhost:3000/config` (never visible in OBS) lets the produc
 3. Position on the right edge of your canvas, layered above your video source
 4. Uncheck "Shutdown source when not visible" and "Refresh browser when scene becomes active"
 5. Set FPS to **30**
+6. On the source's **Advanced Audio Properties**, set monitoring to **"Monitor and Output"** — required so Fred's sound cues reach both the host and the broadcast.
 
 The overlay background is fully transparent. Bubbles float directly over your video feed.
+
+---
+
+## OBS setup for Fred sound effects
+
+OBS's browser source runs on CEF (Chromium Embedded Framework), which enforces Chrome's autoplay policy. `Audio.play()` is blocked until the page receives a user gesture. The overlay auto-detects OBS via `window.obsstudio` and **never shows the unlock prompt inside OBS** — instead, the producer unlocks audio with a single click on the scene preview.
+
+1. **Click the rendered overlay once in your scene preview** after adding the source. This single click satisfies CEF's autoplay policy and enables Fred's sound effects for the session.
+2. In the browser source properties, check **"Control audio via OBS"**. This routes Fred's audio through OBS's audio mixer so you can control volume independently of the show's main audio. Note: this setting handles audio *routing*, not autoplay unlock — step 1 is still required.
+3. In the OBS Audio Mixer, the browser source appears under whatever name you gave it. Set the slider to a comfortable level. Fred's sounds are already capped at 25% by the overlay code, but OBS gives you a master override on top of that.
+4. If you reload the browser source or restart OBS, repeat step 1 (single click on the source preview) to re-enable audio for the new session.
+
+When the overlay is loaded in a regular browser for testing (not OBS), a compact centered **"Click to enable Fred audio"** prompt appears if Layer A silent unlock fails. Click it once — audio is unlocked for the rest of the session.
 
 ---
 
@@ -91,16 +124,17 @@ For testing without OpenOats:
 
 ---
 
-## The 4 personas
+## The 5 personas
 
-Each persona reacts once per minute in round-robin rotation. One fresh pop-up every ~15 seconds.
+Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → Robin → Fred. One fresh pop-up every ~15 seconds, with a "Not Ad" yield slot sprinkled in for pacing.
 
-| | Persona | Role | Voice |
-|---|---------|------|-------|
-| 🔍 | **Not Jamie** | Fact-checker | Dry, deadpan. Always cites a specific fact, number, or correction. |
-| 🔥 | **Not Delinquent** | Chaotic troll | Conspiracy-comedy. ALL CAPS emphasis. Excited about insane connections. |
-| 😑 | **Not Cautious** | Cynical analyst | Names a specific historical parallel for every hype cycle. Doom-pattern detection. |
-| 😂 | **Not Taco** | Comedian | Punchlines only. Callbacks, roasts, one-liners. No setup, no buddy/bro. |
+| Persona | Role | Color | Voice |
+|---------|------|-------|-------|
+| **Not Jamie** | Fact-checker | Teal (`#2DD4BF`) | Dry, precise, deadpan. Always cites a specific fact, number, or correction. |
+| **Not Delinquent** | Chaotic troll | Orange (`#F97316`) | Conspiracy-comedy. ALL CAPS emphasis. Excited about insane connections. |
+| **Not Taco** | Comedy writer | Lime (`#84CC16`) | Tight punchlines, callbacks, roasts. No emojis, no setup, no buddy/bro. |
+| **Not Robin** | News update | Rose (`#F472B6`) | Knowing, current, dry wit. Works from a rolling daily tech-news brief. |
+| **Not Fred** | Sound effects + context | Crimson (`#EF4444`) | Producer energy — drops a sound cue plus one line of archival color. |
 
 ### Why these names?
 
@@ -108,9 +142,13 @@ Each persona reacts once per minute in round-robin rotation. One fresh pop-up ev
 
 **Not Delinquent** — Lon Harris played a heel character called "The Delinquent" on Movie Trivia Schmoedown. Our Not Delinquent channels that energy into conspiracy-adjacent takes about startup culture.
 
-**Not Cautious** — Alex Wilhelm publishes "Cautious Optimism," his newsletter on startups and markets. Our most recklessly pessimistic persona is the direct inversion.
-
 **Not Taco** — Lon's foster chihuahua. The funniest persona in the sidebar is named after a tiny rescue dog.
+
+<!-- TODO: confirm the real-world Robin reference Imani had in mind (Robin Wauters? Robin Williams? Robin from the TWiST chat?) before the demo. -->
+
+**Not Robin** — Our news reader. Rides into every utterance with a one-line callback to today's tech headlines.
+
+**Not Fred** — Jason literally said "not Fred" on the bounty stream as a name to avoid. We took it literally, made it the sound-effects operator, and gave it the crimson accent. The joke writes itself.
 
 Jason said "not Jackie, not Bob, not Fred — so we don't get in trouble." We took that literally and made every name an Easter egg for the show's actual world.
 
@@ -144,7 +182,7 @@ WebSocket broadcast
 OBS browser source overlay (floating transparent bubbles)
 ```
 
-One persona fires per utterance in round-robin order: Jamie → Delinquent → Cautious → Taco → repeat. Each reaction takes ~2-4 seconds with Claude Haiku.
+One persona fires per utterance in round-robin order: Jamie → Delinquent → Taco → Robin → Fred → repeat, with a "Not Ad" yield slot mixed in for visual pacing. Each reaction takes ~2-4 seconds end-to-end.
 
 ---
 
@@ -157,6 +195,52 @@ One persona fires per utterance in round-robin order: Jamie → Delinquent → C
 | `ollama` | ~8-15s | Free | Good — qwen2.5:7b, runs 100% local |
 
 Hybrid mode tries Claude Haiku first, falls back to Groq, then Ollama. The pipeline never dies — if cloud is down, local catches it.
+
+### Per-persona routing (locked)
+
+Each persona has a primary model plus a multi-tier fallback. Jamie and Fred want factual precision; Delinquent, Taco, and Robin want speed and comedic timing.
+
+| Persona | Primary | Fallback chain |
+|---------|---------|----------------|
+| Not Jamie | Claude Haiku 4.5 | Groq → Ollama |
+| Not Fred | Claude Haiku 4.5 | Groq → Ollama |
+| Not Delinquent | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
+| Not Taco | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
+| Not Robin | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
+
+Each step has a hard timeout; if the primary misses the window, the next tier takes over in under a second.
+
+---
+
+## Daily brief (Not Robin's fuel)
+
+Not Robin reads `data/daily_brief.json` on startup and sprinkles the headlines into reactions throughout the episode. Keep it fresh before every show.
+
+```json
+{
+  "headlines": [
+    "Anthropic's rise is reportedly giving some OpenAI investors second thoughts.",
+    "... 7 more one-sentence headlines ..."
+  ],
+  "updated": "2026-04-15T08:00:00Z",
+  "source": "TechCrunch, The Verge, Wired, Hacker News RSS"
+}
+```
+
+Drop in 8 current headlines — tech, startups, AI, funding, product launches. One declarative sentence each, nothing older than 7 days. Robin handles the rest.
+
+---
+
+## Bonus features beyond spec
+
+Shipped beyond the bounty requirements:
+
+- **Not Ad system** — visual-pacing yield slot in the rotation, keeps bubbles from feeling mechanical.
+- **Cross-Episode Memory** — LanceDB vector store of prior-episode highlights for future callback work.
+- **Audience Pulse** — lightweight sentiment telemetry per utterance, logged to `data/audience-pulse.jsonl`.
+- **Pre-show Guest Dossier** — Claude-generated background pack on each booked guest, dropped into `data/dossiers/`.
+- **Auto Smart Clipper** — flags high-energy moments from the reaction log as candidate short-form clips. <!-- TODO: link Launch Bay Dashboard if/when the UI ships. -->
+- **Hybrid LLM fallback chain** — Haiku ↔ Grok ↔ Groq ↔ Ollama; the pipeline never dies.
 
 ---
 
@@ -193,18 +277,24 @@ Copy `.env.example` to `.env`. Defaults work out of the box with a Claude API ke
 
 Built and shipping:
 
-- [x] 4-persona overlay with live reactions
-- [x] Round-robin rotation (one pop-up at a time)
-- [x] Hybrid LLM with three-tier fallback
+- [x] 5-persona overlay with live reactions (Jamie, Delinquent, Taco, Robin, Fred)
+- [x] Round-robin rotation with "Not Ad" pacing slot
+- [x] Per-persona LLM routing (Haiku for fact-check/sound, Grok for comedy/news)
+- [x] Hybrid LLM with multi-tier fallback (Haiku ↔ Grok ↔ Groq ↔ Ollama)
+- [x] Not Fred sound-effects system with 12 curated cues
+- [x] Not Robin daily news brief integration
 - [x] Rolling episode summary memory
 - [x] Callback Engine (within-episode memory)
 - [x] Contradiction Catcher
 - [x] Sponsor Guardian with ad break suppression
 - [x] Jason-ism Detector
+- [x] Pre-show guest dossier
+- [x] Audience Pulse tracking
+- [x] Auto smart clipper
 - [x] 30+ pattern flat reaction filter
 - [x] Production config panel with feedback controls
 - [x] Timestamped reaction log for editors
-- [x] Server-side truncation (200 char ceiling)
+- [x] Server-side truncation (220 char ceiling)
 
 Next:
 
