@@ -217,27 +217,25 @@ body{
 .status span{font-size:6px;font-weight:500;color:rgba(255,255,255,0.5)}
 body.prod .status{display:none}
 
-/* === AUDIO UNLOCK PROMPT === */
+/* === AUDIO UNLOCK PROMPT — compact centered, no fullscreen cover === */
 #audio-unlock-prompt{
-  position:fixed;top:0;left:0;right:0;bottom:0;
-  background:rgba(0,0,0,0.85);
-  display:flex;align-items:center;justify-content:center;
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   cursor:pointer;z-index:9999;
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
 }
 .unlock-content{
   text-align:center;color:#F1F5F9;
   font-family:'Inter','system-ui',sans-serif;
-  padding:32px 40px;
+  padding:20px 28px;
   border:2px solid var(--tw);
-  border-radius:16px;
+  border-radius:12px;
   background:rgba(30,30,34,0.95);
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
   transition:background 150ms ease;
 }
 #audio-unlock-prompt:hover .unlock-content{background:rgba(40,40,44,0.95)}
-.unlock-icon{font-size:48px;margin-bottom:12px;line-height:1}
-.unlock-text{font-size:18px;font-weight:600;margin-bottom:6px}
-.unlock-subtext{font-size:12px;opacity:0.6}
+.unlock-icon{font-size:32px;margin-bottom:8px;line-height:1}
+.unlock-text{font-size:14px;font-weight:600;margin-bottom:4px}
+.unlock-subtext{font-size:11px;opacity:0.6}
 </style>
 </head>
 <body>
@@ -324,7 +322,7 @@ body.prod .status{display:none}
   <div class="persona fred" id="panel-fred">
     <div class="bubble">
       <div class="persona-avatar">
-        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><path d="M10 20 Q10 8, 20 8 Q30 8, 30 20" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="10" cy="22" r="3.5" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="30" cy="22" r="3.5" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="16" cy="19" r="1.5" fill="#EF4444"/><circle cx="24" cy="19" r="1.5" fill="#EF4444"/><path d="M17 27 Q20 29, 23 27" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M35 18 Q37.5 22, 35 26" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M37 14 Q40 22, 37 30" stroke="#EF4444" stroke-width="1.2" fill="none" stroke-linecap="round" opacity="0.55"/></svg>
+        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><path d="M10 20 Q10 8, 20 8 Q30 8, 30 20" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="10" cy="22" r="3.5" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="30" cy="22" r="3.5" stroke="#EF4444" stroke-width="1.5" fill="none"/><circle cx="16" cy="19" r="1.5" fill="#EF4444"/><circle cx="24" cy="19" r="1.5" fill="#EF4444"/><path d="M17 27 Q20 29, 23 27" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M34 20 Q35.5 22, 34 24" stroke="#EF4444" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M36 18 Q38 22, 36 26" stroke="#EF4444" stroke-width="1.3" fill="none" stroke-linecap="round" opacity="0.7"/><path d="M38 15 Q40.5 22, 38 29" stroke="#EF4444" stroke-width="1.1" fill="none" stroke-linecap="round" opacity="0.45"/></svg>
       </div>
       <div class="persona-info">
         <span class="p-name">Fred</span>
@@ -381,13 +379,18 @@ body.prod .status{display:none}
   var sponsorTimeout=null;
 
   // ───────── Audio autoplay unlock ─────────
-  // Chrome (and OBS's headless Chromium) silently suppress Audio.play() until the
-  // user interacts with the page. Three-layer defense:
+  // Chrome (and OBS's CEF browser engine) silently suppress Audio.play() until the
+  // user interacts with the page. "Control audio via OBS" routes audio through
+  // the mixer but does NOT bypass autoplay — a user gesture is still required.
+  // Two-layer defense:
   //   A. Try a silent AudioContext unlock on DOMContentLoaded.
-  //   B. If A fails, show a centered "Click to enable audio" prompt.
-  //   C. If a sound_cue arrives while still locked, re-show the prompt and skip.
+  //   B. If A fails AND we're not inside OBS, show a compact centered prompt.
+  //      In OBS we skip the prompt entirely — Oliver clicks the scene preview
+  //      once, which satisfies CEF's gesture requirement without visual noise.
   var audioUnlocked=false;
   var audioCtx=null;
+
+  function isInOBS(){return typeof window.obsstudio!=='undefined'}
 
   async function attemptAudioUnlock(){
     try{
@@ -413,13 +416,18 @@ body.prod .status{display:none}
   }
 
   function showUnlockPrompt(){
+    // In OBS, never show the prompt — don't add visual noise to the broadcast.
+    if(isInOBS()){
+      console.log('[audio] In OBS — skipping unlock prompt (click scene preview to unlock)');
+      return;
+    }
     if(document.getElementById('audio-unlock-prompt'))return;
     var prompt=document.createElement('div');
     prompt.id='audio-unlock-prompt';
     prompt.innerHTML='<div class="unlock-content">'+
       '<div class="unlock-icon">🔊</div>'+
       '<div class="unlock-text">Click to enable Fred audio</div>'+
-      '<div class="unlock-subtext">Required by browser autoplay policy</div>'+
+      '<div class="unlock-subtext">Browser autoplay policy</div>'+
       '</div>';
     prompt.addEventListener('click',async function(){
       var ok=await attemptAudioUnlock();
@@ -523,7 +531,8 @@ body.prod .status{display:none}
   function playCue(name){
     if(!fredAudioEnabled)return;
     if(!audioUnlocked){
-      console.warn('[audio] sound_cue received but audio not unlocked, prompting');
+      console.warn('[audio] sound_cue received but audio not unlocked, skipping');
+      // showUnlockPrompt() is OBS-aware — no-op in broadcast, shown in regular browsers.
       showUnlockPrompt();
       return;
     }
