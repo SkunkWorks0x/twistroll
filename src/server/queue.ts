@@ -65,10 +65,14 @@ const JASON_ISMS = [
   "that's just insane"
 ];
 
-// Personas that are toggled on (all by default). Filter out 'not-ad' since
-// it isn't a generated persona — it's a visual-pacing slot.
+// Personas that are toggled on by default. Filter out 'not-ad' (visual-pacing
+// slot, not a generated persona) AND any entries in DEFAULT_DISABLED_PERSONAS
+// below (not spec-required; producer can enable via config panel).
+const DEFAULT_DISABLED_PERSONAS: PersonaId[] = [
+  'not-robin', // Experimental 5th persona — pending NEWS-SHAPE refinement. Not spec-required.
+];
 const enabledPersonas = new Set<PersonaId>(
-  ROTATION.filter((r): r is PersonaId => r !== 'not-ad')
+  ROTATION.filter((r): r is PersonaId => r !== 'not-ad' && !DEFAULT_DISABLED_PERSONAS.includes(r as PersonaId))
 );
 
 // Sponsor suppression — suppress troll reactions during ad reads

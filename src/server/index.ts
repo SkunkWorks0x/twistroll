@@ -530,6 +530,8 @@ function configPanelHTML(): string {
   <label><input type="checkbox" checked data-persona="not-jamie"> Gary (Fact-checker)</label>
   <label><input type="checkbox" checked data-persona="not-delinquent"> Troll (Cynical Commentator)</label>
   <label><input type="checkbox" checked data-persona="not-taco"> Jackie (Comedy Writer)</label>
+  <label><input type="checkbox" checked data-persona="not-fred"> Fred (Sound Effects)</label>
+  <label><input type="checkbox" data-persona="not-robin"> Robin <span style="font-size:10px;color:#94A3B8;font-style:italic;">— Experimental 5th persona. Pending NEWS-SHAPE refinement. Not spec-required.</span></label>
 </div>
 <div class="card">
   <h2>Question Sniper</h2>
