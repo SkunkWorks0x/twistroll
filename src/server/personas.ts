@@ -395,7 +395,8 @@ export const PERSONA_ORDER: PersonaId[] = [
   'not-fred',
 ];
 
-// Question Sniper — independent agent, not in the troll rotation
+// Question Sniper — independent agent, not in the troll rotation.
+// Module preserved but disabled — not in current April 15 spec. Re-enable post-launch if needed.
 export const SNIPER_CONFIG = {
   id: 'sniper' as const,
   name: 'ASK THIS',

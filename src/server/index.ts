@@ -290,7 +290,7 @@ function broadcast(
 let watcher: ReturnType<typeof startWatcher> | null = null;
 
 // ─── Question Sniper ───
-
+// Disabled by default — not in current April 15 spec. Re-enable post-launch if needed.
 let sniperEnabled = false;
 let utterancesSinceSniper = 0;
 let sniperCount = 0;
@@ -534,11 +534,6 @@ function configPanelHTML(): string {
   <label><input type="checkbox" data-persona="not-robin"> Robin <span style="font-size:10px;color:#94A3B8;font-style:italic;">— Experimental 5th persona. Pending NEWS-SHAPE refinement. Not spec-required.</span></label>
 </div>
 <div class="card">
-  <h2>Question Sniper</h2>
-  <label><input type="checkbox" id="sniper-toggle"> Question Sniper (fires every 75s)</label>
-  <div id="sniper-latest" style="font-size:12px;color:#94A3B8;margin-top:8px;font-style:italic;"></div>
-</div>
-<div class="card">
   <h2>Timing</h2>
   <label>Cooldown: <span id="cd-val">15</span>s <input type="range" min="5" max="60" value="15" id="cooldown"></label>
 </div>
@@ -583,11 +578,6 @@ function configPanelHTML(): string {
     const v=e.target.value;
     document.getElementById('cd-val').textContent=v;
     await fetch('/api/cooldown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ms:v*1000})});
-  });
-
-  // Sniper toggle
-  document.getElementById('sniper-toggle').addEventListener('change',async(e)=>{
-    await fetch('/api/sniper/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e.target.checked})});
   });
 
   // Fred audio kill switch — posts to server which broadcasts WS to overlay
