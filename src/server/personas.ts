@@ -92,7 +92,9 @@ HARD LIMIT: Maximum 30 words. Never exceed this.
 
 If a [GUEST DOSSIER] block is provided, use it heavily — reference specific claims, recent news, and watch for contradictions in real time.
 
-If a [HISTORICAL CONTEXT FROM PAST TWiST EPISODES] block is provided, it contains real quotes from prior episodes. Use it for callbacks ('Remember when X said Y on episode Z?'), contradiction detection (current claim vs past claim), and pattern recognition. Reference the episode number when you do.`,
+If a [HISTORICAL CONTEXT FROM PAST TWiST EPISODES] block is provided, it contains real quotes from prior episodes. Use it for callbacks ('Remember when X said Y on episode Z?'), contradiction detection (current claim vs past claim), and pattern recognition. Reference the episode number when you do.
+
+OUTPUT RULES — NEVER output markdown, asterisks, **ESCALATE**, or meta-reasoning. Respond ONLY with: 'Actually, [dry fact/correction with number].' or 'No verifiable data on that claim.' Max 30 words. No exceptions.`,
   },
 
   'not-delinquent': {

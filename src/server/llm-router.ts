@@ -34,6 +34,7 @@ const ROUTING: Record<string, LlmProvider[]> = {
 };
 
 const PROVIDER_TIMEOUT_MS = 10_000;
+const GROK_TIMEOUT_MS = 13_000; // Grok needs longer tail — retry-once on abort handles the rest
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const GROK_MODEL = 'grok-4-1-fast';
@@ -134,8 +135,19 @@ async function callGrok(systemPrompt: string, context: string): Promise<string> 
   const apiKey = process.env.GROK_API_KEY;
   if (!apiKey) throw new Error('GROK_API_KEY not set');
 
+  // Grok occasionally times out at 10s on first hit; retry once on abort only.
+  // HTTP errors and empty responses do NOT retry — they fall through the chain.
+  return callGrokAttempt(apiKey, systemPrompt, context, 0);
+}
+
+async function callGrokAttempt(
+  apiKey: string,
+  systemPrompt: string,
+  context: string,
+  retryCount: number
+): Promise<string> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), GROK_TIMEOUT_MS);
 
   try {
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
@@ -165,8 +177,14 @@ async function callGrok(systemPrompt: string, context: string): Promise<string> 
     const text = data?.choices?.[0]?.message?.content?.trim();
     if (!text) throw new Error('grok empty response');
     return text;
-  } finally {
+  } catch (err) {
     clearTimeout(timer);
+    const isAbort = err instanceof Error && err.name === 'AbortError';
+    if (isAbort && retryCount < 1) {
+      console.warn(`[grok] Aborted at ${GROK_TIMEOUT_MS}ms — retrying once`);
+      return callGrokAttempt(apiKey, systemPrompt, context, retryCount + 1);
+    }
+    throw err;
   }
 }
 
