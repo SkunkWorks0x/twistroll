@@ -14,7 +14,7 @@ export interface OpenOatsUtterance {
 
 // ─── Internal Types ───
 
-export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-cautious' | 'not-taco' | 'not-robin';
+export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-cautious' | 'not-taco' | 'not-robin' | 'not-fred';
 export type AgentId = PersonaId | 'sniper';
 
 export interface ParsedUtterance {
@@ -39,7 +39,29 @@ export interface StatusMessage {
   lastReaction?: number;
 }
 
-export type WSMessage = TrollReaction | StatusMessage;
+// ─── Fred sound cue (broadcast to overlay on Fred rotations with sound !== "none") ───
+export interface SoundCueMessage {
+  type: 'sound_cue';
+  sound: string;
+}
+
+// ─── Producer controls (config panel → server → overlay) ───
+export interface FredAudioToggleMessage {
+  type: 'fred_audio_toggle';
+  enabled: boolean;
+}
+
+export interface FredVolumeMessage {
+  type: 'fred_volume';
+  volume: number; // capped at 0.3 on both ends
+}
+
+export type WSMessage =
+  | TrollReaction
+  | StatusMessage
+  | SoundCueMessage
+  | FredAudioToggleMessage
+  | FredVolumeMessage;
 
 export interface PersonaConfig {
   id: PersonaId;

@@ -1,4 +1,4 @@
-import type { ParsedUtterance, PersonaId, TrollReaction, LlmEngine } from '../shared/types.js';
+import type { ParsedUtterance, PersonaId, TrollReaction, LlmEngine, SoundCueMessage } from '../shared/types.js';
 import { appConfig } from '../config/config.js';
 import { PERSONAS } from './personas.js';
 import { buildContext, addUtterance, getDailyBriefBlock } from './context.js';
@@ -8,7 +8,9 @@ import { groqGenerate } from './groq-llm.js';
 import { callLLM } from './llm-router.js';
 import { logReaction } from './logger.js';
 
-type ReactionCallback = (reaction: TrollReaction) => void;
+// Queue can emit both text bubbles (TrollReaction) and Fred sound cues
+// (SoundCueMessage). The caller (index.ts) forwards both to broadcast().
+type ReactionCallback = (message: TrollReaction | SoundCueMessage) => void;
 
 let lastProcessedTime = 0;
 let processing = false;
@@ -29,6 +31,7 @@ const ROTATION: RotationSlot[] = [
   'not-delinquent',
   'not-taco',
   'not-robin',
+  'not-fred',
   'not-ad',
 ];
 const NOT_AD_PACE_WINDOW_MS = 30_000;
@@ -79,6 +82,10 @@ let sponsorSuppressUntil: number = 0;
 // 4th rotation forces her output through regardless of content — keeps the
 // bubble visually alive even when no news angle exists for a stretch.
 let consecutiveRobinSkips = 0;
+
+// Fred consecutive-skip counter — same force-through semantics as Robin.
+// Fred's SKIP is signaled by {"sound": "none", "text": "SKIP"} JSON payload.
+let consecutiveFredSkips = 0;
 
 /**
  * Generate a response using the configured LLM mode.
@@ -261,6 +268,60 @@ export async function processUtterance(
         console.log('[queue] Robin forced through after 3 consecutive skips — broadcasting raw SKIP');
       }
       consecutiveRobinSkips = 0;
+    }
+
+    // Fred returns JSON: {"sound": "rimshot", "text": "🔊 RIMSHOT — ..."}.
+    // Parse it, emit a sound_cue message if sound != "none", and set the
+    // text bubble to .text. Malformed JSON falls back to plain-text broadcast.
+    // SKIP handling mirrors Robin: 3 consecutive → force-through on 4th.
+    if (personaId === 'not-fred') {
+      const trimmed = response.trim();
+      let parsed: { sound?: unknown; text?: unknown } | null = null;
+      try {
+        // Strip markdown code-fence wrappers if present (some models add them)
+        const jsonCandidate = trimmed
+          .replace(/^```(?:json)?\s*/i, '')
+          .replace(/\s*```$/, '')
+          .trim();
+        parsed = JSON.parse(jsonCandidate);
+      } catch {
+        parsed = null;
+      }
+
+      if (parsed && typeof parsed === 'object') {
+        const sound = typeof parsed.sound === 'string' ? parsed.sound : 'none';
+        const fredText = typeof parsed.text === 'string' ? parsed.text : '';
+        const isSkip = sound === 'none' && fredText.trim().toUpperCase() === 'SKIP';
+
+        if (isSkip && consecutiveFredSkips < 3) {
+          consecutiveFredSkips++;
+          console.log(`[queue] Fred skipped — no sound/context fit (${consecutiveFredSkips}/3)`);
+          processing = false;
+          return;
+        }
+        if (isSkip && consecutiveFredSkips >= 3) {
+          console.log('[queue] Fred forced through after 3 consecutive skips — broadcasting raw SKIP');
+        }
+        consecutiveFredSkips = 0;
+
+        // Emit the sound cue as a SEPARATE message before the text bubble.
+        if (sound !== 'none' && sound.trim().length > 0) {
+          onReaction({ type: 'sound_cue', sound });
+          console.log(`[queue] Fred sound cue: ${sound}`);
+        }
+
+        // The text bubble gets the parsed .text (may be empty for
+        // serious-topic silence per spec — bail if so).
+        if (!fredText.trim()) {
+          console.log('[queue] Fred silent on serious topic — no bubble');
+          processing = false;
+          return;
+        }
+        response = fredText;
+      } else {
+        console.warn('[queue] Fred returned non-JSON, falling back to plain text');
+        // Leave `response` as-is; normal downstream truncation handles it.
+      }
     }
 
     // Empty response from router (all providers exhausted). Bail silently

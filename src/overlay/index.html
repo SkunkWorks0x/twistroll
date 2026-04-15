@@ -10,6 +10,7 @@
   --caut:#A78BFA;
   --taco:#84CC16;
   --robin:#F472B6;
+  --fred:#EF4444;
   --notad:#B8860B;
   --tw:#FF4D00;
 }
@@ -117,6 +118,7 @@ body{
 .persona.cautious .p-name{color:var(--caut)}
 .persona.taco .p-name{color:var(--taco)}
 .persona.robin .p-name{color:var(--robin)}
+.persona.fred .p-name{color:var(--fred)}
 .persona.notad .p-name{color:var(--notad)}
 
 /* === ANIMATIONS — transform + opacity only, OBS safe === */
@@ -249,6 +251,19 @@ body.prod .status{display:none}
     </div>
   </div>
 
+  <!-- Fred — sound effects persona. Placeholder "F" avatar; real SVG lands in Commit 4. -->
+  <div class="persona fred" id="panel-fred">
+    <div class="bubble">
+      <div class="persona-avatar">
+        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><circle cx="20" cy="20" r="18" fill="#EF4444"/><text x="20" y="27" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">F</text></svg>
+      </div>
+      <div class="persona-info">
+        <span class="p-name">Not Fred</span>
+        <div class="reaction-text" id="text-fred"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Not Ad — daily-brief contextual sponsor reads -->
   <div class="persona notad" id="panel-notad">
     <div class="bubble">
@@ -287,9 +302,9 @@ body.prod .status{display:none}
   var P=new URLSearchParams(location.search);
   if(P.get('mode')==='prod')document.body.classList.add('prod');
   var isDemo=P.get('demo')==='true';
-  var IDS=['jamie','delinquent','cautious','taco','robin','notad','sniper'];
-  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco','not-robin':'robin','not-ad':'notad',
-           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco',robin:'robin',notad:'notad'};
+  var IDS=['jamie','delinquent','cautious','taco','robin','fred','notad','sniper'];
+  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-cautious':'cautious','not-taco':'taco','not-robin':'robin','not-fred':'fred','not-ad':'notad',
+           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',cautious:'cautious',taco:'taco',robin:'robin',fred:'fred',notad:'notad'};
 
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;
@@ -352,10 +367,65 @@ body.prod .status{display:none}
     },15000);
   }
 
+  // ───────── Fred sound effects system ─────────
+  // Preload 12 Audio elements, play on sound_cue messages with 250ms fade in
+  // and fade out (250ms before the clip ends). Hard volume cap at 0.3 —
+  // producer panel controls the live target via fred_volume messages.
+  var SOUND_NAMES=['rimshot','applause','sad-trombone','dramatic-sting','record-scratch','crickets','wrong-buzzer','cash-register','airhorn','laugh-track','boo','price-is-right-fail'];
+  var SOUND_MAX=0.3,SOUND_DEFAULT=0.25;
+  var fredAudioEnabled=true;
+  var fredTargetVolume=SOUND_DEFAULT;
+  var soundMap={};
+  SOUND_NAMES.forEach(function(name){
+    try{
+      var a=new Audio('/sounds/'+name+'.mp3');
+      a.preload='auto';
+      a.volume=0;
+      soundMap[name]=a;
+    }catch(e){/* preload failures are non-fatal */}
+  });
+
+  function playCue(name){
+    if(!fredAudioEnabled)return;
+    var a=soundMap[name];
+    if(!a){console.warn('[fred] unknown sound:',name);return}
+    // Ignore if already playing — no stacking
+    if(!a.paused&&a.currentTime>0)return;
+    var target=Math.min(SOUND_MAX,Math.max(0,fredTargetVolume));
+    a.currentTime=0;
+    // For very short / unknown-duration clips, skip fade and play at target
+    var dur=a.duration;
+    if(!isFinite(dur)||dur<0.5){
+      a.volume=target;
+      a.play().catch(function(){});
+      return;
+    }
+    // Fade in 0 → target over 250ms (50ms steps)
+    a.volume=0;
+    var stepIn=target/5;
+    var fadeIn=setInterval(function(){
+      a.volume=Math.min(target,a.volume+stepIn);
+      if(a.volume>=target)clearInterval(fadeIn);
+    },50);
+    // Fade out starting 250ms before end
+    var fadeOutTimer=setTimeout(function(){
+      var stepOut=a.volume/5;
+      var fadeOut=setInterval(function(){
+        a.volume=Math.max(0,a.volume-stepOut);
+        if(a.volume<=0)clearInterval(fadeOut);
+      },50);
+    },Math.max(0,(dur*1000)-250));
+    a.addEventListener('ended',function(){clearTimeout(fadeOutTimer);a.volume=0},{once:true});
+    a.play().catch(function(){});
+  }
+
   function hm(d){
     if(d.type==='troll_comment'){var id=MAP[d.persona];if(id&&d.text)showReaction(id,d.text)}
     if(d.type==='sponsor'&&d.copy){showSponsor(d.copy)}
     if(d.type==='status'&&d.session){var e=document.getElementById('status-session');if(e)e.textContent=d.session}
+    if(d.type==='sound_cue'&&d.sound){playCue(d.sound)}
+    if(d.type==='fred_audio_toggle'){fredAudioEnabled=!!d.enabled}
+    if(d.type==='fred_volume'){fredTargetVolume=Math.min(SOUND_MAX,Math.max(0,Number(d.volume)||0))}
   }
 
   function tick(){

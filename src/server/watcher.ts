@@ -185,8 +185,8 @@ export function startWatcher(onUtterance: UtteranceCallback): {
     await readNewLines(filePath, onUtterance);
   });
 
-  watcher.on('error', (err) => {
-    console.error(`[watcher] Error:`, err.message);
+  watcher.on('error', (err: unknown) => {
+    console.error(`[watcher] Error:`, err instanceof Error ? err.message : err);
   });
 
   return {

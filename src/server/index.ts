@@ -23,12 +23,16 @@ import {
   getCurrentBrief,
   getLastAlsoMatched,
 } from './dailyBrief.js';
-import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
+import type { TrollReaction, StatusMessage, PersonaId, SoundCueMessage, FredAudioToggleMessage, FredVolumeMessage } from '../shared/types.js';
 import { logReaction } from './logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
+
+// ─── Serve Fred's sound effects (static) ───
+// Mounted before the root/overlay routes so /sounds/*.mp3 resolves cleanly.
+app.use('/sounds', express.static(resolve(__dirname, '..', '..', 'public', 'sounds')));
 
 // ─── Serve Overlay at root ───
 app.get('/', (_req, res) => {
@@ -80,6 +84,27 @@ app.post('/api/sniper/toggle', (req, res) => {
   const { enabled } = req.body as { enabled: boolean };
   sniperEnabled = enabled;
   res.json({ ok: true, enabled });
+});
+
+// API: Fred audio kill switch. Producer-facing. Broadcasts to the overlay
+// which ignores future sound_cue messages when disabled (text bubbles still
+// render). No server-side state — the overlay is the source of truth for
+// whether audio plays.
+app.post('/api/fred/audio_toggle', (req, res) => {
+  const { enabled } = req.body as { enabled: boolean };
+  const msg: FredAudioToggleMessage = { type: 'fred_audio_toggle', enabled: !!enabled };
+  broadcast(msg);
+  res.json({ ok: true, enabled: !!enabled });
+});
+
+// API: Fred volume. Hard-capped at 0.3 on the server regardless of what the
+// client sends — the overlay also caps, but double-defense is cheap.
+app.post('/api/fred/volume', (req, res) => {
+  const { volume } = req.body as { volume: number };
+  const clamped = Math.min(0.3, Math.max(0, Number(volume) || 0));
+  const msg: FredVolumeMessage = { type: 'fred_volume', volume: clamped };
+  broadcast(msg);
+  res.json({ ok: true, volume: clamped });
 });
 
 // API: Commit episode — flip provisional chunks to committed
@@ -214,7 +239,14 @@ interface PlugOpportunityMessage {
 }
 
 function broadcast(
-  message: TrollReaction | StatusMessage | SponsorMessage | PlugOpportunityMessage
+  message:
+    | TrollReaction
+    | StatusMessage
+    | SponsorMessage
+    | PlugOpportunityMessage
+    | SoundCueMessage
+    | FredAudioToggleMessage
+    | FredVolumeMessage
 ): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
@@ -481,6 +513,11 @@ function configPanelHTML(): string {
   <label>Cooldown: <span id="cd-val">15</span>s <input type="range" min="5" max="60" value="15" id="cooldown"></label>
 </div>
 <div class="card">
+  <h2>Sound Effects</h2>
+  <label><input type="checkbox" id="fred-audio-toggle" checked> Fred Audio</label>
+  <label style="margin-top:8px;">Volume: <span id="fred-vol-val">25%</span> <input type="range" min="0" max="0.3" step="0.05" value="0.25" id="fred-volume"></label>
+</div>
+<div class="card">
   <h2>OBS Setup</h2>
   <button id="copy-url">Copy OBS URL</button>
   <div id="obs-url">http://localhost:${appConfig.overlayPort}?mode=prod</div>
@@ -521,6 +558,20 @@ function configPanelHTML(): string {
   // Sniper toggle
   document.getElementById('sniper-toggle').addEventListener('change',async(e)=>{
     await fetch('/api/sniper/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e.target.checked})});
+  });
+
+  // Fred audio kill switch — posts to server which broadcasts WS to overlay
+  document.getElementById('fred-audio-toggle').addEventListener('change',async(e)=>{
+    await fetch('/api/fred/audio_toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e.target.checked})});
+  });
+
+  // Fred volume — clamp at 0.3 client-side too; server double-clamps.
+  // Display raw value × 100 so 0.25 → 25%, matching the spec's default label.
+  document.getElementById('fred-volume').addEventListener('input',async(e)=>{
+    const raw=parseFloat(e.target.value);
+    const v=Math.min(0.3,Math.max(0,isNaN(raw)?0.25:raw));
+    document.getElementById('fred-vol-val').textContent=Math.round(v*100)+'%';
+    await fetch('/api/fred/volume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:v})});
   });
 
   // Copy URL
