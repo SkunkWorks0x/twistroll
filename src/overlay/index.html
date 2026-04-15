@@ -112,7 +112,14 @@ body{
   will-change:opacity;transition:opacity 180ms ease;
 }
 
-/* === VOICES — name color only === */
+/* === VOICES — name color + --persona-color for wave tinting === */
+.persona.jamie      {--persona-color:var(--jamie)}
+.persona.delinquent {--persona-color:var(--del)}
+.persona.cautious   {--persona-color:var(--caut)}
+.persona.taco       {--persona-color:var(--taco)}
+.persona.robin      {--persona-color:var(--robin)}
+.persona.fred       {--persona-color:var(--fred)}
+.persona.notad      {--persona-color:var(--notad)}
 .persona.jamie .p-name{color:var(--jamie)}
 .persona.delinquent .p-name{color:var(--del)}
 .persona.cautious .p-name{color:var(--caut)}
@@ -120,6 +127,46 @@ body{
 .persona.robin .p-name{color:var(--robin)}
 .persona.fred .p-name{color:var(--fred)}
 .persona.notad .p-name{color:var(--notad)}
+
+/* === SINE WAVE — "active/speaking" signal, OBS-safe (transform+opacity only) === */
+.sine-wave{
+  display:flex;align-items:center;justify-content:flex-start;
+  gap:3px;
+  height:12px;width:40px;
+  margin-top:6px;
+  opacity:0;
+  transition:opacity 200ms ease-out;
+}
+.sine-wave.speaking{opacity:1}
+.wave-bar{
+  display:block;
+  width:3px;height:12px;
+  background:var(--persona-color,#94A3B8);
+  border-radius:1.5px;
+  transform:scaleY(0.2);transform-origin:center;
+  will-change:transform;
+  box-shadow:0 0 4px var(--persona-color,transparent);
+}
+.sine-wave.speaking .wave-bar{
+  animation:wave-pulse 900ms cubic-bezier(0.4,0,0.6,1) infinite;
+}
+.sine-wave.speaking .wave-bar:nth-child(1){animation-delay:0ms}
+.sine-wave.speaking .wave-bar:nth-child(2){animation-delay:120ms}
+.sine-wave.speaking .wave-bar:nth-child(3){animation-delay:240ms}
+.sine-wave.speaking .wave-bar:nth-child(4){animation-delay:360ms}
+.sine-wave.speaking .wave-bar:nth-child(5){animation-delay:480ms}
+@keyframes wave-pulse{
+  0%,100%{transform:scaleY(0.25)}
+  50%    {transform:scaleY(1.0)}
+}
+/* Fred-only: stronger pulse while a sound cue is actively playing */
+.sine-wave.speaking.sound-active .wave-bar{
+  animation:wave-pulse-strong 600ms cubic-bezier(0.4,0,0.6,1) infinite;
+}
+@keyframes wave-pulse-strong{
+  0%,100%{transform:scaleY(0.4)}
+  50%    {transform:scaleY(1.5)}
+}
 
 /* === ANIMATIONS — transform + opacity only, OBS safe === */
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
@@ -195,6 +242,7 @@ body.prod .status{display:none}
       <div class="persona-info">
         <span class="p-name">Not Jamie</span>
         <div class="reaction-text" id="text-jamie"></div>
+        <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
     </div>
   </div>
@@ -208,6 +256,7 @@ body.prod .status{display:none}
       <div class="persona-info">
         <span class="p-name">Not Delinquent</span>
         <div class="reaction-text" id="text-delinquent"></div>
+        <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
     </div>
   </div>
@@ -234,6 +283,7 @@ body.prod .status{display:none}
       <div class="persona-info">
         <span class="p-name">Not Taco</span>
         <div class="reaction-text" id="text-taco"></div>
+        <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
     </div>
   </div>
@@ -247,6 +297,7 @@ body.prod .status{display:none}
       <div class="persona-info">
         <span class="p-name">Not Robin</span>
         <div class="reaction-text" id="text-robin"></div>
+        <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
     </div>
   </div>
@@ -260,6 +311,7 @@ body.prod .status{display:none}
       <div class="persona-info">
         <span class="p-name">Not Fred</span>
         <div class="reaction-text" id="text-fred"></div>
+        <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
       </div>
     </div>
   </div>
@@ -309,11 +361,17 @@ body.prod .status{display:none}
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;
 
+  // Wave helper — find the sine-wave element inside a persona panel.
+  // Returns null for panels that don't have a wave (Cautious, Not Ad, Sniper).
+  function waveIn(panel){return panel?panel.querySelector('.sine-wave'):null}
+
   function showReaction(id,txt){
-    // Hide any currently visible bubble
+    // Hide any currently visible bubble + kill its wave
     if(currentBubble){
       currentBubble.classList.remove('visible');
       currentBubble.classList.add('fading-out');
+      var pw=waveIn(currentBubble);
+      if(pw){pw.classList.remove('speaking');pw.classList.remove('sound-active')}
       clearTimeout(currentTimeout);
       currentBubble=null;
     }
@@ -330,13 +388,18 @@ body.prod .status{display:none}
     p.style.transform='scale(1.03)';
     setTimeout(function(){p.style.transform='scale(1)'},300);
 
+    // Activate the wave for this bubble's persona
+    var w=waveIn(p);
+    if(w)w.classList.add('speaking');
+
     currentBubble=p;
     lr=Date.now();
 
-    // Auto-hide after 8 seconds
+    // Auto-hide after 8 seconds — also stops the wave
     currentTimeout=setTimeout(function(){
       p.classList.remove('visible');
       p.classList.add('fading-out');
+      if(w){w.classList.remove('speaking');w.classList.remove('sound-active')}
       currentBubble=null;
     },8000);
   }
@@ -393,11 +456,20 @@ body.prod .status{display:none}
     if(!a.paused&&a.currentTime>0)return;
     var target=Math.min(SOUND_MAX,Math.max(0,fredTargetVolume));
     a.currentTime=0;
+
+    // Light up Fred's wave in "sound-active" mode — harder pulse while audio plays.
+    // The CSS selector is .speaking.sound-active, so this only takes effect if
+    // Fred's bubble is currently visible. Correct: audio outlives bubble → wave stays off.
+    var fredWave=waveIn(document.getElementById('panel-fred'));
+    if(fredWave)fredWave.classList.add('sound-active');
+    var clearSoundActive=function(){if(fredWave)fredWave.classList.remove('sound-active')};
+
     // For very short / unknown-duration clips, skip fade and play at target
     var dur=a.duration;
     if(!isFinite(dur)||dur<0.5){
       a.volume=target;
-      a.play().catch(function(){});
+      a.addEventListener('ended',clearSoundActive,{once:true});
+      a.play().catch(clearSoundActive);
       return;
     }
     // Fade in 0 → target over 250ms (50ms steps)
@@ -415,8 +487,12 @@ body.prod .status{display:none}
         if(a.volume<=0)clearInterval(fadeOut);
       },50);
     },Math.max(0,(dur*1000)-250));
-    a.addEventListener('ended',function(){clearTimeout(fadeOutTimer);a.volume=0},{once:true});
-    a.play().catch(function(){});
+    a.addEventListener('ended',function(){
+      clearTimeout(fadeOutTimer);
+      a.volume=0;
+      clearSoundActive();
+    },{once:true});
+    a.play().catch(clearSoundActive);
   }
 
   function hm(d){
