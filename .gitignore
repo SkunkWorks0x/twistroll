@@ -4,3 +4,7 @@ dist/
 data/
 *.log
 .DS_Store
+
+# Heap snapshots (huge, scriptable via DIAGNOSTICS=1; redundant under data/
+# but explicit so a future loosening of the data/ ignore doesn't leak them)
+data/diagnostics/*.heapsnapshot

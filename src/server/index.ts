@@ -107,6 +107,35 @@ app.post('/api/fred/volume', (req, res) => {
   res.json({ ok: true, volume: clamped });
 });
 
+// API: Manual Fred sound trigger — producer/demo helper. Broadcasts a
+// Fred bubble AND a sound_cue to all overlay clients without waiting for
+// a Fred rotation. Useful for pre-show audio verification and for
+// exercising the sine-wave `.speaking.sound-active` stronger-pulse path
+// (the CSS selector requires both classes present simultaneously).
+app.post('/api/fred/test_cue', (req, res) => {
+  const { sound, text } = req.body as { sound?: string; text?: string };
+  if (!sound || typeof sound !== 'string') {
+    return res.status(400).json({ error: 'sound required' });
+  }
+  const bubbleText = typeof text === 'string' && text.trim().length > 0
+    ? text
+    : `🔊 ${sound.toUpperCase().replace(/-/g, ' ')} — test cue`;
+
+  const bubble: TrollReaction = {
+    type: 'troll_comment',
+    persona: 'not-fred',
+    text: bubbleText,
+    timestamp: Date.now(),
+    utteranceId: `utt_test_${Date.now()}`,
+  };
+  const cue: SoundCueMessage = { type: 'sound_cue', sound };
+
+  // Order matters: bubble first (adds .speaking), then cue (adds .sound-active).
+  broadcast(bubble);
+  broadcast(cue);
+  res.json({ ok: true, sound, text: bubbleText });
+});
+
 // API: Commit episode — flip provisional chunks to committed
 app.post('/api/commit-episode', async (req, res) => {
   const { sessionFile } = req.body as { sessionFile: string };

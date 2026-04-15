@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/server/index.ts",
+    "dev:profile": "DIAGNOSTICS=1 NODE_OPTIONS=\"--inspect --max-old-space-size=2048 --require ./scripts/diagnostics-preload.cjs\" tsx src/server/index.ts",
     "build:frontend": "vite build",
     "start": "node dist/server/index.js"
   },
