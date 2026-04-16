@@ -98,7 +98,7 @@ function robinFingerprint(text: string): string {
 // Fred threshold injected from env (default 9/10 — battle-tested across 5 anti-fabrication rounds).
 // Override with FRED_TRIGGER_THRESHOLD=7 npm run dev for demo recording. Do not lower the default.
 const FRED_TRIGGER_THRESHOLD = process.env.FRED_TRIGGER_THRESHOLD || '9';
-console.log(`[fred] Trigger threshold: ${FRED_TRIGGER_THRESHOLD}/10`);
+console.log(`[FRED-HB] BOOT threshold=${FRED_TRIGGER_THRESHOLD} cooldown=${Math.round(appConfig.cooldownMs / 1000)}s sound_library=12`);
 
 /**
  * Generate a response using the configured LLM mode.
@@ -197,18 +197,27 @@ export async function processUtterance(
   // Sponsor suppression gate
   if (Date.now() < sponsorSuppressUntil) {
     console.log('[queue] Suppressed during ad break');
+    if (!isViewer && ROTATION[rotationIndex % ROTATION.length] === 'not-fred') {
+      console.log(`[FRED-HB] SKIP reason=sponsor_suppression utt=${utterance.id}`);
+    }
     return;
   }
 
   // Cooldown gate
   if (timeSinceLast < activeCooldown) {
     console.log(`[queue] DROPPED by cooldown gate: ${timeSinceLast}ms < ${activeCooldown}ms (${Math.round((activeCooldown - timeSinceLast) / 1000)}s remaining)`);
+    if (!isViewer && ROTATION[rotationIndex % ROTATION.length] === 'not-fred') {
+      console.log(`[FRED-HB] SKIP reason=cooldown_active remaining=${Math.round((activeCooldown - timeSinceLast) / 1000)}s utt=${utterance.id}`);
+    }
     return;
   }
 
   // Don't stack processing
   if (processing) {
     console.log(`[queue] DROPPED — already processing another utterance`);
+    if (!isViewer && ROTATION[rotationIndex % ROTATION.length] === 'not-fred') {
+      console.log(`[FRED-HB] SKIP reason=processing_locked utt=${utterance.id}`);
+    }
     return;
   }
 
@@ -240,6 +249,10 @@ export async function processUtterance(
   if (!personaId) {
     console.warn('[queue] All personas disabled, skipping');
     return;
+  }
+
+  if (!isViewer && personaId !== 'not-fred') {
+    console.log(`[FRED-HB] SKIP reason=rotation_not_fred utt=${utterance.id}`);
   }
 
   processing = true;
@@ -325,11 +338,13 @@ export async function processUtterance(
         if (isSkip && consecutiveFredSkips < 3) {
           consecutiveFredSkips++;
           console.log(`[queue] Fred skipped — no sound/context fit (${consecutiveFredSkips}/3)`);
+          console.log(`[FRED-HB] SKIP reason=llm_skip_counted n=${consecutiveFredSkips}/3 utt=${utterance.id}`);
           processing = false;
           return;
         }
         if (isSkip && consecutiveFredSkips >= 3) {
           console.log('[queue] Fred force-through returned SKIP — suppressing bubble, resetting counter');
+          console.log(`[FRED-HB] SKIP reason=llm_skip_forcethrough_suppressed utt=${utterance.id}`);
           consecutiveFredSkips = 0;
           processing = false;
           return;
@@ -340,18 +355,21 @@ export async function processUtterance(
         if (sound !== 'none' && sound.trim().length > 0) {
           onReaction({ type: 'sound_cue', sound });
           console.log(`[queue] Fred sound cue: ${sound}`);
+          console.log(`[FRED-HB] FIRE sound=${sound} utt=${utterance.id}`);
         }
 
         // The text bubble gets the parsed .text (may be empty for
         // serious-topic silence per spec — bail if so).
         if (!fredText.trim()) {
           console.log('[queue] Fred silent on serious topic — no bubble');
+          console.log(`[FRED-HB] SKIP reason=silent_serious_topic utt=${utterance.id}`);
           processing = false;
           return;
         }
         response = fredText;
       } else {
         console.warn('[queue] Fred returned non-JSON, falling back to plain text');
+        console.log(`[FRED-HB] SKIP reason=malformed_json utt=${utterance.id}`);
         // Leave `response` as-is; normal downstream truncation handles it.
       }
     }
