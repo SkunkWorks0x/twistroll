@@ -281,6 +281,18 @@ export async function processUtterance(
     let response = routerText;
     const engine: string = provider;
 
+    // Troll "PASS" = intentional silence per f0a233e silence-is-power.
+    // No force-through counter (unlike Robin): passes ARE the hypothesis;
+    // capping would re-introduce always-fire.
+    if (personaId === 'not-delinquent') {
+      const trimmed = response.trim();
+      if (trimmed.toUpperCase() === 'PASS') {
+        console.log(`[DELINQ-HB] PASS reason=silence_is_power utt=${utterance.id}`);
+        processing = false;
+        return;
+      }
+    }
+
     // Robin SKIP handling. Trim + case-insensitive match on literal "SKIP".
     // Count consecutive skips; on the 4th Robin rotation (3 skips, then a
     // 4th call) force the output through even if she says SKIP again.
