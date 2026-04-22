@@ -28,7 +28,6 @@ const ROUTING: Record<string, LlmProvider[]> = {
   'not-jamie': ['haiku', 'groq', 'ollama'],
   'not-fred': ['haiku', 'groq', 'ollama'],
   'not-taco': ['grok', 'haiku', 'groq', 'ollama'],
-  'not-robin': ['grok', 'haiku', 'groq', 'ollama'],
   'not-delinquent': ['haiku', 'groq', 'ollama'], // rolled back from grok 2026-04-15 after 1 fab on Coachella ("hammer 500 contacts" invented number under CLAIM-SHAPE). Haiku has 0 fabs validated across 5 tuning rounds.
 };
 
