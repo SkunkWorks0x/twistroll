@@ -8,7 +8,6 @@
   --jamie:#2DD4BF;
   --del:#F97316;
   --taco:#84CC16;
-  --robin:#F472B6;
   --fred:#EF4444;
   --notad:#B8860B;
   --tw:#FF4D00;
@@ -123,13 +122,11 @@ body{
 .persona.jamie      {--persona-color:var(--jamie)}
 .persona.delinquent {--persona-color:var(--del)}
 .persona.taco       {--persona-color:var(--taco)}
-.persona.robin      {--persona-color:var(--robin)}
 .persona.fred       {--persona-color:var(--fred)}
 .persona.notad      {--persona-color:var(--notad)}
 .persona.jamie .p-name{color:var(--jamie)}
 .persona.delinquent .p-name{color:var(--del)}
 .persona.taco .p-name{color:var(--taco)}
-.persona.robin .p-name{color:var(--robin)}
 .persona.fred .p-name{color:var(--fred)}
 .persona.notad .p-name{color:var(--notad)}
 
@@ -303,21 +300,6 @@ body.prod .status{display:none}
     </div>
   </div>
 
-  <!-- Robin — news update persona. Broadcast microphone avatar. -->
-  <div class="persona robin" id="panel-robin">
-    <div class="bubble">
-      <div class="persona-avatar">
-        <svg width="46" height="46" viewBox="0 0 40 40" fill="none"><rect x="15" y="6" width="10" height="18" rx="5" stroke="#F472B6" stroke-width="1.5" fill="none"/><line x1="18" y1="11" x2="22" y2="11" stroke="#F472B6" stroke-width="1.2"/><line x1="18" y1="15" x2="22" y2="15" stroke="#F472B6" stroke-width="1.2"/><line x1="18" y1="19" x2="22" y2="19" stroke="#F472B6" stroke-width="1.2"/><path d="M10 20 Q10 30, 20 30 Q30 30, 30 20" stroke="#F472B6" stroke-width="1.5" fill="none"/><line x1="20" y1="30" x2="20" y2="34" stroke="#F472B6" stroke-width="1.5" stroke-linecap="round"/><line x1="15" y1="34" x2="25" y2="34" stroke="#F472B6" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </div>
-      <div class="persona-info">
-        <span class="p-name">Robin</span>
-        <span class="p-role">News Update</span>
-        <div class="reaction-text" id="text-robin"></div>
-        <div class="sine-wave" aria-hidden="true"><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span><span class="wave-bar"></span></div>
-      </div>
-    </div>
-  </div>
-
   <!-- Fred — sound effects persona. Headphones + face + outbound sound waves. -->
   <div class="persona fred" id="panel-fred">
     <div class="bubble">
@@ -375,9 +357,9 @@ body.prod .status{display:none}
   var P=new URLSearchParams(location.search);
   if(P.get('mode')==='prod')document.body.classList.add('prod');
   var isDemo=P.get('demo')==='true';
-  var IDS=['jamie','delinquent','taco','robin','fred','notad','sniper'];
-  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-taco':'taco','not-robin':'robin','not-fred':'fred','not-ad':'notad',
-           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',taco:'taco',robin:'robin',fred:'fred',notad:'notad'};
+  var IDS=['jamie','delinquent','taco','fred','notad','sniper'];
+  var MAP={'not-jamie':'jamie','not-delinquent':'delinquent','not-taco':'taco','not-fred':'fred','not-ad':'notad',
+           sniper:'sniper',jamie:'jamie',delinquent:'delinquent',taco:'taco',fred:'fred',notad:'notad'};
 
   var currentTimeout=null,currentBubble=null;
   var sponsorTimeout=null;
