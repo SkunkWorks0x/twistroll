@@ -14,7 +14,7 @@ export interface OpenOatsUtterance {
 
 // ─── Internal Types ───
 
-export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-taco' | 'not-robin' | 'not-fred';
+export type PersonaId = 'not-jamie' | 'not-delinquent' | 'not-taco' | 'not-fred';
 export type AgentId = PersonaId | 'sniper';
 
 export interface ParsedUtterance {

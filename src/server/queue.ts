@@ -1,7 +1,7 @@
 import type { ParsedUtterance, PersonaId, TrollReaction, LlmEngine, SoundCueMessage } from '../shared/types.js';
 import { appConfig } from '../config/config.js';
 import { PERSONAS } from './personas.js';
-import { buildContext, addUtterance, getDailyBriefBlock } from './context.js';
+import { buildContext, addUtterance } from './context.js';
 import { callOllama, isOllamaAvailable } from './ollama.js';
 import { cloudGenerate } from './cloud-llm.js';
 import { groqGenerate } from './groq-llm.js';
@@ -26,7 +26,6 @@ const ROTATION: RotationSlot[] = [
   'not-jamie',
   'not-delinquent',
   'not-taco',
-  'not-robin',
   'not-fred',
   'not-ad',
 ];
@@ -68,9 +67,7 @@ const JASON_ISMS = [
 // Personas that are toggled on by default. Filter out 'not-ad' (visual-pacing
 // slot, not a generated persona) AND any entries in DEFAULT_DISABLED_PERSONAS
 // below (not spec-required; producer can enable via config panel).
-const DEFAULT_DISABLED_PERSONAS: PersonaId[] = [
-  'not-robin', // Experimental 5th persona — pending NEWS-SHAPE refinement. Not spec-required.
-];
+const DEFAULT_DISABLED_PERSONAS: PersonaId[] = [];
 const enabledPersonas = new Set<PersonaId>(
   ROTATION.filter((r): r is PersonaId => r !== 'not-ad' && !DEFAULT_DISABLED_PERSONAS.includes(r as PersonaId))
 );
@@ -78,22 +75,11 @@ const enabledPersonas = new Set<PersonaId>(
 // Sponsor suppression — suppress troll reactions during ad reads
 let sponsorSuppressUntil: number = 0;
 
-// Robin consecutive-skip counter. If Robin says SKIP 3 times in a row, the
-// 4th rotation forces her output through regardless of content — keeps the
-// bubble visually alive even when no news angle exists for a stretch.
-let consecutiveRobinSkips = 0;
-
-// Fred consecutive-skip counter — same force-through semantics as Robin.
-// Fred's SKIP is signaled by {"sound": "none", "text": "SKIP"} JSON payload.
+// Fred consecutive-skip counter. If Fred returns SKIP 3 times in a row, the
+// 4th rotation forces the output through regardless of content — keeps Fred
+// from going silent across a long quiet stretch. SKIP is signaled by the
+// {"sound": "none", "text": "SKIP"} JSON payload.
 let consecutiveFredSkips = 0;
-
-// Per-session Robin headline dedup. Grok paraphrases the same brief headline
-// multiple ways; we fingerprint the first 8 significant words of each Robin
-// broadcast and suppress matches. In-memory only — resets on server restart.
-const firedRobinHeadlines = new Set<string>();
-function robinFingerprint(text: string): string {
-  return text.toLowerCase().replace(/^news:\s*/i, '').split(/\s+/).slice(0, 8).join(' ');
-}
 
 // Fred threshold injected from env (default 9/10 — battle-tested across 5 anti-fabrication rounds).
 // Override with FRED_TRIGGER_THRESHOLD=7 npm run dev for demo recording. Do not lower the default.
@@ -267,12 +253,7 @@ export async function processUtterance(
   try {
     const context = buildContext(personaId, utterance);
 
-    // Robin gets her system prompt's {{DAILY_BRIEF}} placeholder substituted
-    // with the currently-loaded brief headlines before the LLM call.
     let systemPrompt = persona.systemPrompt;
-    if (personaId === 'not-robin') {
-      systemPrompt = systemPrompt.replace('{{DAILY_BRIEF}}', getDailyBriefBlock());
-    }
     if (personaId === 'not-fred') {
       systemPrompt = systemPrompt.replace(/\{\{FRED_THRESHOLD\}\}/g, FRED_TRIGGER_THRESHOLD);
     }
@@ -282,7 +263,7 @@ export async function processUtterance(
     const engine: string = provider;
 
     // Troll "PASS" = intentional silence per f0a233e silence-is-power.
-    // No force-through counter (unlike Robin): passes ARE the hypothesis;
+    // No force-through counter: passes ARE the hypothesis;
     // capping would re-introduce always-fire.
     if (personaId === 'not-delinquent') {
       const trimmed = response.trim();
@@ -293,41 +274,11 @@ export async function processUtterance(
       }
     }
 
-    // Robin SKIP handling. Trim + case-insensitive match on literal "SKIP".
-    // Count consecutive skips; on the 4th Robin rotation (3 skips, then a
-    // 4th call) force the output through even if she says SKIP again.
-    if (personaId === 'not-robin') {
-      const trimmed = response.trim();
-      const isSkip = trimmed.toUpperCase() === 'SKIP';
-      if (isSkip && consecutiveRobinSkips < 3) {
-        consecutiveRobinSkips++;
-        console.log(`[queue] Robin skipped — no news angle for this utterance (${consecutiveRobinSkips}/3)`);
-        processing = false;
-        return;
-      }
-      if (isSkip && consecutiveRobinSkips >= 3) {
-        console.log('[queue] Robin force-through returned SKIP — suppressing bubble, resetting counter');
-        consecutiveRobinSkips = 0;
-        processing = false;
-        return;
-      }
-      consecutiveRobinSkips = 0;
-
-      // Per-session headline dedup — Grok paraphrases repeat sources.
-      const fp = robinFingerprint(trimmed);
-      if (fp && firedRobinHeadlines.has(fp)) {
-        consecutiveRobinSkips++;
-        console.log(`[queue] Robin headline already fired this session — suppressing (${consecutiveRobinSkips}/3)`);
-        processing = false;
-        return;
-      }
-      if (fp) firedRobinHeadlines.add(fp);
-    }
-
     // Fred returns JSON: {"sound": "rimshot", "text": "🔊 RIMSHOT — ..."}.
     // Parse it, emit a sound_cue message if sound != "none", and set the
     // text bubble to .text. Malformed JSON falls back to plain-text broadcast.
-    // SKIP handling mirrors Robin: 3 consecutive → force-through on 4th.
+    // SKIP handling: 3 consecutive SKIPs count, then the 4th rotation forces
+    // the output through regardless of content.
     if (personaId === 'not-fred') {
       const trimmed = response.trim();
       let parsed: { sound?: unknown; text?: unknown } | null = null;
