@@ -472,7 +472,6 @@ async function main() {
     console.log(`   Config:   http://localhost:${appConfig.overlayPort}/config`);
     console.log(`   WebSocket: ws://localhost:${appConfig.wsPort}`);
     console.log(`   Watching: ${appConfig.transcriptDir}`);
-    console.log(`   Sniper:  every 75s (enabled=${sniperEnabled})`);
     console.log('');
   });
 
