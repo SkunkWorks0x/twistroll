@@ -27,8 +27,6 @@ All 8 requirements from the [@twistartups April 15, 2026 bounty post](https://x.
 - [x] **Visual sine wave** — Animates per-persona color when speaking/active
 - [x] **Two-stream output** — OBS scene structure produces both regular and enhanced streams
 
-**Bonus 5th persona shipped beyond spec:** Robin (News Update) → *Not Robin* — wry news anchor with daily brief loader, 60s refresh, NEWS-SHAPE rule.
-
 ---
 
 ## What it does
@@ -124,16 +122,15 @@ For testing without OpenOats:
 
 ---
 
-## The 5 personas
+## The 4 personas
 
-Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → Robin → Fred. One fresh pop-up every ~15 seconds, with a "Not Ad" yield slot sprinkled in for pacing.
+Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → Fred. One fresh pop-up every ~15 seconds, with a "Not Ad" yield slot sprinkled in for pacing.
 
 | Persona | Role | Color | Voice |
 |---------|------|-------|-------|
 | **Not Jamie** | Fact-checker | Teal (`#2DD4BF`) | Dry, precise, deadpan. Always cites a specific fact, number, or correction. |
 | **Not Delinquent** | Chaotic troll | Orange (`#F97316`) | Conspiracy-comedy. ALL CAPS emphasis. Excited about insane connections. |
 | **Not Taco** | Comedy writer | Lime (`#84CC16`) | Tight punchlines, callbacks, roasts. No emojis, no setup, no buddy/bro. |
-| **Not Robin** | News update | Rose (`#F472B6`) | Knowing, current, dry wit. Works from a rolling daily tech-news brief. |
 | **Not Fred** | Sound effects + context | Crimson (`#EF4444`) | Producer energy — drops a sound cue plus one line of archival color. |
 
 ### Why these names?
@@ -143,10 +140,6 @@ Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → R
 **Not Delinquent** — Lon Harris played a heel character called "The Delinquent" on Movie Trivia Schmoedown. Our Not Delinquent channels that energy into conspiracy-adjacent takes about startup culture.
 
 **Not Taco** — Lon's foster chihuahua. The funniest persona in the sidebar is named after a tiny rescue dog.
-
-<!-- TODO: confirm the real-world Robin reference Imani had in mind (Robin Wauters? Robin Williams? Robin from the TWiST chat?) before the demo. -->
-
-**Not Robin** — Our news reader. Rides into every utterance with a one-line callback to today's tech headlines.
 
 **Not Fred** — Jason literally said "not Fred" on the bounty stream as a name to avoid. We took it literally, made it the sound-effects operator, and gave it the crimson accent. The joke writes itself.
 
@@ -182,7 +175,7 @@ WebSocket broadcast
 OBS browser source overlay (floating transparent bubbles)
 ```
 
-One persona fires per utterance in round-robin order: Jamie → Delinquent → Taco → Robin → Fred → repeat, with a "Not Ad" yield slot mixed in for visual pacing. Each reaction takes ~2-4 seconds end-to-end.
+One persona fires per utterance in round-robin order: Jamie → Delinquent → Taco → Fred → repeat, with a "Not Ad" yield slot mixed in for visual pacing. Each reaction takes ~2-4 seconds end-to-end.
 
 ---
 
@@ -198,7 +191,7 @@ Hybrid mode tries Claude Haiku first, falls back to Groq, then Ollama. The pipel
 
 ### Per-persona routing (locked)
 
-Each persona has a primary model plus a multi-tier fallback. Jamie and Fred want factual precision; Delinquent, Taco, and Robin want speed and comedic timing.
+Each persona has a primary model plus a multi-tier fallback. Jamie and Fred want factual precision; Delinquent and Taco want speed and comedic timing.
 
 | Persona | Primary | Fallback chain |
 |---------|---------|----------------|
@@ -206,28 +199,8 @@ Each persona has a primary model plus a multi-tier fallback. Jamie and Fred want
 | Not Fred | Claude Haiku 4.5 | Groq → Ollama |
 | Not Delinquent | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
 | Not Taco | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
-| Not Robin | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
 
 Each step has a hard timeout; if the primary misses the window, the next tier takes over in under a second.
-
----
-
-## Daily brief (Not Robin's fuel)
-
-Not Robin reads `data/daily_brief.json` on startup and sprinkles the headlines into reactions throughout the episode. Keep it fresh before every show.
-
-```json
-{
-  "headlines": [
-    "Anthropic's rise is reportedly giving some OpenAI investors second thoughts.",
-    "... 7 more one-sentence headlines ..."
-  ],
-  "updated": "2026-04-15T08:00:00Z",
-  "source": "TechCrunch, The Verge, Wired, Hacker News RSS"
-}
-```
-
-Drop in 8 current headlines — tech, startups, AI, funding, product launches. One declarative sentence each, nothing older than 7 days. Robin handles the rest.
 
 ---
 
@@ -277,12 +250,11 @@ Copy `.env.example` to `.env`. Defaults work out of the box with a Claude API ke
 
 Built and shipping:
 
-- [x] 5-persona overlay with live reactions (Jamie, Delinquent, Taco, Robin, Fred)
+- [x] 4-persona overlay with live reactions (Jamie, Delinquent, Taco, Fred)
 - [x] Round-robin rotation with "Not Ad" pacing slot
-- [x] Per-persona LLM routing (Haiku for fact-check/sound, Grok for comedy/news)
+- [x] Per-persona LLM routing (Haiku for fact-check/sound, Grok for comedy)
 - [x] Hybrid LLM with multi-tier fallback (Haiku ↔ Grok ↔ Groq ↔ Ollama)
 - [x] Not Fred sound-effects system with 12 curated cues
-- [x] Not Robin daily news brief integration
 - [x] Rolling episode summary memory
 - [x] Callback Engine (within-episode memory)
 - [x] Contradiction Catcher

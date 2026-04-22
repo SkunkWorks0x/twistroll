@@ -2,7 +2,7 @@
 
 > **This file is the spec. Everything we build traces back to this. If a feature isn't required by this post, it's a bonus — not a priority. If a feature IS required by this post and isn't shipped, we fail.**
 
-> **Spec source:** Updated April 15, 2026. The previous April 14 post listed five personas; the active April 15 repost listed four. The four-persona spec is now the locked target. Robin (News Update) was in the prior version and remains shipped as a bonus over-delivery.
+> **Spec source:** Updated April 15, 2026. The previous April 14 post listed five personas; the active April 15 repost listed four. The four-persona spec is the locked target.
 
 ---
 
@@ -49,7 +49,6 @@
 
 | Ambiguity | Decision | Reasoning |
 |-----------|----------|-----------|
-| Four personas in current spec; Robin (News Update) was in prior version | **Keep Robin shipped as a bonus.** Spec target = 4 required personas. Robin = 5th over-delivery. | Robin is already shipped, validated, and adds genuine value. Cutting her now would lose work for no upside. Jason can disable her in the config panel if he wants strict 4-persona mode. |
 | "Sound effects" — literal audio or text-based? | **Literal audio playback.** Fred ships with real sound effects + 0.25 volume cap + producer kill switch. | Spec says "sound effects" not "sound effect descriptions." |
 | "Two streams" output requirement | **Already handled by OBS scene structure.** Producer outputs one scene with TWiSTroll layered in (enhanced), one without (regular). No code change required. | Standard OBS multi-scene workflow. README documents this. |
 | Persona names — Stern names or original TWiSTroll names? | **Keep "Not [X]" naming.** Maps to Stern roles internally. | The inside-joke naming earned Jason's first positive reaction on the original Friday stream. |
@@ -77,7 +76,6 @@
 
 These differentiate TWiSTroll from any other submission. They are NOT required by the April 15 bounty post.
 
-- **Not Robin (News Update)** — 5th persona, rose color, 45-word limit, NEWS-SHAPE RULE, Grok 4.1 Fast primary with daily brief refresh every 60 seconds. Was in the April 14 spec; kept as bonus in the April 15 build.
 - **Sponsor Guardian** — 12 sponsors, instant-fire, bypasses cooldown, 45-second ad break suppression
 - **"Not Ad" producer-facing system** — per-episode brief, dual-surface (viewer bubble + producer plug cards), TAKEN/PASSED buttons
 - **Cross-Episode Memory** — LanceDB + EmbeddingGemma, 21+ episodes backfilled, contextual recall for fact-checks
