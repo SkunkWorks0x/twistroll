@@ -1,34 +1,27 @@
 #!/bin/bash
-# Simulates OpenOats by appending JSONL lines to the watch directory one at a time.
-# Usage: ./scripts/simulate-session.sh
-# This lets you test TWiSTroll without a real OpenOats recording.
+# Simulates OpenOats by replaying a JSONL file into the watch directory with
+# timestamp-preserving cadence (honors the deltas between adjacent `timestamp`
+# fields). Previous version used a flat `sleep 8` between lines, which broke
+# natural pacing and mis-tested cooldowns.
+#
+# Usage:
+#   ./scripts/simulate-session.sh                       # demo sample, 1x
+#   ./scripts/simulate-session.sh --rate 2              # 2x speed
+#   ./scripts/simulate-session.sh --file path.jsonl     # custom source
+#   ./scripts/simulate-session.sh --limit 30 --rate 20  # quick test
 
-TRANSCRIPT_DIR="${OPENOATS_TRANSCRIPT_DIR:-$HOME/Library/Application Support/OpenOats/sessions}"
-SAMPLE_FILE="demo/sample-transcript.jsonl"
-SESSION_FOLDER="$TRANSCRIPT_DIR/session_$(date +%Y-%m-%d_%H-%M-%S)"
-SESSION_FILE="$SESSION_FOLDER/transcript.live.jsonl"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Ensure session subfolder exists (matches real OpenOats structure)
-mkdir -p "$SESSION_FOLDER"
+# Default source if --file not provided
+DEFAULT_FILE="$REPO_ROOT/demo/sample-transcript.jsonl"
+if [[ ! " $* " =~ " --file " ]]; then
+  set -- --file "$DEFAULT_FILE" "$@"
+fi
 
-echo "🔴 TWiSTroll Test Session"
-echo "   Writing to: $SESSION_FILE"
-echo "   Appending one utterance every 8 seconds..."
-echo "   Press Ctrl+C to stop"
-echo ""
+# Default name
+if [[ ! " $* " =~ " --name " ]]; then
+  set -- --name "sim" "$@"
+fi
 
-# Clear any existing test file
-> "$SESSION_FILE"
-
-# Read sample file line by line and append with delay
-while IFS= read -r line; do
-    echo "$line" >> "$SESSION_FILE"
-    # Extract speaker and first few words for display
-    SPEAKER=$(echo "$line" | grep -o '"speaker":"[^"]*"' | cut -d'"' -f4)
-    TEXT=$(echo "$line" | grep -o '"refinedText":"[^"]*"' | cut -d'"' -f4 | head -c 60)
-    echo "  [$SPEAKER] ${TEXT}..."
-    sleep 8
-done < "$SAMPLE_FILE"
-
-echo ""
-echo "✅ Test session complete. Check your TWiSTroll overlay!"
+exec npx tsx "$SCRIPT_DIR/replay-session.ts" "$@"
