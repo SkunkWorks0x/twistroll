@@ -77,7 +77,6 @@
 These differentiate TWiSTroll from any other submission. They are NOT required by the April 15 bounty post.
 
 - **Sponsor Guardian** — 12 sponsors, instant-fire, bypasses cooldown, 45-second ad break suppression
-- **"Not Ad" producer-facing system** — per-episode brief, dual-surface (viewer bubble + producer plug cards), TAKEN/PASSED buttons
 - **Cross-Episode Memory** — LanceDB + EmbeddingGemma, 21+ episodes backfilled, contextual recall for fact-checks
 - **Pre-show Guest Dossier** — structured context injection per guest
 - **Hybrid LLM stack** — Claude Haiku + Grok 4.1 Fast + Groq + Ollama with intelligent fallback chains

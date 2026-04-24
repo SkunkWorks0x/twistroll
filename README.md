@@ -123,7 +123,7 @@ For testing without OpenOats:
 
 ## The 4 personas
 
-Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → Fred. One fresh pop-up every ~15 seconds, with a "Not Ad" yield slot sprinkled in for pacing.
+Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → Fred. One fresh pop-up every ~15 seconds.
 
 | Persona | Role | Color | Voice |
 |---------|------|-------|-------|
@@ -174,7 +174,7 @@ WebSocket broadcast
 OBS browser source overlay (floating transparent bubbles)
 ```
 
-One persona fires per utterance in round-robin order: Jamie → Delinquent → Taco → Fred → repeat, with a "Not Ad" yield slot mixed in for visual pacing. Each reaction takes ~2-4 seconds end-to-end.
+One persona fires per utterance in round-robin order: Jamie → Delinquent → Taco → Fred → repeat. Each reaction takes ~2-4 seconds end-to-end.
 
 ---
 
@@ -207,7 +207,6 @@ Each step has a hard timeout; if the primary misses the window, the next tier ta
 
 Shipped beyond the bounty requirements:
 
-- **Not Ad system** — visual-pacing yield slot in the rotation, keeps bubbles from feeling mechanical.
 - **Cross-Episode Memory** — LanceDB vector store of prior-episode highlights for future callback work.
 - **Pre-show Guest Dossier** — Claude-generated background pack on each booked guest, dropped into `data/dossiers/`.
 - **Hybrid LLM fallback chain** — Haiku ↔ Grok ↔ Groq ↔ Ollama; the pipeline never dies.
@@ -248,7 +247,6 @@ Copy `.env.example` to `.env`. Defaults work out of the box with a Claude API ke
 Built and shipping:
 
 - [x] 4-persona overlay with live reactions (Jamie, Delinquent, Taco, Fred)
-- [x] Round-robin rotation with "Not Ad" pacing slot
 - [x] Per-persona LLM routing (Haiku for fact-check/sound, Grok for comedy)
 - [x] Hybrid LLM with multi-tier fallback (Haiku ↔ Grok ↔ Groq ↔ Ollama)
 - [x] Not Fred sound-effects system with 12 curated cues
