@@ -14,7 +14,6 @@ import { SNIPER_CONFIG } from './personas.js';
 import { getRecentUtterances, setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
-import { startAudiencePulseWatcher, appendViewerComment } from './audiencePulse.js';
 import {
   loadBrief,
   clearBrief,
@@ -182,22 +181,6 @@ app.post('/api/brief/clear', (_req, res) => {
 
 app.get('/api/brief/current', (_req, res) => {
   res.json(getCurrentBrief());
-});
-
-// API: Inject a viewer comment (manual / external integrations)
-app.post('/api/viewer-comment', (req, res) => {
-  const { username, text, platform } = req.body as {
-    username?: string;
-    text?: string;
-    platform?: 'youtube' | 'x' | 'manual';
-  };
-  if (!username || !text) {
-    return res.status(400).json({ error: 'username and text required' });
-  }
-  const p: 'youtube' | 'x' | 'manual' =
-    platform === 'youtube' || platform === 'x' || platform === 'manual' ? platform : 'manual';
-  const comment = appendViewerComment({ username, text, platform: p });
-  res.json({ ok: true, comment });
 });
 
 // API: Thumbs-up reaction
@@ -431,9 +414,6 @@ async function main() {
 
   // Start file watcher (OpenOats transcripts)
   watcher = startWatcher(handleUtterance);
-
-  // Start audience pulse watcher (viewer comments) — runs in parallel, same queue
-  startAudiencePulseWatcher(handleUtterance);
 
   // Start Express server
   server.listen(appConfig.overlayPort, () => {
