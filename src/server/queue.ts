@@ -16,23 +16,12 @@ let lastProcessedTime = 0;
 let processing = false;
 let rotationIndex = 0;
 
-// Slot 'not-ad' is a visual-pacing yield, not a generated persona.
-// When the rotation lands on it AND a real Not Ad bubble has fired in the
-// recent window, this slot is left empty so the bubble has breathing room.
-// Otherwise the slot is skipped immediately and the next persona fires.
-type RotationSlot = PersonaId | 'not-ad';
-const ROTATION: RotationSlot[] = [
+const ROTATION: PersonaId[] = [
   'not-jamie',
   'not-delinquent',
   'not-taco',
   'not-fred',
-  'not-ad',
 ];
-const NOT_AD_PACE_WINDOW_MS = 30_000;
-let lastNotAdFireMs = 0;
-export function recordNotAdFire(): void {
-  lastNotAdFireMs = Date.now();
-}
 
 // Jason-ism phrases — when the host says these, force Taco next
 const JASON_ISMS = [
@@ -57,12 +46,12 @@ const JASON_ISMS = [
   "that's just insane"
 ];
 
-// Personas that are toggled on by default. Filter out 'not-ad' (visual-pacing
-// slot, not a generated persona) AND any entries in DEFAULT_DISABLED_PERSONAS
-// below (not spec-required; producer can enable via config panel).
+// Personas toggled on by default. Filter out any entries in
+// DEFAULT_DISABLED_PERSONAS below (not spec-required; producer can
+// enable via config panel).
 const DEFAULT_DISABLED_PERSONAS: PersonaId[] = [];
 const enabledPersonas = new Set<PersonaId>(
-  ROTATION.filter((r): r is PersonaId => r !== 'not-ad' && !DEFAULT_DISABLED_PERSONAS.includes(r as PersonaId))
+  ROTATION.filter((r) => !DEFAULT_DISABLED_PERSONAS.includes(r))
 );
 
 // Sponsor suppression — suppress troll reactions during ad reads
@@ -126,21 +115,9 @@ export async function generate(
  * Skips disabled personas, wraps around.
  */
 function nextPersona(): PersonaId | null {
-  // Loop up to 2× length so a recent-not-ad-yield can pass through and
-  // the next real persona is reached on the same call.
-  for (let i = 0; i < ROTATION.length * 2; i++) {
+  for (let i = 0; i < ROTATION.length; i++) {
     const id = ROTATION[rotationIndex % ROTATION.length];
     rotationIndex++;
-    if (id === 'not-ad') {
-      // Slot 5 — Not Ad is fired by index.ts on detection events, not here.
-      // Yield this slot (return null to leave the utterance unanswered) ONLY
-      // if Not Ad has fired recently — gives the Not Ad bubble visual space.
-      // Otherwise skip immediately so we don't waste a turn on an empty slot.
-      if (Date.now() - lastNotAdFireMs < NOT_AD_PACE_WINDOW_MS) {
-        return null;
-      }
-      continue;
-    }
     if (enabledPersonas.has(id)) return id;
   }
   return null; // all disabled
