@@ -181,7 +181,6 @@ app.post('/api/brief/clear', (_req, res) => {
 });
 
 app.get('/api/brief/current', (_req, res) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:3002');
   res.json(getCurrentBrief());
 });
 
@@ -254,25 +253,11 @@ interface SponsorMessage {
   timestamp: number;
 }
 
-interface PlugOpportunityMessage {
-  type: 'plug-opportunity';
-  sponsor: string;
-  copy: string;
-  url: string;
-  code: string | null;
-  angle: string;
-  matched_trigger: string;
-  neutral_pivot: string;
-  also_matched: string[];
-  timestamp: number;
-}
-
 function broadcast(
   message:
     | TrollReaction
     | StatusMessage
     | SponsorMessage
-    | PlugOpportunityMessage
     | SoundCueMessage
     | FredAudioToggleMessage
     | FredVolumeMessage
@@ -417,20 +402,6 @@ async function main() {
               text: output.personality_bubble,
               timestamp: Date.now(),
               utteranceId: utterance.id,
-            });
-
-            // Mode 2 — producer panel on Launch Bay
-            broadcast({
-              type: 'plug-opportunity',
-              sponsor: output.matched_ad.sponsor,
-              copy: output.matched_ad.copy,
-              url: output.matched_ad.url,
-              code: output.matched_ad.code,
-              angle: output.matched_ad.angle,
-              matched_trigger: output.matched_trigger,
-              neutral_pivot: output.neutral_pivot,
-              also_matched: output.also_matched.map((a) => a.sponsor),
-              timestamp: Date.now(),
             });
 
             recordNotAdFire();
