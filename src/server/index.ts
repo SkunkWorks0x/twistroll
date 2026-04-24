@@ -6,7 +6,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
 import { startWatcher } from './watcher.js';
-import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression, recordNotAdFire } from './queue.js';
+import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { checkForSponsor } from './sponsors.js';
@@ -14,14 +14,6 @@ import { SNIPER_CONFIG } from './personas.js';
 import { getRecentUtterances, setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
-import {
-  loadBrief,
-  clearBrief,
-  checkBrief,
-  generateNotAdOutput,
-  getCurrentBrief,
-  getLastAlsoMatched,
-} from './dailyBrief.js';
 import type { TrollReaction, StatusMessage, PersonaId, SoundCueMessage, FredAudioToggleMessage, FredVolumeMessage } from '../shared/types.js';
 import { logReaction } from './logger.js';
 
@@ -162,25 +154,6 @@ app.post('/api/dossier/load', (req, res) => {
   setCurrentDossier(dossier);
   console.log(`[dossier] Loaded dossier for "${dossier.name}"`);
   res.json(dossier);
-});
-
-// API: Daily brief — load, clear, get current
-app.post('/api/brief/load', (req, res) => {
-  const brief = req.body;
-  if (!brief || !brief.episode || !Array.isArray(brief.ads)) {
-    return res.status(400).json({ error: 'Invalid brief format' });
-  }
-  loadBrief(brief);
-  res.json({ status: 'loaded', episode: brief.episode, ads: brief.ads.length });
-});
-
-app.post('/api/brief/clear', (_req, res) => {
-  clearBrief();
-  res.json({ status: 'cleared' });
-});
-
-app.get('/api/brief/current', (_req, res) => {
-  res.json(getCurrentBrief());
 });
 
 // API: Thumbs-up reaction
@@ -363,41 +336,6 @@ async function main() {
         });
         console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
         startSponsorSuppression();
-      }
-
-      // Not Ad — daily-brief contextual ad insertion. Runs in parallel to
-      // the sponsor guardian above; both can fire on the same utterance.
-      const matchedAd = checkBrief(utterance.text);
-      if (matchedAd) {
-        const recent = getRecentUtterances().slice(-4);
-        const alsoMatched = getLastAlsoMatched();
-        const notAdTimerLabel = `notAd-${utterance.id}`;
-        console.time(notAdTimerLabel);
-        generateNotAdOutput(matchedAd, recent, alsoMatched)
-          .then((output) => {
-            console.timeEnd(notAdTimerLabel);
-            if (!output) return;
-
-            // Mode 1 — viewer overlay: identical render path to the four trolls
-            broadcast({
-              type: 'troll_comment',
-              persona: 'not-ad' as PersonaId,
-              text: output.personality_bubble,
-              timestamp: Date.now(),
-              utteranceId: utterance.id,
-            });
-
-            recordNotAdFire();
-            console.log(
-              `[not-ad] Fired ${matchedAd.sponsor} on trigger "${output.matched_trigger}"`
-            );
-          })
-          .catch((err) => {
-            console.timeEnd(notAdTimerLabel);
-            console.warn(
-              `[not-ad] generation error: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
       }
     }
 
