@@ -212,7 +212,6 @@ Shipped beyond the bounty requirements:
 - **Cross-Episode Memory** — LanceDB vector store of prior-episode highlights for future callback work.
 - **Audience Pulse** — lightweight sentiment telemetry per utterance, logged to `data/audience-pulse.jsonl`.
 - **Pre-show Guest Dossier** — Claude-generated background pack on each booked guest, dropped into `data/dossiers/`.
-- **Auto Smart Clipper** — flags high-energy moments from the reaction log as candidate short-form clips. <!-- TODO: link Launch Bay Dashboard if/when the UI ships. -->
 - **Hybrid LLM fallback chain** — Haiku ↔ Grok ↔ Groq ↔ Ollama; the pipeline never dies.
 
 ---
@@ -262,7 +261,6 @@ Built and shipping:
 - [x] Jason-ism Detector
 - [x] Pre-show guest dossier
 - [x] Audience Pulse tracking
-- [x] Auto smart clipper
 - [x] 30+ pattern flat reaction filter
 - [x] Production config panel with feedback controls
 - [x] Timestamped reaction log for editors
