@@ -105,12 +105,12 @@ export async function generate(
   }
 
   if (mode === 'cloud') {
-    return { text: await cloudGenerate(systemPrompt, userMessage, personaId), engine: 'cloud' };
+    return { text: await cloudGenerate(systemPrompt, userMessage), engine: 'cloud' };
   }
 
   // hybrid: cloud → groq → ollama
   try {
-    const text = await cloudGenerate(systemPrompt, userMessage, personaId);
+    const text = await cloudGenerate(systemPrompt, userMessage);
     return { text, engine: 'cloud' };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
