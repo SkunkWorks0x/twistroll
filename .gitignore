@@ -9,3 +9,6 @@ data/
 # but explicit so a future loosening of the data/ ignore doesn't leak them)
 data/diagnostics/*.heapsnapshot
 .claude/
+*.bak
+*.backup*
+.env.backup-*
