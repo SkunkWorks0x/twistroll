@@ -209,7 +209,6 @@ Shipped beyond the bounty requirements:
 
 - **Not Ad system** — visual-pacing yield slot in the rotation, keeps bubbles from feeling mechanical.
 - **Cross-Episode Memory** — LanceDB vector store of prior-episode highlights for future callback work.
-- **Audience Pulse** — lightweight sentiment telemetry per utterance, logged to `data/audience-pulse.jsonl`.
 - **Pre-show Guest Dossier** — Claude-generated background pack on each booked guest, dropped into `data/dossiers/`.
 - **Hybrid LLM fallback chain** — Haiku ↔ Grok ↔ Groq ↔ Ollama; the pipeline never dies.
 
