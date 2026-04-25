@@ -10,5 +10,6 @@ data/
 data/diagnostics/*.heapsnapshot
 .claude/
 *.bak
+*.bak.*
 *.backup*
 .env.backup-*
