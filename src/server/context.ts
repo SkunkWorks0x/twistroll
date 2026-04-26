@@ -9,8 +9,13 @@ import { initMemory, queryMemory, formatMemoryBlock } from './episodeMemory.js';
 
 // Cross-episode memory state
 let currentMemoryBlock = '';
+let currentMemoryMaxScore = 0;
 let memoryLastUpdated = 0;
 let memoryAvailable = false;
+
+// Gary-only memory confidence gate: blocks below this max-score threshold
+// are omitted from Gary's context entirely (falsifiability gate per c85d297).
+const GARY_MEMORY_CONFIDENCE_THRESHOLD = 0.68;
 
 // Init LanceDB once at startup — if it fails, memory is disabled for the session.
 initMemory()
@@ -161,6 +166,8 @@ async function refreshMemoryBlock(summary: string): Promise<void> {
     const STRONG_MATCH_THRESHOLD = 0.46;
     const strongResults = results.filter((r) => r.score > STRONG_MATCH_THRESHOLD);
     currentMemoryBlock = strongResults.length > 0 ? formatMemoryBlock(strongResults) : '';
+    // Stash max score for Gary's confidence gate at inject time.
+    currentMemoryMaxScore = strongResults.length > 0 ? strongResults[0].score : 0;
     memoryLastUpdated = Date.now();
     console.log(`[memory] Query fired (${latencyMs}ms, ${results.length} results${filter ? `, filter guestName=${filter.guestName}` : ''})`);
     console.log(`[memory] Filtered ${results.length} results to ${strongResults.length} strong matches (>${STRONG_MATCH_THRESHOLD})`);
@@ -191,7 +198,8 @@ export function buildContext(
   }
 
   // Cross-episode memory (populated on summary cadence, not per utterance)
-  if (currentMemoryBlock) {
+  // Gary-only: gate on max-score confidence; other personas use the formatted block at the 0.46 floor.
+  if (currentMemoryBlock && (persona !== 'not-jamie' || currentMemoryMaxScore >= GARY_MEMORY_CONFIDENCE_THRESHOLD)) {
     context += `${currentMemoryBlock}\n\n`;
   }
 
