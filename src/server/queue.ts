@@ -67,6 +67,7 @@ let consecutiveFredSkips = 0;
 // Override with FRED_TRIGGER_THRESHOLD=7 npm run dev for demo recording. Do not lower the default.
 const FRED_TRIGGER_THRESHOLD = process.env.FRED_TRIGGER_THRESHOLD || '9';
 console.log(`[FRED-HB] BOOT threshold=${FRED_TRIGGER_THRESHOLD} cooldown=${Math.round(appConfig.cooldownMs / 1000)}s sound_library=12`);
+console.log(`[JAMIE-HB] BOOT guardrails=verifiable_claim_rule pass_token=enabled`);
 
 /**
  * Generate a response using the configured LLM mode.
@@ -213,13 +214,16 @@ export async function processUtterance(
     let response = routerText;
     const engine: string = provider;
 
-    // Troll "PASS" = intentional silence per f0a233e silence-is-power.
+    // PASS token = intentional silence (Delinquent: silence_is_power per f0a233e;
+    // Gary: no_verifiable_claim per VERIFIABLE-CLAIM RULE c85d297).
     // No force-through counter: passes ARE the hypothesis;
     // capping would re-introduce always-fire.
-    if (personaId === 'not-delinquent') {
+    if (['not-delinquent', 'not-jamie'].includes(personaId)) {
       const trimmed = response.trim();
       if (trimmed.toUpperCase() === 'PASS') {
-        console.log(`[DELINQ-HB] PASS reason=silence_is_power utt=${utterance.id}`);
+        console.log(personaId === 'not-delinquent'
+          ? `[DELINQ-HB] PASS reason=silence_is_power utt=${utterance.id}`
+          : `[JAMIE-HB] PASS reason=no_verifiable_claim utt=${utterance.id}`);
         processing = false;
         return;
       }
