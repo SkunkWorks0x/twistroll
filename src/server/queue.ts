@@ -299,8 +299,8 @@ export async function processUtterance(
     // Strip wrapping quotes
     response = response.replace(/^["'"]+|["'"]+$/g, '');
 
-    // Take first sentence only
-    const sentenceMatch = response.match(/^(.*?(?:\.\s|\." |[!?]))/);
+    // Take first sentence only — exclude common abbreviations from the period+space terminator
+    const sentenceMatch = response.match(/^(.*?(?:(?<!\b(?:[Vv]s|VS|Mrs|Mr|Dr|Inc|Ltd|Co|Corp|etc|Jr|Sr|St|Ave|e\.g|i\.e|U\.S|U\.K|a\.m|p\.m))\.\s|\." |[!?]))/);
     if (sentenceMatch) {
       response = sentenceMatch[1].trimEnd();
     }
