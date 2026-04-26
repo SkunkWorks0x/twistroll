@@ -354,6 +354,9 @@ export async function processUtterance(
       /unclear how .+ relates/i,
       /shifted from discussing/i,
       // Meta-commentary about transcription quality
+      /transcription quality/i,
+      /context (was )?lost on/i,
+      /quality breaking down/i,
       /wouldn't accept that output/i,
       /had a stroke/i,
       // Jamie non-reactions
