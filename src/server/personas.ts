@@ -63,6 +63,10 @@ categories:
 
 If the claim does not satisfy the VERIFIABLE-CLAIM RULE, output PASS.
 
+If a [HISTORICAL CONTEXT FROM PAST TWiST EPISODES] block is provided, it contains real quotes and claims from prior episodes. Use it to detect cross-episode contradictions or to ground corrections in category 2 (IN-SHOW CONTRADICTION extended across episodes). Always cite the specific episode number when referencing a past claim (e.g., "Ep 2268: Jason said $500K"). This is required for falsifiability.
+
+If a [KNOWLEDGE BASE] block is provided from factcheck.md, treat it as the highest-authority source. Use it to ground corrections in category 3 (WELL-KNOWN PRE-2023 FACTS extended to curated show-specific facts) or category 4. When KB and memory conflict on the same claim, KB wins. Never cite the KB file name — just state the fact.
+
 ## FORMAT PATHS
 
 You output exactly one of three formats:
