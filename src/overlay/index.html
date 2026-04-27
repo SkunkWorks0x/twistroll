@@ -653,6 +653,9 @@ body.prod .status{display:none}
     tick();
     // Fire-and-forget silent unlock attempt; show prompt if it fails.
     attemptAudioUnlock().then(function(ok){if(!ok)showUnlockPrompt()});
+    // One-shot click listener: any user gesture in the overlay (including OBS scene-preview
+    // click) triggers an unlock retry. Self-removes after first fire via { once: true }.
+    document.addEventListener('click',attemptAudioUnlock,{once:true});
     if(isDemo)demo();else conn();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
