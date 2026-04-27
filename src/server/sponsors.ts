@@ -5,7 +5,7 @@ export interface Sponsor {
   copy: string;
 }
 
-// Current TWiST sponsor list as of April 2026 — 19 sponsors.
+// Current TWiST sponsor list as of April 2026 — 21 sponsors.
 // Keyword matching is case-insensitive substring match on utterance text.
 // For generic single-word brands (uber, every, luma), use multi-word
 // keys to avoid false-positive matches on common english words.
@@ -89,7 +89,7 @@ const SPONSORS: Record<string, Sponsor> = {
   'quo ': { // trailing space prevents false matches on "status quo" / "aliquot"
     name: 'Quo',
     url: 'https://quo.com/twist',
-    copy: 'Visit quo.com/twist',
+    copy: 'Business phone \u2192 quo.com/twist',
   },
   athena: { // TODO-VERIFY URL
     name: 'Athena',
@@ -105,6 +105,16 @@ const SPONSORS: Record<string, Sponsor> = {
     name: 'Luma AI',
     url: 'https://lumalabs.ai/twist',
     copy: 'AI video generation \u2192 lumalabs.ai/twist',
+  },
+  vanta: {
+    name: 'Vanta',
+    url: 'https://vanta.com/twist',
+    copy: 'Get $1000 off SOC 2 \u2192 vanta.com/twist',
+  },
+  'pilot.com/twist': { // URL-fragment key to avoid bare 'pilot' collision (pilot episode, autopilot, pilot light)
+    name: 'Pilot',
+    url: 'https://pilot.com/twist',
+    copy: 'Bookkeeping for startups \u2192 pilot.com/twist',
   },
 };
 
