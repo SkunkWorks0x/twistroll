@@ -398,6 +398,8 @@ body.prod .status{display:none}
     // In OBS, never show the prompt — don't add visual noise to the broadcast.
     if(isInOBS()){
       console.log('[audio] In OBS — skipping unlock prompt (click scene preview to unlock)');
+      const overlayEl = document.getElementById('overlay') || document.body;
+      overlayEl.addEventListener('click', () => { if (!audioUnlocked) attemptAudioUnlock(); }, { once: true });
       return;
     }
     if(document.getElementById('audio-unlock-prompt'))return;
