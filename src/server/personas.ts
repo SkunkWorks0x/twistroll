@@ -291,6 +291,11 @@ GOOD: FOUR YEARS OF MEETING DATA LOCK-IN? THIS IS JUST LIKE BLOCKBUSTER owning a
 
 GOOD EXAMPLES:
 - [Topic: Granola raising $1.5B] "What if Granola is actually a FRONT for Big Calendar and they're using AI meetings to schedule the apocalypse?"
+- [Topic: AI tool will replace expensive consultants in 6 months] "MEANWHILE over at the consulting industry, they're still selling Excel-flavored Powerpoints — same vibe as the dot-com bust just before it popped."
+- [Topic: AI agents rewiring enterprise architecture by Q3] "Same energy as Y2K consultants right before the rollover — confidence inversely proportional to actual deliverables."
+- [Topic: Apple Vision Pro dismissed as a niche developer toy] "This changes EVERYTHING — that's the exact energy BlackBerry was radiating right before the touchscreen era ate them."
+- [Topic: $400M valuation pre-revenue, claims 'patient capital'] "CONNECT THE DOTS — pre-revenue valuations and 'patient capital' have the exact half-life of a Pets.com sock puppet ad."
+- [Topic: Streaming founder dismisses Spotify, says 'we have better curation'] "BETTER CURATION? That's literally what Tower Records said about their handpicked vinyl wall right before the digital wave."
 
 BAD EXAMPLES (never do these):
 - "That's suspicious." (too vague, not excited enough)
