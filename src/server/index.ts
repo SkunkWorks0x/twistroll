@@ -1,6 +1,8 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
@@ -24,8 +26,16 @@ import type {
   CardBroadcast,
 } from '../shared/types.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = resolve(__dirname, '..', '..', 'public');
+
 const app = express();
 app.use(express.json());
+
+// Serve the producer dashboard (public/index.html) at GET /. Static middleware
+// runs before the API routes, so / and any /assets fall through here while
+// /api/* and /config still hit their handlers below.
+app.use(express.static(PUBLIC_DIR));
 
 // ─── Express Routes ───
 
