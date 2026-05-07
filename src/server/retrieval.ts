@@ -272,52 +272,101 @@ const TAVILY_TIER1_BIAS: string[] = [
 
 const MAX_TAVILY_RESULTS = 6;
 
-// Build a topical query for the BROAD search. The discriminator is composed
-// from primaryEntity + entityType + keyNumbers + claim language, not
-// claimType alone — the classifier's ClaimType enum is too coarse-grained
-// (everything money-related is just 'financial').
-function buildTavilyQuery(claim: ClaimClassification): string {
+// Helpers (exported for unit testing — see scripts/test-tavily-query.ts).
+
+// Convert numeric strings >= 1M to named-magnitude form. Sub-million values
+// pass through unchanged. Strips $, %, comma punctuation before parsing so
+// "$5,000,000" still humanizes to "5 million".
+export function humanizeNumber(n: string): string {
+  const num = parseFloat(n.replace(/[,$%]/g, ''));
+  if (isNaN(num)) return n;
+  if (num >= 1_000_000_000) {
+    const v = num / 1_000_000_000;
+    return `${num % 1_000_000_000 === 0 ? v.toFixed(0) : v.toFixed(1)} billion`;
+  }
+  if (num >= 1_000_000) {
+    const v = num / 1_000_000;
+    return `${num % 1_000_000 === 0 ? v.toFixed(0) : v.toFixed(1)} million`;
+  }
+  return n;
+}
+
+const PRESENT_TENSE_TRIGGERS = /\b(is|has|are|currently|available|using)\b|right now/i;
+const HISTORICAL_TRIGGERS = /\b(was|were|founded|started)\b|\bback in\b/i;
+
+function isPresentTenseClaim(claimText: string): boolean {
+  const text = claimText || '';
+  if (HISTORICAL_TRIGGERS.test(text)) return false;
+  return PRESENT_TENSE_TRIGGERS.test(text);
+}
+
+// Guess a likely domain for the entity. TLD-bearing entities use it as-is;
+// short (≤2 token) plain entities get a `.com` guess. Longer entities return
+// null — too ambiguous to bet a site:-scoped query on.
+function inferDomain(entity: string): string | null {
+  const trimmed = entity.trim();
+  if (!trimmed) return null;
+  const tldMatch = trimmed.match(/[a-z0-9-]+\.(com|io|ai|org)/i);
+  if (tldMatch) return tldMatch[0].toLowerCase();
+  const tokens = trimmed.split(/\s+/).filter((t) => t.length > 0);
+  if (tokens.length === 0 || tokens.length > 2) return null;
+  return `${tokens.join('').toLowerCase()}.com`;
+}
+
+// Build the BROAD topical query.
+// Rules (per cc-retrieval-surgical-fix Step 1):
+//   1. Quote primaryEntity in literal double quotes
+//   2. Humanize numbers >= 1M to named-magnitude form
+//   3. Append 2026 for present-tense claims (suppressed on historical markers)
+//   4. Drop claimType tokens — those belong in ranking, not search
+export function buildTavilyQuery(claim: ClaimClassification): string {
   const entity = (claim.primaryEntity || '').trim();
-  const noun = (claim.searchableNoun || entity).trim();
-  const numbers = claim.keyNumbers || [];
-  const firstNum = numbers[0] || '';
-  const numStr = numbers.join(' ');
+  const numbers = (claim.keyNumbers || []).map(humanizeNumber).filter((n) => n.length > 0);
 
-  const hasMoney = /\$/.test(numStr);
-  const hasPercent = /%/.test(numStr);
-  const isCompany = claim.entityType === 'company';
-  const isPerson = claim.entityType === 'person';
+  // Strip entity tokens from searchableNoun so they don't double up with the
+  // already-quoted entity term.
+  const entityTokensSet = new Set(
+    entity.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
+  );
+  const descriptorTokens = (claim.searchableNoun || '')
+    .split(/\s+/)
+    .filter((t) => t.length > 0 && !entityTokensSet.has(t.toLowerCase()));
 
-  // Person → biographical / attribution-style query
-  if (isPerson) {
-    return `${entity} ${noun}`.trim();
+  const year = isPresentTenseClaim(claim.claimText) ? '2026' : '';
+
+  const parts: string[] = [];
+  if (entity) parts.push(`"${entity}"`);
+  if (numbers.length) parts.push(numbers.join(' '));
+  if (descriptorTokens.length) parts.push(descriptorTokens.join(' '));
+  if (year) parts.push(year);
+
+  return parts.join(' ').trim();
+}
+
+// Build the NARROW query. Rule 5: site-scope when an entity-domain can be
+// inferred; otherwise fall back to a quoted-entity advanced search.
+export function buildTavilyNarrowQuery(claim: ClaimClassification): {
+  query: string;
+  domain: string | null;
+} {
+  const entity = (claim.primaryEntity || '').trim();
+  if (!entity) return { query: '', domain: null };
+
+  const numbers = (claim.keyNumbers || []).map(humanizeNumber).filter((n) => n.length > 0);
+  const entityTokensSet = new Set(
+    entity.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
+  );
+  const descriptorTokens = (claim.searchableNoun || '')
+    .split(/\s+/)
+    .filter((t) => t.length > 0 && !entityTokensSet.has(t.toLowerCase()));
+
+  const claimKeywords = [...numbers, ...descriptorTokens].join(' ').trim();
+  const domain = inferDomain(entity);
+
+  if (domain) {
+    return { query: `site:${domain} ${claimKeywords}`.trim(), domain };
   }
-
-  // Funding round detection: dollar amount + claim language hints
-  // ("Series X", "valuation", "raised", "led by", etc.)
-  const claimBlob = `${claim.claimText} ${noun}`.toLowerCase();
-  const looksLikeRound = hasMoney && /\b(series\s+[a-z]\b|valuation|raised|round|seed funding|led by)\b/i.test(claimBlob);
-  if (looksLikeRound) {
-    return `${entity} series funding ${firstNum} TechCrunch OR Crunchbase`.trim();
-  }
-
-  // Company metric: company entity + percentage (CAC, retention, churn, etc.)
-  if (isCompany && hasPercent) {
-    return `${entity} ${firstNum} earnings OR "investor relations" OR revenue`.trim();
-  }
-
-  switch (claim.claimType) {
-    case 'financial':
-      // Broad market/finance — bias toward primary venture data sources
-      return `${entity} ${firstNum} PitchBook OR NVCA OR Crunchbase OR "venture monitor"`.trim();
-    case 'prediction':
-      return `${entity} forecast OR outlook ${firstNum}`.trim();
-    case 'historical':
-    case 'attribution':
-    case 'comparative':
-    default:
-      return `${entity} ${noun} ${firstNum}`.trim();
-  }
+  return { query: `"${entity}" ${claimKeywords}`.trim(), domain: null };
 }
 
 export async function queryTavily(claim: ClaimClassification): Promise<RetrievedSource[]> {
@@ -329,8 +378,11 @@ export async function queryTavily(claim: ClaimClassification): Promise<Retrieved
   }
 
   const broadQuery = buildTavilyQuery(claim);
-  const numStr = (claim.keyNumbers || []).join(' ').trim();
-  const narrowQuery = `${claim.primaryEntity || ''} ${numStr}`.trim();
+  const { query: narrowQuery, domain: narrowDomain } = buildTavilyNarrowQuery(claim);
+
+  if (narrowDomain) console.log(`[RETRIEVAL] site-scope: ${narrowDomain}`);
+  console.log(`[RETRIEVAL] tavily broad: "${broadQuery}"`);
+  console.log(`[RETRIEVAL] tavily narrow: "${narrowQuery}"`);
 
   if (!broadQuery && !narrowQuery) return [];
 
