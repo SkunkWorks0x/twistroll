@@ -99,11 +99,51 @@ export interface ClaimDetectedMessage {
   data: ClaimClassification;
 }
 
+// ─── Synthesis layer outputs (shipped on the 'claim_card' broadcast) ───
+export interface DocketCitationPayload {
+  title: string;
+  url: string;
+  tier: number;
+}
+export interface DocketPayload {
+  verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIAL' | 'UNVERIFIABLE';
+  explanation: string;
+  citations: DocketCitationPayload[];
+  follow_up: string;
+}
+export interface PatternPayload {
+  text: string;
+}
+export interface HostContradictionPayload {
+  episodeNumber: number;
+  episodeDate: string;
+  paraphrase: string;
+  followUp: string;
+  priorChunkId: string;
+}
+export interface CardBroadcast {
+  type: 'claim_card';
+  claimId: string;
+  claimText: string;
+  speaker: 'host' | 'guest';
+  timestamp: number;
+  docket: DocketPayload | null;
+  pattern: PatternPayload | null;
+  hostContradiction: HostContradictionPayload | null;
+  timing: {
+    docketMs: number;
+    patternMs: number;
+    contradictionMs: number;
+    totalMs: number;
+  };
+}
+
 export type WSMessage =
   | TrollReaction
   | StatusMessage
   | TranscriptSegmentMessage
-  | ClaimDetectedMessage;
+  | ClaimDetectedMessage
+  | CardBroadcast;
 
 export interface PersonaConfig {
   id: PersonaId;

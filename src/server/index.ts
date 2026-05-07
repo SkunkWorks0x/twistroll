@@ -9,8 +9,9 @@ import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
 import { classifyWindow, SpeakerMap } from './classifier.js';
-import { enqueueClaim, queueStats } from './claimQueue.js';
+import { enqueueClaim, queueStats, setProcessHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
+import { synthesize } from './synthesis.js';
 import type {
   TrollReaction,
   StatusMessage,
@@ -20,6 +21,7 @@ import type {
   TranscriptSegment,
   ClaimClassification,
   SessionContext,
+  CardBroadcast,
 } from '../shared/types.js';
 
 const app = express();
@@ -230,6 +232,31 @@ function validateSpeakerMap(input: unknown): SpeakerMap {
   return out;
 }
 
+// ─── Synthesis pipeline: claim queue → retrieval → synthesis → broadcast ─
+setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
+  try {
+    const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
+    const card: CardBroadcast = {
+      type: 'claim_card',
+      claimId: claim.segmentId,
+      claimText: claim.claimText,
+      speaker: claim.speaker,
+      timestamp: claim.timestamp,
+      docket: result.docket,
+      pattern: result.pattern,
+      hostContradiction: result.hostContradiction,
+      timing: result.timing,
+    };
+    broadcast(card);
+    console.log(
+      `[SYNTHESIS] claim=${claim.segmentId.slice(0, 8)} docket=${result.docket?.verdict ?? 'null'} pattern=${result.pattern ? 'fired' : 'null'} contradiction=${result.hostContradiction ? 'fired' : 'null'} total=${result.timing.totalMs}ms`
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[SYNTHESIS] failed: ${msg}`);
+  }
+});
+
 function validateSessionContext(input: unknown): SessionContext {
   if (!input || typeof input !== 'object') return {};
   const src = input as Record<string, unknown>;
@@ -358,7 +385,7 @@ wss.on('connection', (ws) => {
 });
 
 function broadcast(
-  message: TrollReaction | StatusMessage | TranscriptSegmentMessage | ClaimDetectedMessage
+  message: TrollReaction | StatusMessage | TranscriptSegmentMessage | ClaimDetectedMessage | CardBroadcast
 ): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
