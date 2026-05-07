@@ -58,14 +58,40 @@ export interface TranscriptSegmentMessage {
 }
 
 // ─── Claim classifier (Sentinel two-stage pipeline, Stage 1) ───
+export type EntityType = 'company' | 'person' | 'product' | 'metric' | 'event' | 'unknown';
+export type ClaimType = 'financial' | 'historical' | 'attribution' | 'comparative' | 'prediction' | 'unknown';
+
+export interface SessionContext {
+  showName?: string;
+  hostName?: string;
+  hostCompany?: string;
+  guestName?: string;
+  guestCompany?: string;
+  guestTitle?: string;
+  episodeTopic?: string;
+}
+
 export interface ClaimClassification {
   isClaim: boolean;
   claimText: string;       // empty when isClaim=false
   speaker: 'host' | 'guest';
   confidence: number;      // 0–1
   reason: string;          // brief explanation, ≤15 words
-  segmentId: string;       // links back to TranscriptSegment.id
+  segmentId: string;       // current segment id (latest in window)
   timestamp: number;       // mirrors TranscriptSegment.timestamp (seconds from session start)
+
+  // Structured extraction (empty defaults when isClaim=false)
+  primaryEntity: string;       // resolved from pronouns via SessionContext when applicable
+  entityType: EntityType;
+  keyNumbers: string[];        // ["200%", "$100M ARR", "Q4"]
+  claimType: ClaimType;
+  searchableNoun: string;      // 1–3 word retrieval kernel
+
+  // Window span — segment IDs covered by this claim.
+  claimSpan: {
+    startSegmentId: string;
+    endSegmentId: string;
+  };
 }
 
 export interface ClaimDetectedMessage {

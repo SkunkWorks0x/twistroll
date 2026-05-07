@@ -8,7 +8,7 @@ import { setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
-import { classifySegment, SpeakerMap } from './classifier.js';
+import { classifyWindow, SpeakerMap } from './classifier.js';
 import type {
   TrollReaction,
   StatusMessage,
@@ -16,6 +16,8 @@ import type {
   TranscriptSegmentMessage,
   ClaimDetectedMessage,
   TranscriptSegment,
+  ClaimClassification,
+  SessionContext,
 } from '../shared/types.js';
 
 const app = express();
@@ -96,17 +98,59 @@ const deepgram: DeepgramClient | null = deepgramApiKey
 
 // ─── Classifier state ───
 const SEGMENT_BUFFER_MAX = 12;
+const WINDOW_SIZE = 3;
 const CLAIM_CONFIDENCE_THRESHOLD = parseFloat(process.env.CLAIM_CONFIDENCE_THRESHOLD || '0.7');
+const CLAIM_SPAN_TTL_MS = 15000;
 const lastSegments: TranscriptSegment[] = [];
 let currentSpeakerMap: SpeakerMap = {};
+let currentSessionContext: SessionContext = {};
+
+interface ActiveSpan {
+  coveredIds: Set<string>;
+  expiresAt: number;
+}
+const activeSpans: ActiveSpan[] = [];
+
 const classifierStats = {
   segmentsProcessed: 0,
+  segmentsSkippedBySpan: 0,
   claimsDetected: 0,
   claimsByHost: 0,
   claimsByGuest: 0,
   sumConfidence: 0,
   sumLatencyMs: 0,
 };
+
+function pruneExpiredSpans(): void {
+  const now = Date.now();
+  for (let i = activeSpans.length - 1; i >= 0; i--) {
+    if (activeSpans[i].expiresAt <= now) activeSpans.splice(i, 1);
+  }
+}
+
+function isSegmentInActiveSpan(segId: string): boolean {
+  pruneExpiredSpans();
+  return activeSpans.some((s) => s.coveredIds.has(segId));
+}
+
+function markSpanActive(window: TranscriptSegment[], span: ClaimClassification['claimSpan']): void {
+  // Translate the LLM-reported start/end IDs to the set of window IDs they cover.
+  const startIdx = window.findIndex((s) => s.id === span.startSegmentId);
+  const endIdx = window.findIndex((s) => s.id === span.endSegmentId);
+  let covered: string[];
+  if (startIdx === -1 || endIdx === -1) {
+    // Fallback: only the current segment.
+    covered = [window[window.length - 1].id];
+  } else {
+    const lo = Math.min(startIdx, endIdx);
+    const hi = Math.max(startIdx, endIdx);
+    covered = window.slice(lo, hi + 1).map((s) => s.id);
+  }
+  activeSpans.push({
+    coveredIds: new Set(covered),
+    expiresAt: Date.now() + CLAIM_SPAN_TTL_MS,
+  });
+}
 
 if (deepgram) {
   deepgram.on('segment', (segment: TranscriptSegment) => {
@@ -117,10 +161,19 @@ if (deepgram) {
     lastSegments.push(segment);
     while (lastSegments.length > SEGMENT_BUFFER_MAX) lastSegments.shift();
 
-    // Fire-and-forget classification. The classifier swallows its own errors.
-    // We pass everything except the current segment as recent context.
-    const recent = lastSegments.slice(0, -1);
-    classifySegment(segment, recent, currentSpeakerMap)
+    // Dedup: if this segment is already inside an active claimSpan, the prior
+    // claim covered it — don't re-classify.
+    if (isSegmentInActiveSpan(segment.id)) {
+      classifierStats.segmentsSkippedBySpan++;
+      console.log(`[CLASSIFIER] Segment ${segment.id} within active claimSpan, skipping`);
+      return;
+    }
+
+    // Build the 3-segment evaluation window plus prior context behind it.
+    const window = lastSegments.slice(-WINDOW_SIZE);
+    const prior = lastSegments.slice(0, -WINDOW_SIZE);
+
+    classifyWindow(window, prior, currentSpeakerMap, currentSessionContext)
       .then(({ classification, latencyMs }) => {
         classifierStats.segmentsProcessed++;
         classifierStats.sumLatencyMs += latencyMs;
@@ -131,6 +184,7 @@ if (deepgram) {
           if (classification.speaker === 'host') classifierStats.claimsByHost++;
           else classifierStats.claimsByGuest++;
 
+          markSpanActive(window, classification.claimSpan);
           broadcast({ type: 'claim_detected', data: classification });
           console.log(
             `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
@@ -143,8 +197,9 @@ if (deepgram) {
           console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
         }
       })
-      .catch((err) => {
-        console.error(`[classifier] unhandled error: ${err}`);
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[classifier] unhandled error: ${msg}`);
       });
   });
   deepgram.on('error', (err: Error) => {
@@ -169,14 +224,28 @@ function validateSpeakerMap(input: unknown): SpeakerMap {
   return out;
 }
 
+function validateSessionContext(input: unknown): SessionContext {
+  if (!input || typeof input !== 'object') return {};
+  const src = input as Record<string, unknown>;
+  const ctx: SessionContext = {};
+  const fields: Array<keyof SessionContext> = [
+    'showName', 'hostName', 'hostCompany', 'guestName', 'guestCompany', 'guestTitle', 'episodeTopic',
+  ];
+  for (const f of fields) {
+    if (typeof src[f] === 'string') ctx[f] = src[f] as string;
+  }
+  return ctx;
+}
+
 app.post('/api/session/start', async (req, res) => {
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
-  const { mode, source, speakerMap } = req.body as {
+  const { mode, source, speakerMap, sessionContext } = req.body as {
     mode?: SessionMode;
     source?: string;
     speakerMap?: unknown;
+    sessionContext?: unknown;
   };
   if (mode !== 'stream' && mode !== 'system-audio') {
     return res.status(400).json({ error: "mode must be 'stream' or 'system-audio'" });
@@ -188,14 +257,22 @@ app.post('/api/session/start', async (req, res) => {
     return res.status(409).json({ error: 'Session already active. Stop it first.' });
   }
 
-  // Reset per-session classifier context. Stats are intentionally cumulative
+  // Reset per-session classifier state. Stats are intentionally cumulative
   // across sessions — clear with a fresh process if the producer wants to.
   lastSegments.length = 0;
+  activeSpans.length = 0;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
+  currentSessionContext = validateSessionContext(sessionContext);
 
   try {
     await deepgram.startSession({ mode, source });
-    res.json({ ok: true, mode, source, speakerMap: currentSpeakerMap });
+    res.json({
+      ok: true,
+      mode,
+      source,
+      speakerMap: currentSpeakerMap,
+      sessionContext: currentSessionContext,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[session/start] ${msg}`);
@@ -227,19 +304,22 @@ app.get('/api/session/status', (_req, res) => {
     uptime: deepgram.getUptime(),
     configured: true,
     speakerMap: currentSpeakerMap,
+    sessionContext: currentSessionContext,
   });
 });
 
 app.get('/api/classifier/stats', (_req, res) => {
-  const { segmentsProcessed, claimsDetected, claimsByHost, claimsByGuest, sumConfidence, sumLatencyMs } = classifierStats;
+  const { segmentsProcessed, segmentsSkippedBySpan, claimsDetected, claimsByHost, claimsByGuest, sumConfidence, sumLatencyMs } = classifierStats;
   res.json({
     segmentsProcessed,
+    segmentsSkippedBySpan,
     claimsDetected,
     claimsByHost,
     claimsByGuest,
     averageConfidence: claimsDetected > 0 ? sumConfidence / claimsDetected : 0,
     averageLatencyMs: segmentsProcessed > 0 ? sumLatencyMs / segmentsProcessed : 0,
     confidenceThreshold: CLAIM_CONFIDENCE_THRESHOLD,
+    activeSpans: activeSpans.length,
   });
 });
 
