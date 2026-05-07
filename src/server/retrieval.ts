@@ -356,7 +356,7 @@ export async function retrieve(claim: ClaimClassification): Promise<RetrievalRes
   const [lr, tr, gr] = await Promise.all([
     timed(() => withTimeout(queryLanceDB(claim), 300, 'lancedb').catch(() => [] as RetrievedSource[])),
     timed(() => withTimeout(queryTavily(claim), 1200, 'tavily').catch(() => [] as RetrievedSource[])),
-    timed(() => withTimeout(queryGrokipedia(claim), 1500, 'grokipedia').catch(() => [] as RetrievedSource[])),
+    timed(() => withTimeout(queryGrokipedia(claim), 2500, 'grokipedia').catch(() => [] as RetrievedSource[])),
   ]);
   const timing = {
     lancedb: lr.ms,
