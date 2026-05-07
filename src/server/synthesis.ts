@@ -96,8 +96,24 @@ const DocketSchema = z.object({
 const CANONICAL_UNVERIFIABLE_PHRASE = 'No primary source located in show archive or live retrieval.';
 const LANCEDB_INJECTION_SCORE_FLOOR = 0.45;
 
-const PatternSchema = z.object({
-  text: z.string().refine((s) => wordCount(s) <= 38, 'Pattern output exceeds 38 words'),
+// Pattern Recognizer word limits — single source of truth. Used by:
+//   - PATTERN_SYSTEM prompt (target stated to Haiku)
+//   - truncateToWordLimit call site in runPattern (hard max enforced)
+//   - PatternSchema Zod refine (post-truncation safety net)
+// Target band 22-28 keeps outputs glance-readable under studio lighting
+// while preserving room for evidence + pressure point. Hard max 32 gives
+// Haiku 4 words of overshoot tolerance before truncation fires.
+export const PATTERN_WORD_LIMITS = {
+  targetMin: 22,
+  targetMax: 28,
+  hardMax: 32,
+} as const;
+
+export const PatternSchema = z.object({
+  text: z.string().refine(
+    (s) => wordCount(s) <= PATTERN_WORD_LIMITS.hardMax,
+    `Pattern output exceeds ${PATTERN_WORD_LIMITS.hardMax} words`
+  ),
 });
 
 // ─── Anti-pattern scans ────────────────────────────────────────────────
@@ -337,12 +353,12 @@ OUTPUT:
   "follow_up": "Is the $280M pre-money or post-money?"
 }`;
 
-const PATTERN_SYSTEM = `You are The Pattern Recognizer — a calm, experienced senior partner providing real-time counterargument during a live podcast interview.
+export const PATTERN_SYSTEM = `You are The Pattern Recognizer — a calm, experienced senior partner providing real-time counterargument during a live podcast interview.
 VOICE: "The precedent here is..." Precedent-driven, evidence-grounded. Low-affect, curious, slightly weary but never nihilistic. You sound like a senior partner leaning over during a board meeting murmuring a concern.
 RULES:
 * The speaker may be the host, co-host, or guest. Use the SPEAKER line in the user message to attribute correctly — don't assume every claim is a guest's.
 * One counterpoint only. No lists, no "also...", no multiple sentences with period + capital.
-* 28-34 words target, 38 hard max. Count carefully.
+* 22-28 words target, 32 hard max. Count carefully.
 * End with a pressure point the interviewer can turn into a follow-up question.
 * Use retrieval context to ground your counterargument. If no retrieval, reason from general knowledge and flag uncertainty.
 * Never start with "Actually," "But," "However," or any corrective adverb.
@@ -358,31 +374,31 @@ FEW-SHOT EXAMPLES:
 
 Example 1
 CLAIM: "We're growing 180% year over year and expect to triple revenue again next year with the new AI features."
-OUTPUT: The precedent here is vertical SaaS companies sustaining triple-digit growth past $20M ARR without margin expansion. That path usually forces a choice between valuation compression or a much larger next round than planned.
+OUTPUT: The precedent here is vertical SaaS sustaining triple-digit growth past $20M ARR without margin expansion. That path forces valuation compression or a much larger next round.
 
 Example 2
 CLAIM: "Our proprietary data moat from five years of customer signals is impossible for anyone to copy."
-OUTPUT: Market history at this scale shows data moats in SaaS erode within 18-24 months once reverse-engineered by funded competitors. The pressure point is whether defensibility cost stays below the value created.
+OUTPUT: Market history at this scale shows SaaS data moats erode within 18-24 months once reverse-engineered. The pressure point is whether defensibility cost stays below value created.
 
 Example 3
 CLAIM: "We're burning $3M a month but the LTV to CAC ratio is 5x so we're fine."
-OUTPUT: Unit economics at this velocity typically break when burn exceeds 40% of forward revenue and the next cohort shows lower conversion. The question is whether the 5x LTV/CAC holds when sales cycles lengthen past 90 days.
+OUTPUT: Unit economics at this velocity break when burn exceeds 40% of forward revenue. The question is whether 5x LTV/CAC holds when cycles lengthen past 90 days.
 
 Example 4
 CLAIM: "Every law firm will have our AI assistant inside their workflow within three years."
-OUTPUT: The pattern we've seen across vertical AI tools is that 80%+ workflow penetration claims at Series B rarely survive contact with actual procurement cycles and incumbent integration costs. The pressure point is whether the three-year timeline assumes zero switching friction.
+OUTPUT: The pattern across vertical AI tools is that 80%+ penetration claims at Series B rarely survive procurement cycles. The pressure point is whether timeline assumes zero friction.
 
 Example 5
 CLAIM: "We're the only company combining real-time transcription with automated follow-up intelligence for this exact workflow."
-OUTPUT: Smart capital would flag that "only company" claims in workflow automation rarely survive first contact with a funded competitor. The pressure point is how long the differentiation window stays open before parity arrives.
+OUTPUT: Smart capital would flag that "only company" claims in workflow automation rarely survive a funded competitor. The pressure point is how long the differentiation window stays open.
 
 Example 6
 CLAIM: "Our expansion revenue from existing customers will more than offset any new logo slowdown this year."
-OUTPUT: The precedent here is SaaS companies relying on net retention above 120% to mask new logo weakness usually face a cliff when the base saturates. The pressure point is what happens if net retention drops 10 points.
+OUTPUT: The precedent here is SaaS companies relying on 120%+ net retention to mask logo weakness face a cliff at base saturation. What if retention drops 10 points?
 
 Example 7
 CLAIM: "We can maintain 40%+ gross margins while scaling to $100M ARR because our AI stack is so efficient."
-OUTPUT: Market history at this scale shows vertical SaaS companies promising 40%+ gross margins at $100M ARR usually see compression once support and model costs scale. The pressure point is whether efficiency survives real customer volume.`;
+OUTPUT: Market history at this scale shows vertical SaaS promising 40%+ margins at $100M ARR see compression as support and model costs scale.`;
 
 // ─── Anthropic call helper (raw fetch — matches llm-router.ts pattern) ─
 
@@ -733,7 +749,7 @@ function extractText(response: any): string {
   return out.trim();
 }
 
-function truncateToWordLimit(text: string, maxWords: number): { text: string; truncated: boolean; from: number; to: number } {
+export function truncateToWordLimit(text: string, maxWords: number): { text: string; truncated: boolean; from: number; to: number } {
   const words = text.split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) return { text, truncated: false, from: words.length, to: words.length };
   // Try to end on a sentence boundary that fits.
@@ -788,7 +804,7 @@ export async function runPattern(
     }
 
     // Word-count cap with sentence-aware truncation (don't suppress, just trim).
-    const t = truncateToWordLimit(text, 38);
+    const t = truncateToWordLimit(text, PATTERN_WORD_LIMITS.hardMax);
     if (t.truncated) console.log(`[PATTERN] Truncated from ${t.from} to ${t.to} words.`);
 
     // Anti-pattern scan: corrective opener (retry) and content blocklist (retry).
