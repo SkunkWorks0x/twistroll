@@ -57,10 +57,27 @@ export interface TranscriptSegmentMessage {
   data: TranscriptSegment;
 }
 
+// ─── Claim classifier (Sentinel two-stage pipeline, Stage 1) ───
+export interface ClaimClassification {
+  isClaim: boolean;
+  claimText: string;       // empty when isClaim=false
+  speaker: 'host' | 'guest';
+  confidence: number;      // 0–1
+  reason: string;          // brief explanation, ≤15 words
+  segmentId: string;       // links back to TranscriptSegment.id
+  timestamp: number;       // mirrors TranscriptSegment.timestamp (seconds from session start)
+}
+
+export interface ClaimDetectedMessage {
+  type: 'claim_detected';
+  data: ClaimClassification;
+}
+
 export type WSMessage =
   | TrollReaction
   | StatusMessage
-  | TranscriptSegmentMessage;
+  | TranscriptSegmentMessage
+  | ClaimDetectedMessage;
 
 export interface PersonaConfig {
   id: PersonaId;

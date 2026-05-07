@@ -8,7 +8,15 @@ import { setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
-import type { TrollReaction, StatusMessage, PersonaId, TranscriptSegmentMessage } from '../shared/types.js';
+import { classifySegment, SpeakerMap } from './classifier.js';
+import type {
+  TrollReaction,
+  StatusMessage,
+  PersonaId,
+  TranscriptSegmentMessage,
+  ClaimDetectedMessage,
+  TranscriptSegment,
+} from '../shared/types.js';
 
 const app = express();
 app.use(express.json());
@@ -86,9 +94,58 @@ const deepgram: DeepgramClient | null = deepgramApiKey
   ? new DeepgramClient(deepgramApiKey)
   : null;
 
+// ─── Classifier state ───
+const SEGMENT_BUFFER_MAX = 12;
+const CLAIM_CONFIDENCE_THRESHOLD = parseFloat(process.env.CLAIM_CONFIDENCE_THRESHOLD || '0.7');
+const lastSegments: TranscriptSegment[] = [];
+let currentSpeakerMap: SpeakerMap = {};
+const classifierStats = {
+  segmentsProcessed: 0,
+  claimsDetected: 0,
+  claimsByHost: 0,
+  claimsByGuest: 0,
+  sumConfidence: 0,
+  sumLatencyMs: 0,
+};
+
 if (deepgram) {
-  deepgram.on('segment', (segment) => {
+  deepgram.on('segment', (segment: TranscriptSegment) => {
+    // Broadcast first — never gate transcript visibility on classifier latency.
     broadcast({ type: 'transcript_segment', data: segment });
+
+    // Roll the context buffer.
+    lastSegments.push(segment);
+    while (lastSegments.length > SEGMENT_BUFFER_MAX) lastSegments.shift();
+
+    // Fire-and-forget classification. The classifier swallows its own errors.
+    // We pass everything except the current segment as recent context.
+    const recent = lastSegments.slice(0, -1);
+    classifySegment(segment, recent, currentSpeakerMap)
+      .then(({ classification, latencyMs }) => {
+        classifierStats.segmentsProcessed++;
+        classifierStats.sumLatencyMs += latencyMs;
+
+        if (classification.isClaim && classification.confidence >= CLAIM_CONFIDENCE_THRESHOLD) {
+          classifierStats.claimsDetected++;
+          classifierStats.sumConfidence += classification.confidence;
+          if (classification.speaker === 'host') classifierStats.claimsByHost++;
+          else classifierStats.claimsByGuest++;
+
+          broadcast({ type: 'claim_detected', data: classification });
+          console.log(
+            `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
+          );
+        } else if (classification.isClaim) {
+          console.log(
+            `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
+          );
+        } else {
+          console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
+        }
+      })
+      .catch((err) => {
+        console.error(`[classifier] unhandled error: ${err}`);
+      });
   });
   deepgram.on('error', (err: Error) => {
     console.error(`[deepgram] error event: ${err.message}`);
@@ -100,11 +157,27 @@ if (deepgram) {
   console.warn('[deepgram] DEEPGRAM_API_KEY not set — session endpoints will return 503');
 }
 
+function validateSpeakerMap(input: unknown): SpeakerMap {
+  if (!input || typeof input !== 'object') return {};
+  const out: SpeakerMap = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    const id = parseInt(k, 10);
+    if (!Number.isNaN(id) && (v === 'host' || v === 'guest')) {
+      out[id] = v;
+    }
+  }
+  return out;
+}
+
 app.post('/api/session/start', async (req, res) => {
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
-  const { mode, source } = req.body as { mode?: SessionMode; source?: string };
+  const { mode, source, speakerMap } = req.body as {
+    mode?: SessionMode;
+    source?: string;
+    speakerMap?: unknown;
+  };
   if (mode !== 'stream' && mode !== 'system-audio') {
     return res.status(400).json({ error: "mode must be 'stream' or 'system-audio'" });
   }
@@ -114,9 +187,15 @@ app.post('/api/session/start', async (req, res) => {
   if (deepgram.isActive()) {
     return res.status(409).json({ error: 'Session already active. Stop it first.' });
   }
+
+  // Reset per-session classifier context. Stats are intentionally cumulative
+  // across sessions — clear with a fresh process if the producer wants to.
+  lastSegments.length = 0;
+  currentSpeakerMap = validateSpeakerMap(speakerMap);
+
   try {
     await deepgram.startSession({ mode, source });
-    res.json({ ok: true, mode, source });
+    res.json({ ok: true, mode, source, speakerMap: currentSpeakerMap });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[session/start] ${msg}`);
@@ -147,6 +226,20 @@ app.get('/api/session/status', (_req, res) => {
     mode: deepgram.getMode(),
     uptime: deepgram.getUptime(),
     configured: true,
+    speakerMap: currentSpeakerMap,
+  });
+});
+
+app.get('/api/classifier/stats', (_req, res) => {
+  const { segmentsProcessed, claimsDetected, claimsByHost, claimsByGuest, sumConfidence, sumLatencyMs } = classifierStats;
+  res.json({
+    segmentsProcessed,
+    claimsDetected,
+    claimsByHost,
+    claimsByGuest,
+    averageConfidence: claimsDetected > 0 ? sumConfidence / claimsDetected : 0,
+    averageLatencyMs: segmentsProcessed > 0 ? sumLatencyMs / segmentsProcessed : 0,
+    confidenceThreshold: CLAIM_CONFIDENCE_THRESHOLD,
   });
 });
 
@@ -174,7 +267,9 @@ wss.on('connection', (ws) => {
   });
 });
 
-function broadcast(message: TrollReaction | StatusMessage | TranscriptSegmentMessage): void {
+function broadcast(
+  message: TrollReaction | StatusMessage | TranscriptSegmentMessage | ClaimDetectedMessage
+): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
