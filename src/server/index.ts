@@ -7,7 +7,8 @@ import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
-import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
+import { DeepgramClient, SessionMode } from './deepgram.js';
+import type { TrollReaction, StatusMessage, PersonaId, TranscriptSegmentMessage } from '../shared/types.js';
 
 const app = express();
 app.use(express.json());
@@ -77,6 +78,78 @@ app.get('/api/feedback', (_req, res) => {
   res.json(loadFeedback());
 });
 
+// ─── Deepgram session ───
+// Singleton — null if DEEPGRAM_API_KEY missing at boot. Endpoints below
+// 503 in that case so the failure mode is visible rather than silent.
+const deepgramApiKey = process.env.DEEPGRAM_API_KEY || '';
+const deepgram: DeepgramClient | null = deepgramApiKey
+  ? new DeepgramClient(deepgramApiKey)
+  : null;
+
+if (deepgram) {
+  deepgram.on('segment', (segment) => {
+    broadcast({ type: 'transcript_segment', data: segment });
+  });
+  deepgram.on('error', (err: Error) => {
+    console.error(`[deepgram] error event: ${err.message}`);
+  });
+  deepgram.on('reconnecting', ({ attempt }: { attempt: number }) => {
+    console.warn(`[deepgram] reconnecting (attempt ${attempt})`);
+  });
+} else {
+  console.warn('[deepgram] DEEPGRAM_API_KEY not set — session endpoints will return 503');
+}
+
+app.post('/api/session/start', async (req, res) => {
+  if (!deepgram) {
+    return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
+  }
+  const { mode, source } = req.body as { mode?: SessionMode; source?: string };
+  if (mode !== 'stream' && mode !== 'system-audio') {
+    return res.status(400).json({ error: "mode must be 'stream' or 'system-audio'" });
+  }
+  if (!source || typeof source !== 'string') {
+    return res.status(400).json({ error: 'source required' });
+  }
+  if (deepgram.isActive()) {
+    return res.status(409).json({ error: 'Session already active. Stop it first.' });
+  }
+  try {
+    await deepgram.startSession({ mode, source });
+    res.json({ ok: true, mode, source });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[session/start] ${msg}`);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.post('/api/session/stop', async (_req, res) => {
+  if (!deepgram) {
+    return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
+  }
+  try {
+    await deepgram.stopSession();
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[session/stop] ${msg}`);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/session/status', (_req, res) => {
+  if (!deepgram) {
+    return res.json({ active: false, mode: null, uptime: null, configured: false });
+  }
+  res.json({
+    active: deepgram.isActive(),
+    mode: deepgram.getMode(),
+    uptime: deepgram.getUptime(),
+    configured: true,
+  });
+});
+
 // ─── WebSocket Server ───
 
 const server = createServer(app);
@@ -101,7 +174,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-function broadcast(message: TrollReaction | StatusMessage): void {
+function broadcast(message: TrollReaction | StatusMessage | TranscriptSegmentMessage): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {

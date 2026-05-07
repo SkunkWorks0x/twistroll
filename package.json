@@ -10,6 +10,7 @@
     "start": "node dist/server/index.js"
   },
   "dependencies": {
+    "@deepgram/sdk": "^5.1.0",
     "@lancedb/lancedb": "^0.27.2",
     "chokidar": "^4.0.0",
     "dotenv": "^16.4.0",

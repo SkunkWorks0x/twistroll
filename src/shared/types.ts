@@ -39,9 +39,28 @@ export interface StatusMessage {
   lastReaction?: number;
 }
 
+// ─── Deepgram transcript segment (Sentinel v2 audio pipeline) ───
+export interface TranscriptSegment {
+  id: string;
+  text: string;
+  speaker: number;       // Deepgram diarization speaker index (0, 1, 2…)
+  speakerLabel: string;  // Producer-renameable display label, defaults to "Speaker N"
+  timestamp: number;     // Seconds from session start
+  duration: number;      // Segment duration in seconds
+  isFinal: boolean;      // Always true — interim results are dropped before emit
+  confidence: number;    // Deepgram per-segment confidence (0–1)
+  createdAt: number;     // Date.now() — monotonic ordering for clients
+}
+
+export interface TranscriptSegmentMessage {
+  type: 'transcript_segment';
+  data: TranscriptSegment;
+}
+
 export type WSMessage =
   | TrollReaction
-  | StatusMessage;
+  | StatusMessage
+  | TranscriptSegmentMessage;
 
 export interface PersonaConfig {
   id: PersonaId;
