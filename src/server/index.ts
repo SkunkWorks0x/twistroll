@@ -9,6 +9,8 @@ import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
 import { classifyWindow, SpeakerMap } from './classifier.js';
+import { enqueueClaim, queueStats } from './claimQueue.js';
+import { getBreakerState } from './retrieval.js';
 import type {
   TrollReaction,
   StatusMessage,
@@ -189,6 +191,10 @@ if (deepgram) {
           console.log(
             `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
           );
+
+          // Enqueue for retrieval. Snapshot of last 12 segments captured inside
+          // the queue so processing sees fire-time state.
+          enqueueClaim(classification, lastSegments);
         } else if (classification.isClaim) {
           console.log(
             `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
@@ -306,6 +312,10 @@ app.get('/api/session/status', (_req, res) => {
     speakerMap: currentSpeakerMap,
     sessionContext: currentSessionContext,
   });
+});
+
+app.get('/api/queue/stats', (_req, res) => {
+  res.json({ queue: queueStats(), breakers: getBreakerState() });
 });
 
 app.get('/api/classifier/stats', (_req, res) => {
