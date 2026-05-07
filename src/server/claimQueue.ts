@@ -73,6 +73,15 @@ export function enqueueClaim(
 ): EnqueueResult {
   pruneOldRecords();
 
+  // Empty / whitespace primaryEntity → drop. Without an entity anchor the
+  // retrieval discriminator can't build a useful Tavily query and the Docket
+  // has nothing to triangulate against; downstream cards consistently end up
+  // null or UNVERIFIABLE-without-citations on these claims.
+  if (!claim.primaryEntity || !claim.primaryEntity.trim()) {
+    console.log('[QUEUE] Dropped: empty primaryEntity');
+    return { enqueued: false, reason: 'empty primaryEntity' };
+  }
+
   const incoming = extractEntities(claim);
   for (const rec of recentlyProcessed) {
     const overlap = entityOverlap(incoming, rec.entities);

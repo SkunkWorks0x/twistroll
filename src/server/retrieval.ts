@@ -104,6 +104,33 @@ function classifyDomain(url: string | null): 1 | 2 | 3 | 4 {
 // invoked from retrieve() — see comment at the call site.
 console.log('[RETRIEVAL] Grokipedia disabled — consistent timeouts. Re-enable when API latency improves.');
 
+// Tier invariant — every domain we bias the broad Tavily query toward should
+// be classifiable as Tier 1 or Tier 2. Catches the regression where a domain
+// gets added to includeDomains but missed in TIER_*_DOMAINS (which happened
+// in the original Phase 3C and dropped NVCA Q1-2026 Venture Monitor PDFs to
+// Tier 3, triggering the all-Tier-3 nudge).
+function verifyTierInvariant(): void {
+  // Forward-declared TAVILY_TIER1_BIAS — the actual constant is defined later
+  // in this file; resolution happens at call time.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  const bias = TAVILY_TIER1_BIAS;
+  const uncovered: string[] = [];
+  for (const domain of bias) {
+    if (TIER_1_DOMAINS.has(domain)) continue;
+    if (TIER_2_DOMAINS.has(domain)) continue;
+    if (domain.endsWith('.gov')) continue; // classifyDomain handles .gov as Tier 1
+    uncovered.push(domain);
+  }
+  if (uncovered.length > 0) {
+    console.warn(`[RETRIEVAL] Tier invariant violation — domains in TAVILY_TIER1_BIAS not classified Tier 1/2: ${uncovered.join(', ')}`);
+  } else {
+    console.log(`[RETRIEVAL] Tier invariant OK — all ${bias.length} bias domains classified`);
+  }
+}
+// Defer the check one tick so module-load order resolves (TAVILY_TIER1_BIAS
+// is declared further down in this file).
+setImmediate(verifyTierInvariant);
+
 const FAIL_THRESHOLD = 5;
 const COOLDOWN_MS = 60_000;
 
