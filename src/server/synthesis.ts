@@ -536,6 +536,43 @@ export function applyLanceDBInjection(
   return next;
 }
 
+// Build a corrective instruction appended to the user message on retry attempt 2
+// when attempt 1 failed Zod validation due to explanation or follow-up word
+// overflow. Tells Haiku to shorten while preserving citations and verdict.
+//
+// `input` is the failed attempt's tool_use payload (matches DocketOutput shape
+// pre-validation). `explFail` and `fuFail` are the matched Zod error messages
+// (or undefined if that field passed). Either or both may be set.
+export function buildCorrectiveInstruction(
+  input: { explanation?: unknown; follow_up?: unknown },
+  explFail: string | undefined,
+  fuFail: string | undefined
+): string {
+  const parts: string[] = [];
+
+  if (explFail && typeof input.explanation === 'string') {
+    const n = input.explanation.split(/\s+/).filter(Boolean).length;
+    parts.push(
+      `Your previous explanation was ${n} words. The required maximum is 28 words. ` +
+      `Shorten the previous explanation to 28 words or fewer while preserving all citation references in the form [1], [2], etc. ` +
+      `Do not introduce new citations. Do not change the verdict. Do not change which sources are referenced — only the prose length.\n\n` +
+      `Your previous explanation:\n"${input.explanation}"`
+    );
+  }
+
+  if (fuFail && typeof input.follow_up === 'string') {
+    const n = input.follow_up.split(/\s+/).filter(Boolean).length;
+    parts.push(
+      `Your previous follow-up question was ${n} words. The required maximum is 18 words. ` +
+      `Shorten the previous follow-up to 18 words or fewer while preserving its meaning.\n\n` +
+      `Your previous follow-up:\n"${input.follow_up}"`
+    );
+  }
+
+  parts.push('Produce the corrected fact_check tool call now.');
+  return parts.join('\n\n');
+}
+
 export async function runDocket(
   claim: ClaimClassification,
   sources: RetrievedSource[],
@@ -561,12 +598,16 @@ export async function runDocket(
   }`;
 
   let parsed: DocketOutput | null = null;
+  let correctiveInstruction: string | null = null;
   for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
+    const attemptUserMessage = correctiveInstruction
+      ? `${userMessage}\n\n${correctiveInstruction}`
+      : userMessage;
     let raw: any;
     try {
       raw = await callHaiku({
         systemPrompt: DOCKET_SYSTEM,
-        userMessage,
+        userMessage: attemptUserMessage,
         maxTokens: 400,
         temperature: 0,
         tools: [FACT_CHECK_TOOL],
@@ -586,7 +627,18 @@ export async function runDocket(
 
     const zParse = DocketSchema.safeParse(input);
     if (!zParse.success) {
-      console.warn(`[DOCKET] Zod validation failed (attempt ${attempt}): ${zParse.error.issues.map((i) => i.message).join('; ')}`);
+      const messages = zParse.error.issues.map((i) => i.message);
+      console.warn(`[DOCKET] Zod validation failed (attempt ${attempt}): ${messages.join('; ')}`);
+
+      // Capture word-count failures for corrective retry on attempt 2.
+      // Only fires on attempt 1 — attempt 2 falls through to suppression if it fails again.
+      if (attempt === 1) {
+        const explFail = messages.find((m) => m.startsWith('Explanation exceeds'));
+        const fuFail = messages.find((m) => m.startsWith('Follow-up exceeds'));
+        if (explFail || fuFail) {
+          correctiveInstruction = buildCorrectiveInstruction(input, explFail, fuFail);
+        }
+      }
       continue;
     }
     let candidate: DocketOutput = zParse.data;
