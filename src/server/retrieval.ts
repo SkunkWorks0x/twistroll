@@ -54,6 +54,14 @@ const TIER_2_DOMAINS = new Set<string>([
   'ft.com',
   'economist.com',
   'wired.com',
+  // Phase 3C: search-bias domains were added to includeDomains but missed
+  // here. NVCA / PitchBook PDFs and the rest are primary venture data sources;
+  // classify them Tier 2 so they don't trigger the all-Tier-3 nudge.
+  'nvca.org',
+  'cbinsights.com',
+  'carta.com',
+  'saastr.com',
+  'arstechnica.com',
 ]);
 
 // Explicit Tier-4 list. No auto-detection of "SEO farms" — false positives risk
@@ -91,6 +99,10 @@ function classifyDomain(url: string | null): 1 | 2 | 3 | 4 {
 }
 
 // ─── Circuit breaker ───────────────────────────────────────────────────
+
+// One-time module-load notice. The Grokipedia retriever is wired but not
+// invoked from retrieve() — see comment at the call site.
+console.log('[RETRIEVAL] Grokipedia disabled — consistent timeouts. Re-enable when API latency improves.');
 
 const FAIL_THRESHOLD = 5;
 const COOLDOWN_MS = 60_000;
@@ -160,7 +172,15 @@ export async function withTimeout<T>(promise: Promise<T>, ms: number, label: str
 
 // ─── 3A. LanceDB retriever ─────────────────────────────────────────────
 
-const NAMED_ENTITY_HEURISTIC = /[A-Z][a-z]+\s+[A-Z][a-z]+|\b[A-Z]{2,}\b/;
+// Tokenize primaryEntity into 4+ char words for the post-filter. Stopwords are
+// filtered out by the length cutoff; what remains is the high-signal vocabulary
+// the chunk text should overlap on.
+function entityTokens(entity: string): string[] {
+  return entity
+    .toLowerCase()
+    .split(/\W+/)
+    .filter((w) => w.length >= 4);
+}
 
 export async function queryLanceDB(claim: ClaimClassification): Promise<RetrievedSource[]> {
   if (isBreakerOpen('lancedb')) return [];
@@ -172,13 +192,18 @@ export async function queryLanceDB(claim: ClaimClassification): Promise<Retrieve
     const results = await queryMemory(queryText, 5);
     recordSuccess('lancedb');
 
-    const entityLc = (claim.primaryEntity || '').toLowerCase();
+    // Post-filter relaxed 2026-05-07 to align with the Docket's LANCEDB
+    // CITATION RULE — the prompt expects topical hits to flow through and
+    // lets Haiku decide relevance. The gap-detection floor (0.35) inside
+    // queryMemory already screened for relevance; here we only confirm
+    // topical overlap via any 4+ char primaryEntity token. Empty primaryEntity
+    // (no tokens to match) falls through.
+    const tokens = entityTokens(claim.primaryEntity || '');
     const filtered = results
       .filter((r) => {
+        if (tokens.length === 0) return true;
         const textLc = r.text.toLowerCase();
-        const hasEntityOverlap = entityLc.length > 2 && textLc.includes(entityLc);
-        const hasNamedEntity = NAMED_ENTITY_HEURISTIC.test(r.text);
-        return hasEntityOverlap || (r.score > 0.5 && hasNamedEntity);
+        return tokens.some((tok) => textLc.includes(tok));
       })
       .slice(0, 3);
 
@@ -207,6 +232,67 @@ export async function queryLanceDB(claim: ClaimClassification): Promise<Retrieve
 
 // ─── 3B. Tavily retriever ──────────────────────────────────────────────
 
+// Tier-1 / Tier-2 sources we bias the BROAD query toward via includeDomains.
+// Source list expanded 2026-05-07 to cover the publishers most likely to host
+// venture/SaaS data points TWiST guests cite (PitchBook, NVCA, Crunchbase,
+// CB Insights, Carta, SaaStr) plus general business journalism that the
+// prior list missed (FT, Economist, The Information, Ars Technica).
+const TAVILY_TIER1_BIAS: string[] = [
+  'sec.gov', 'bloomberg.com', 'techcrunch.com', 'reuters.com',
+  'pitchbook.com', 'nvca.org', 'cbinsights.com', 'carta.com', 'saastr.com',
+  'ft.com', 'economist.com', 'theinformation.com', 'arstechnica.com',
+];
+
+const MAX_TAVILY_RESULTS = 6;
+
+// Build a topical query for the BROAD search. The discriminator is composed
+// from primaryEntity + entityType + keyNumbers + claim language, not
+// claimType alone — the classifier's ClaimType enum is too coarse-grained
+// (everything money-related is just 'financial').
+function buildTavilyQuery(claim: ClaimClassification): string {
+  const entity = (claim.primaryEntity || '').trim();
+  const noun = (claim.searchableNoun || entity).trim();
+  const numbers = claim.keyNumbers || [];
+  const firstNum = numbers[0] || '';
+  const numStr = numbers.join(' ');
+
+  const hasMoney = /\$/.test(numStr);
+  const hasPercent = /%/.test(numStr);
+  const isCompany = claim.entityType === 'company';
+  const isPerson = claim.entityType === 'person';
+
+  // Person → biographical / attribution-style query
+  if (isPerson) {
+    return `${entity} ${noun}`.trim();
+  }
+
+  // Funding round detection: dollar amount + claim language hints
+  // ("Series X", "valuation", "raised", "led by", etc.)
+  const claimBlob = `${claim.claimText} ${noun}`.toLowerCase();
+  const looksLikeRound = hasMoney && /\b(series\s+[a-z]\b|valuation|raised|round|seed funding|led by)\b/i.test(claimBlob);
+  if (looksLikeRound) {
+    return `${entity} series funding ${firstNum} TechCrunch OR Crunchbase`.trim();
+  }
+
+  // Company metric: company entity + percentage (CAC, retention, churn, etc.)
+  if (isCompany && hasPercent) {
+    return `${entity} ${firstNum} earnings OR "investor relations" OR revenue`.trim();
+  }
+
+  switch (claim.claimType) {
+    case 'financial':
+      // Broad market/finance — bias toward primary venture data sources
+      return `${entity} ${firstNum} PitchBook OR NVCA OR Crunchbase OR "venture monitor"`.trim();
+    case 'prediction':
+      return `${entity} forecast OR outlook ${firstNum}`.trim();
+    case 'historical':
+    case 'attribution':
+    case 'comparative':
+    default:
+      return `${entity} ${noun} ${firstNum}`.trim();
+  }
+}
+
 export async function queryTavily(claim: ClaimClassification): Promise<RetrievedSource[]> {
   if (isBreakerOpen('tavily')) return [];
   const apiKey = process.env.TAVILY_API_KEY;
@@ -215,34 +301,50 @@ export async function queryTavily(claim: ClaimClassification): Promise<Retrieved
     return [];
   }
 
-  const parts: string[] = [];
-  if (claim.primaryEntity) parts.push(claim.primaryEntity);
-  if (claim.keyNumbers && claim.keyNumbers.length > 0) parts.push(claim.keyNumbers[0]);
-  if (claim.claimType && claim.claimType !== 'unknown') parts.push(claim.claimType);
-  const query = parts.join(' ').trim();
-  if (!query) return [];
+  const broadQuery = buildTavilyQuery(claim);
+  const numStr = (claim.keyNumbers || []).join(' ').trim();
+  const narrowQuery = `${claim.primaryEntity || ''} ${numStr}`.trim();
+
+  if (!broadQuery && !narrowQuery) return [];
 
   try {
     const client = tavily({ apiKey });
-    const response = await client.search(query, {
-      searchDepth: 'basic',
-      maxResults: 5,
-      includeDomains: ['sec.gov', 'bloomberg.com', 'techcrunch.com', 'reuters.com'],
-    });
+
+    // Two queries in parallel. Broad: tier-1-biased, basic depth. Narrow:
+    // entity + raw numbers, no domain filter, deeper search — let Tavily
+    // surface the actual stat-bearing pages. Cost: ~$0.005 extra per claim.
+    const [broadResp, narrowResp] = await Promise.all([
+      broadQuery
+        ? client.search(broadQuery, {
+            searchDepth: 'basic',
+            maxResults: 5,
+            includeDomains: TAVILY_TIER1_BIAS,
+          })
+        : Promise.resolve({ results: [] as any[] }),
+      narrowQuery && narrowQuery !== broadQuery
+        ? client.search(narrowQuery, {
+            searchDepth: 'advanced',
+            maxResults: 5,
+          })
+        : Promise.resolve({ results: [] as any[] }),
+    ]);
     recordSuccess('tavily');
 
-    const sources: RetrievedSource[] = [];
-    for (const r of response.results || []) {
+    // Merge by URL, keeping first occurrence's score; drop Tier-4.
+    const byUrl = new Map<string, RetrievedSource>();
+    for (const r of [...(broadResp.results || []), ...(narrowResp.results || [])]) {
+      if (!r?.url) continue;
       const tier = classifyDomain(r.url);
       if (tier === 4) continue;
+      if (byUrl.has(r.url)) continue;
       let domain: string | undefined;
       try {
         domain = new URL(r.url).hostname.replace(/^www\./, '');
       } catch {
         domain = undefined;
       }
-      sources.push({
-        id: `tavily_${Date.now()}_${sources.length}`,
+      byUrl.set(r.url, {
+        id: `tavily_${Date.now()}_${byUrl.size}`,
         type: 'tavily',
         tier,
         title: r.title || '(untitled)',
@@ -254,9 +356,9 @@ export async function queryTavily(claim: ClaimClassification): Promise<Retrieved
           publishDate: r.publishedDate || undefined,
         },
       });
-      if (sources.length >= 4) break;
+      if (byUrl.size >= MAX_TAVILY_RESULTS) break;
     }
-    return sources;
+    return [...byUrl.values()];
   } catch (err) {
     recordFailure('tavily');
     const msg = err instanceof Error ? err.message : String(err);
@@ -351,12 +453,39 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ data: T; ms: number }> 
   return { data, ms: Date.now() - t };
 }
 
+const TAVILY_TIMEOUT_MS = 2000;
+
+// Tavily retry-once on timeout. First attempt 2000ms; on timeout (only — not
+// other errors), retry once at 2000ms. Both fail → empty array. Mirrors the
+// retry shape in llm-router.ts's grok path.
+async function tavilyWithRetry(claim: ClaimClassification): Promise<RetrievedSource[]> {
+  try {
+    return await withTimeout(queryTavily(claim), TAVILY_TIMEOUT_MS, 'tavily');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/timed out/.test(msg)) {
+      // Non-timeout failure — already logged inside queryTavily/withTimeout
+      return [];
+    }
+    console.warn('[RETRIEVAL] tavily timed out — retrying once');
+    try {
+      return await withTimeout(queryTavily(claim), TAVILY_TIMEOUT_MS, 'tavily');
+    } catch {
+      return [];
+    }
+  }
+}
+
 export async function retrieve(claim: ClaimClassification): Promise<RetrievalResult> {
   const tStart = Date.now();
   const [lr, tr, gr] = await Promise.all([
     timed(() => withTimeout(queryLanceDB(claim), 300, 'lancedb').catch(() => [] as RetrievedSource[])),
-    timed(() => withTimeout(queryTavily(claim), 1200, 'tavily').catch(() => [] as RetrievedSource[])),
-    timed(() => withTimeout(queryGrokipedia(claim), 2500, 'grokipedia').catch(() => [] as RetrievedSource[])),
+    timed(() => tavilyWithRetry(claim)),
+    // Grokipedia disabled — 2026-05-07 live test showed 8/8 timeouts at 2500ms
+    // against grok-4-1-fast. Function preserved (queryGrokipedia is exported)
+    // for re-enable when API latency improves.
+    // timed(() => withTimeout(queryGrokipedia(claim), 2500, 'grokipedia').catch(() => [] as RetrievedSource[])),
+    timed(async () => [] as RetrievedSource[]),
   ]);
   const timing = {
     lancedb: lr.ms,
@@ -478,9 +607,12 @@ export function formatForDocket(
   } else {
     sources.forEach((s, i) => {
       const url = s.url ?? '(LanceDB)';
+      // LanceDB chunks need more excerpt for the topical anchor to surface —
+      // 200 chars often cut mid-transcript before any anchor word appeared.
+      const limit = s.type === 'lancedb' ? 400 : 200;
       out += `[${i + 1}] ${s.title} | ${url} | Tier ${s.tier}\n`;
-      const excerpt = s.content.slice(0, 200);
-      out += `Excerpt: "${excerpt}${s.content.length > 200 ? '…' : ''}"\n\n`;
+      const excerpt = s.content.slice(0, limit);
+      out += `Excerpt: "${excerpt}${s.content.length > limit ? '…' : ''}"\n\n`;
     });
   }
   return out;

@@ -416,6 +416,18 @@ async function main() {
     console.log('✅ Ollama connected');
   }
 
+  // Warmup LanceDB embedding path so the first claim doesn't hit 300ms
+  // cold-start timeout. context.ts opens the connection at module load,
+  // but the embedding side stays cold until the first queryMemory call.
+  try {
+    const { queryMemory } = await import('./episodeMemory.js');
+    await queryMemory('startup funding venture capital', 1);
+    console.log('[LANCEDB] Warmup complete');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[LANCEDB] Warmup failed — first query may timeout: ${msg}`);
+  }
+
   // Start Express server
   server.listen(appConfig.overlayPort, () => {
     console.log('');
