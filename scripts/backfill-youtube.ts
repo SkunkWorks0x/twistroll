@@ -127,7 +127,22 @@ function ytDownloadCaptions(videoId: string, url: string): string | null {
 }
 
 // ─── VTT cleaning ──────────────────────────────────────────────────────
-function cleanVtt(vttPath: string): string {
+// YouTube auto-caption VTTs ship with HTML-encoded carets for speaker turns
+// (&gt;&gt;) and ampersands in titles/quotes (&amp;). Decode before chunking so
+// embeddings see real text, not entity noise.
+const HTML_ENTITY_MAP: Record<string, string> = {
+  '&amp;': '&', '&lt;': '<', '&gt;': '>',
+  '&quot;': '"', '&apos;': "'", '&#39;': "'", '&nbsp;': ' ',
+};
+function decodeHtmlEntities(s: string): string {
+  return s.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39|#\d+);/g, (m) => {
+    if (m in HTML_ENTITY_MAP) return HTML_ENTITY_MAP[m];
+    const num = m.match(/^&#(\d+);$/);
+    return num ? String.fromCharCode(parseInt(num[1], 10)) : m;
+  });
+}
+
+export function cleanVtt(vttPath: string): string {
   const raw = readFileSync(vttPath, 'utf-8');
   const lines = raw.split('\n');
 
@@ -141,12 +156,13 @@ function cleanVtt(vttPath: string): string {
     if (line.startsWith('Kind:') || line.startsWith('Language:')) continue;
     if (line.startsWith('NOTE')) continue;
 
-    // Strip inline timestamp tags like <00:00:12.345> and <c> style tags
-    const stripped = line
-      .replace(/<\d\d:\d\d:\d\d[.,]\d{3}>/g, '')
-      .replace(/<\/?c[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
+    // Strip inline timestamp tags like <00:00:12.345> and <c> style tags first,
+    // then decode HTML entities (after, so entity-encoded fake tags survive as text).
+    const stripped = decodeHtmlEntities(
+      line
+        .replace(/<\d\d:\d\d:\d\d[.,]\d{3}>/g, '')
+        .replace(/<\/?c[^>]*>/g, '')
+    ).trim();
     if (!stripped) continue;
 
     // Deduplicate consecutive identical lines (YouTube auto-caption build-up)
@@ -169,7 +185,14 @@ function cleanVtt(vttPath: string): string {
 
 // ─── Metadata extraction ───────────────────────────────────────────────
 function extractEpisodeNumber(title: string, videoId: string, description: string): number {
-  const patterns = [/E(\d{2,5})\b/i, /Episode (\d{2,5})/i, /#(\d{2,5})/, /\b(\d{4})\b/];
+  // Prefix-required patterns only. The bare /\b(\d{4})\b/ caused year-collisions
+  // (e.g. "2007" in a title for a 2026 episode → wrongly tagged Ep 2007).
+  const patterns = [
+    /E(\d{2,5})\b/i,
+    /Ep\.?\s*(\d{2,5})\b/i,
+    /Episode\s+(\d{2,5})\b/i,
+    /#(\d{2,5})\b/,
+  ];
   // Try title first
   for (const pat of patterns) {
     const m = title.match(pat);
@@ -192,6 +215,9 @@ function extractEpisodeNumber(title: string, videoId: string, description: strin
 // Reject extracted names that are obviously company/firm names, not people
 const FIRM_SUFFIXES = /\b(Fund|Ventures|Capital|Partners|Labs|Inc|Corp|Group|Holdings|Foundation)\s*$/i;
 
+// Best-effort guest extraction. Many TWiST episodes are topic-driven with no
+// guest in the title; in that case this returns '' and the row stores '' for
+// guestName. Empty-string is the documented fallback — not an error.
 function extractGuestName(title: string, description: string, videoId: string, url: string): string {
   const titlePatterns: RegExp[] = [
     /with ([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s*:/,
@@ -201,6 +227,8 @@ function extractGuestName(title: string, description: string, videoId: string, u
     /([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s+on\s/,
     /feat\.?\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/i,
     /ft\.?\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/i,
+    /Interview(?:\s+with)?\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)/i,
+    /([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+)+)\s+joins\s/,
   ];
   for (const pat of titlePatterns) {
     const m = title.match(pat);
@@ -347,6 +375,7 @@ async function main() {
         topicTags: [],
         transcriptText,
         startTimestamp: 0,
+        provisional: false,
       });
       const ingestMs = Date.now() - ingestStart;
       r.chunkCount = chunkCount;
