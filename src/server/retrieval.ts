@@ -480,14 +480,15 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ data: T; ms: number }> 
   return { data, ms: Date.now() - t };
 }
 
-const TAVILY_TIMEOUT_MS = 2000;
+const TAVILY_TIMEOUT_FIRST_MS = 2500;
+const TAVILY_TIMEOUT_RETRY_MS = 3000;
 
-// Tavily retry-once on timeout. First attempt 2000ms; on timeout (only — not
-// other errors), retry once at 2000ms. Both fail → empty array. Mirrors the
+// Tavily retry-once on timeout. First attempt 2500ms; on timeout (only — not
+// other errors), retry once at 3000ms. Both fail → empty array. Mirrors the
 // retry shape in llm-router.ts's grok path.
 async function tavilyWithRetry(claim: ClaimClassification): Promise<RetrievedSource[]> {
   try {
-    return await withTimeout(queryTavily(claim), TAVILY_TIMEOUT_MS, 'tavily');
+    return await withTimeout(queryTavily(claim), TAVILY_TIMEOUT_FIRST_MS, 'tavily');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (!/timed out/.test(msg)) {
@@ -496,7 +497,7 @@ async function tavilyWithRetry(claim: ClaimClassification): Promise<RetrievedSou
     }
     console.warn('[RETRIEVAL] tavily timed out — retrying once');
     try {
-      return await withTimeout(queryTavily(claim), TAVILY_TIMEOUT_MS, 'tavily');
+      return await withTimeout(queryTavily(claim), TAVILY_TIMEOUT_RETRY_MS, 'tavily');
     } catch {
       return [];
     }
