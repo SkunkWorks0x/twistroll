@@ -105,6 +105,10 @@ export interface DocketCitationPayload {
   // null marks LanceDB show-archive citations (no public URL — episode reference)
   url: string | null;
   tier: number;
+  // Provenance flag — 'haiku' for citations the model emitted, 'post_processor'
+  // for ones the LanceDB injection added. Logged on the server for tuning;
+  // the dashboard does not render this field.
+  citationSource?: 'haiku' | 'post_processor';
 }
 export interface DocketPayload {
   verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIAL' | 'UNVERIFIABLE';
