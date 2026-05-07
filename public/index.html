@@ -142,7 +142,14 @@
     cursor: pointer;
   }
   .seg.has-claim:hover { background: rgba(255, 77, 0, 0.13); }
-  .seg.has-claim .speaker { color: var(--orange); }
+
+  /* Role-based speaker name colors. With these in place, the has-claim
+     orange wash + left border still flag claim segments — the speaker
+     name keeps its role color so the speaker identity stays visually
+     consistent across claim and non-claim segments. */
+  .seg .speaker.role-host     { color: #FF5C00; }
+  .seg .speaker.role-guest    { color: #818CF8; }
+  .seg .speaker.role-unmapped { color: var(--text-faint); }
 
   @keyframes pulse-bg {
     0%, 100% { background-color: var(--orange-wash); }
@@ -424,6 +431,12 @@
     segments: [],          // append-only ring of TranscriptSegment
     cards: [],             // newest-first cards (max 10)
     segmentsWithClaims: new Set(), // segmentId → true
+    // Session metadata cached from /api/session/status — drives the
+    // speaker name/role rendering on each transcript segment.
+    session: {
+      speakerMap: {},          // { [speakerId]: 'host' | 'guest' }
+      sessionContext: {},      // { hostName, guestName, … }
+    },
   };
 
   const MAX_SEGMENTS = 250;
@@ -451,6 +464,56 @@
     if (!text) return '';
     if (text.length <= n) return text;
     return text.slice(0, n).trim() + '…';
+  }
+
+  // Resolve a Deepgram speaker id to a display name + role class using the
+  // cached session metadata. Speaker keys round-trip through JSON as strings,
+  // so look up by both forms. CSS upper-cases the rendered text — we leave
+  // capitalization alone here.
+  function resolveSpeaker(speakerId) {
+    const map = state.session.speakerMap || {};
+    const ctx = state.session.sessionContext || {};
+    const role = map[speakerId] ?? map[String(speakerId)];
+    if (role === 'host') {
+      return { name: ctx.hostName || 'Host', roleClass: 'role-host' };
+    }
+    if (role === 'guest') {
+      return { name: ctx.guestName || 'Guest', roleClass: 'role-guest' };
+    }
+    return { name: `Speaker ${speakerId}`, roleClass: 'role-unmapped' };
+  }
+
+  // Re-paint speaker labels on every existing segment. Called when session
+  // metadata changes (e.g., a producer hits /api/session/start mid-show).
+  function applyMetaToTranscript() {
+    const els = transcriptEl.querySelectorAll('.seg[data-speaker]');
+    for (const el of els) {
+      const id = parseInt(el.dataset.speaker, 10);
+      if (!Number.isFinite(id)) continue;
+      const speakerEl = el.querySelector('.speaker');
+      if (!speakerEl) continue;
+      const { name, roleClass } = resolveSpeaker(id);
+      speakerEl.textContent = name;
+      speakerEl.className = `speaker ${roleClass}`;
+    }
+  }
+
+  async function refreshSessionMeta() {
+    try {
+      const r = await fetch('/api/session/status');
+      if (!r.ok) return;
+      const d = await r.json();
+      let changed = false;
+      if (d.speakerMap && JSON.stringify(d.speakerMap) !== JSON.stringify(state.session.speakerMap)) {
+        state.session.speakerMap = d.speakerMap;
+        changed = true;
+      }
+      if (d.sessionContext && JSON.stringify(d.sessionContext) !== JSON.stringify(state.session.sessionContext)) {
+        state.session.sessionContext = d.sessionContext;
+        changed = true;
+      }
+      if (changed) applyMetaToTranscript();
+    } catch { /* tolerate transient fetch failures */ }
   }
 
   function fmtTimestamp(seconds) {
@@ -541,8 +604,10 @@
     const el = document.createElement('div');
     el.className = 'seg';
     el.dataset.segmentId = seg.id;
+    el.dataset.speaker = String(seg.speaker);
+    const { name: speakerName, roleClass: speakerRoleClass } = resolveSpeaker(seg.speaker);
     el.innerHTML = `
-      <span class="speaker">${escape(seg.speakerLabel || `Speaker ${seg.speaker}`)}</span>
+      <span class="speaker ${speakerRoleClass}">${escape(speakerName)}</span>
       <span class="text">${escape(seg.text)}</span>
       <span class="ts">${fmtTimestamp(seg.timestamp)}</span>
     `;
@@ -777,6 +842,8 @@
   }
 
   // ─── Boot ───────────────────────────────────────────────────
+  refreshSessionMeta();
+  setInterval(refreshSessionMeta, 10000);
   connect();
 })();
 </script>
