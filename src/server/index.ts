@@ -130,6 +130,7 @@ const classifierStats = {
   segmentsSkippedBySpan: 0,
   claimsDetected: 0,
   claimsByHost: 0,
+  claimsByCohost: 0,
   claimsByGuest: 0,
   sumConfidence: 0,
   sumLatencyMs: 0,
@@ -196,6 +197,7 @@ if (deepgram) {
           classifierStats.claimsDetected++;
           classifierStats.sumConfidence += classification.confidence;
           if (classification.speaker === 'host') classifierStats.claimsByHost++;
+          else if (classification.speaker === 'cohost') classifierStats.claimsByCohost++;
           else classifierStats.claimsByGuest++;
 
           markSpanActive(window, classification.claimSpan);
@@ -235,7 +237,7 @@ function validateSpeakerMap(input: unknown): SpeakerMap {
   const out: SpeakerMap = {};
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
     const id = parseInt(k, 10);
-    if (!Number.isNaN(id) && (v === 'host' || v === 'guest')) {
+    if (!Number.isNaN(id) && (v === 'host' || v === 'cohost' || v === 'guest')) {
       out[id] = v;
     }
   }
@@ -245,12 +247,13 @@ function validateSpeakerMap(input: unknown): SpeakerMap {
 // ─── Synthesis pipeline: claim queue → retrieval → synthesis → broadcast ─
 setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
   try {
-    const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
+    const result = await synthesize(claim, retrieval.merged, segmentSnapshot, currentSessionContext);
     const card: CardBroadcast = {
       type: 'claim_card',
       claimId: claim.segmentId,
       claimText: claim.claimText,
       speaker: claim.speaker,
+      speakerNumber: claim.speakerNumber,
       timestamp: claim.timestamp,
       docket: result.docket,
       pattern: result.pattern,
@@ -271,11 +274,23 @@ function validateSessionContext(input: unknown): SessionContext {
   if (!input || typeof input !== 'object') return {};
   const src = input as Record<string, unknown>;
   const ctx: SessionContext = {};
-  const fields: Array<keyof SessionContext> = [
-    'showName', 'hostName', 'hostCompany', 'guestName', 'guestCompany', 'guestTitle', 'episodeTopic',
+  const stringFields: Array<Exclude<keyof SessionContext, 'speakerNames'>> = [
+    'showName', 'hostName', 'hostCompany', 'cohostName', 'cohostCompany',
+    'guestName', 'guestCompany', 'guestTitle', 'episodeTopic',
   ];
-  for (const f of fields) {
+  for (const f of stringFields) {
     if (typeof src[f] === 'string') ctx[f] = src[f] as string;
+  }
+  // speakerNames: per-id name override. Numeric keys, string values.
+  if (src.speakerNames && typeof src.speakerNames === 'object') {
+    const names: Record<number, string> = {};
+    for (const [k, v] of Object.entries(src.speakerNames as Record<string, unknown>)) {
+      const id = parseInt(k, 10);
+      if (!Number.isNaN(id) && typeof v === 'string' && v.trim()) {
+        names[id] = v;
+      }
+    }
+    if (Object.keys(names).length > 0) ctx.speakerNames = names;
   }
   return ctx;
 }
@@ -356,12 +371,13 @@ app.get('/api/queue/stats', (_req, res) => {
 });
 
 app.get('/api/classifier/stats', (_req, res) => {
-  const { segmentsProcessed, segmentsSkippedBySpan, claimsDetected, claimsByHost, claimsByGuest, sumConfidence, sumLatencyMs } = classifierStats;
+  const { segmentsProcessed, segmentsSkippedBySpan, claimsDetected, claimsByHost, claimsByCohost, claimsByGuest, sumConfidence, sumLatencyMs } = classifierStats;
   res.json({
     segmentsProcessed,
     segmentsSkippedBySpan,
     claimsDetected,
     claimsByHost,
+    claimsByCohost,
     claimsByGuest,
     averageConfidence: claimsDetected > 0 ? sumConfidence / claimsDetected : 0,
     averageLatencyMs: segmentsProcessed > 0 ? sumLatencyMs / segmentsProcessed : 0,

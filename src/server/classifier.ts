@@ -16,7 +16,8 @@ import type {
   TranscriptSegment,
 } from '../shared/types.js';
 
-export type SpeakerMap = Record<number, 'host' | 'guest'>;
+export type SpeakerRole = 'host' | 'cohost' | 'guest';
+export type SpeakerMap = Record<number, SpeakerRole>;
 
 const PRIOR_CONTEXT_SIZE = 5;
 
@@ -27,11 +28,13 @@ const SYSTEM_PROMPT_TEMPLATE = `You are a factual claim detector for a live podc
 
 SESSION CONTEXT:
 Host: {{hostName}} ({{hostCompany}})
+Co-host: {{cohostName}} ({{cohostCompany}})
 Guest: {{guestName}}, {{guestTitle}} at {{guestCompany}}
 
 PRONOUN RESOLUTION:
 - When the guest says "we", "our", "my company" → resolve to {{guestCompany}}
 - When the host says "I", "we" → resolve to {{hostName}} / {{hostCompany}}
+- When the co-host says "I", "we" → resolve to {{cohostName}} / {{cohostCompany}}
 - Use the resolved entity as primary_entity, not the pronoun
 
 A verifiable factual claim contains one or more of:
@@ -51,7 +54,7 @@ NOT a verifiable claim (do NOT fire):
 - Pure strategy discussion without factual anchors
 - Emotional statements
 
-CRITICAL: Treat host statements with IDENTICAL rigor to guest statements.
+CRITICAL: Treat host AND co-host statements with IDENTICAL rigor to guest statements.
 
 If the claim spans multiple statements in the window, combine them into one claim_text and set claim_span_start / claim_span_end to the segment labels (seg1, seg2, seg3) covering the range.
 
@@ -66,7 +69,7 @@ Respond with ONLY this JSON, nothing else:
 {
   "is_claim": true/false,
   "claim_text": "the complete claim as one sentence, with pronouns resolved to names",
-  "speaker": "host"/"guest",
+  "speaker": "host"/"cohost"/"guest",
   "confidence": 0.0-1.0,
   "reason": "under 15 words",
   "primary_entity": "company/person/product name or empty string",
@@ -81,32 +84,58 @@ Respond with ONLY this JSON, nothing else:
 If is_claim is false: primary_entity and searchable_noun are empty strings, key_numbers is [], entity_type and claim_type are "unknown", and claim_span_start = claim_span_end = the most recent segment label (the last seg in the window).`;
 
 function fillContext(template: string, ctx: SessionContext): string {
+  // Replace each placeholder globally — the system prompt mentions some
+  // placeholders multiple times (e.g. {{hostName}} appears in SESSION CONTEXT
+  // and PRONOUN RESOLUTION). Using replaceAll keeps every reference in sync.
   return template
-    .replace('{{hostName}}', ctx.hostName || '(unknown)')
-    .replace('{{hostCompany}}', ctx.hostCompany || '(unknown)')
-    .replace('{{guestName}}', ctx.guestName || '(unknown)')
-    .replace('{{guestTitle}}', ctx.guestTitle || '(unknown)')
-    .replace('{{guestCompany}}', ctx.guestCompany || '(unknown)')
-    .replace('{{hostName}}', ctx.hostName || '(unknown)')
-    .replace('{{hostCompany}}', ctx.hostCompany || '(unknown)')
-    .replace('{{guestCompany}}', ctx.guestCompany || '(unknown)');
+    .replaceAll('{{hostName}}', ctx.hostName || '(unknown)')
+    .replaceAll('{{hostCompany}}', ctx.hostCompany || '(unknown)')
+    .replaceAll('{{cohostName}}', ctx.cohostName || '(unknown)')
+    .replaceAll('{{cohostCompany}}', ctx.cohostCompany || '(unknown)')
+    .replaceAll('{{guestName}}', ctx.guestName || '(unknown)')
+    .replaceAll('{{guestTitle}}', ctx.guestTitle || '(unknown)')
+    .replaceAll('{{guestCompany}}', ctx.guestCompany || '(unknown)');
 }
 
-export function resolveSpeaker(speaker: number, map: SpeakerMap): 'host' | 'guest' {
+// Resolve a Deepgram speaker id to its role. Three-tier fallback:
+//   1. Explicit speakerMap entry → use it (host/cohost/guest)
+//   2. speakerMap is non-empty but this id isn't in it → 'guest' (per spec
+//      Phase 3: don't reuse role-based names for unmapped speakers)
+//   3. speakerMap is empty (no producer config) → legacy default:
+//      id===0 → 'host', else 'guest' (preserves backward compatibility for
+//      sessions started without a speakerMap)
+export function resolveSpeaker(speaker: number, map: SpeakerMap): SpeakerRole {
   const explicit = map[speaker];
-  if (explicit === 'host' || explicit === 'guest') return explicit;
-  return speaker === 0 ? 'host' : 'guest';
+  if (explicit === 'host' || explicit === 'cohost' || explicit === 'guest') return explicit;
+  const mapIsEmpty = Object.keys(map).length === 0;
+  if (mapIsEmpty) return speaker === 0 ? 'host' : 'guest';
+  return 'guest';
+}
+
+// Look up the display name for a speaker id. Per-id overrides
+// (speakerNames[id]) take priority over the role-based names.
+export function resolveSpeakerName(
+  speakerId: number,
+  role: SpeakerRole,
+  ctx: SessionContext
+): string {
+  const perId = ctx.speakerNames?.[speakerId];
+  if (perId) return perId;
+  if (role === 'host') return ctx.hostName || 'Host';
+  if (role === 'cohost') return ctx.cohostName || 'Cohost';
+  return ctx.guestName || 'Guest';
 }
 
 function emptyClassification(
   current: TranscriptSegment,
-  fallbackSpeaker: 'host' | 'guest',
+  fallbackSpeaker: SpeakerRole,
   reason: string
 ): ClaimClassification {
   return {
     isClaim: false,
     claimText: '',
     speaker: fallbackSpeaker,
+    speakerNumber: current.speaker,
     confidence: 0,
     reason,
     segmentId: current.id,
@@ -145,17 +174,24 @@ export async function classifyWindow(
   // Build user message with seg1..segN labels (UUIDs are too noisy for the LLM
   // to echo reliably; we map labels back to real IDs after the call).
   let userMsg = '';
-  if (sessionContext.hostName || sessionContext.guestName || sessionContext.hostCompany || sessionContext.guestCompany) {
+  if (sessionContext.hostName || sessionContext.cohostName || sessionContext.guestName) {
     userMsg += 'Session context:\n';
     userMsg += `Host: ${sessionContext.hostName || '(unknown)'} (${sessionContext.hostCompany || ''})\n`;
+    if (sessionContext.cohostName) {
+      userMsg += `Co-host: ${sessionContext.cohostName} (${sessionContext.cohostCompany || ''})\n`;
+    }
     userMsg += `Guest: ${sessionContext.guestName || '(unknown)'}, ${sessionContext.guestTitle || ''} at ${sessionContext.guestCompany || ''}\n\n`;
   }
+
+  // Capitalize the role tag for the user message (CSS-like uppercase).
+  const tag = (r: SpeakerRole) => (r === 'host' ? 'Host' : r === 'cohost' ? 'Co-host' : 'Guest');
 
   if (prior.length > 0) {
     userMsg += 'Recent context (prior exchanges):\n';
     for (const r of prior.slice(-PRIOR_CONTEXT_SIZE)) {
-      const role = resolveSpeaker(r.speaker, speakerMap) === 'host' ? 'Host' : 'Guest';
-      userMsg += `[Speaker ${r.speaker} - ${role}]: "${r.text}"\n`;
+      const role = resolveSpeaker(r.speaker, speakerMap);
+      const name = resolveSpeakerName(r.speaker, role, sessionContext);
+      userMsg += `[Speaker ${r.speaker} - ${tag(role)} (${name})]: "${r.text}"\n`;
     }
     userMsg += '\n';
   }
@@ -163,9 +199,10 @@ export async function classifyWindow(
   userMsg += 'Current window to evaluate (up to 3 segments):\n';
   for (let i = 0; i < window.length; i++) {
     const seg = window[i];
-    const role = resolveSpeaker(seg.speaker, speakerMap) === 'host' ? 'Host' : 'Guest';
+    const role = resolveSpeaker(seg.speaker, speakerMap);
+    const name = resolveSpeakerName(seg.speaker, role, sessionContext);
     const tail = i === window.length - 1 ? ' (most recent)' : '';
-    userMsg += `[seg${i + 1}] [${seg.timestamp.toFixed(1)}s] [Speaker ${seg.speaker} - ${role}]: "${seg.text}"${tail}\n`;
+    userMsg += `[seg${i + 1}] [${seg.timestamp.toFixed(1)}s] [Speaker ${seg.speaker} - ${tag(role)} (${name})]: "${seg.text}"${tail}\n`;
   }
 
   const systemPrompt = fillContext(SYSTEM_PROMPT_TEMPLATE, sessionContext);
@@ -207,8 +244,10 @@ export async function classifyWindow(
   }
 
   const isClaim = parsed.is_claim === true;
-  const speaker: 'host' | 'guest' =
-    parsed.speaker === 'host' || parsed.speaker === 'guest' ? parsed.speaker : fallbackSpeaker;
+  const speaker: SpeakerRole =
+    parsed.speaker === 'host' || parsed.speaker === 'cohost' || parsed.speaker === 'guest'
+      ? parsed.speaker
+      : fallbackSpeaker;
   const confidence =
     typeof parsed.confidence === 'number' && parsed.confidence >= 0 && parsed.confidence <= 1
       ? parsed.confidence
@@ -233,6 +272,7 @@ export async function classifyWindow(
       isClaim,
       claimText,
       speaker,
+      speakerNumber: current.speaker,
       confidence,
       reason,
       segmentId: current.id,

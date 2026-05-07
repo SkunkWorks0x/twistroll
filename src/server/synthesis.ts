@@ -19,7 +19,7 @@
 // when the ingestion pipeline starts emitting per-speaker chunks.
 
 import { z } from 'zod';
-import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
+import type { ClaimClassification, SessionContext, TranscriptSegment } from '../shared/types.js';
 import type { RetrievedSource } from './retrieval.js';
 import { formatForDocket, formatForPattern } from './retrieval.js';
 
@@ -169,7 +169,7 @@ const DOCKET_SYSTEM = `You are The Docket — a real-time fact-checker for a liv
 VOICE: Clinical precision. Senior research librarian. "The record is the record." Zero fluff, zero editorializing, zero speculation.
 RULES:
 * You verify claims using ONLY the sources provided. Never invent sources.
-* Treat host statements with identical rigor to guest statements.
+* Treat host AND co-host statements with identical rigor to guest statements.
 * Never use under TRUE / FALSE / UNVERIFIABLE: "likely", "probably", "concerning", "important", "notable", "exciting"
 * "appears" and "suggests" are reserved for PARTIAL explanations only — to describe what a source partially establishes
 * Never use precedent/pattern language: "history shows", "similar to", "we saw with", "this matches"
@@ -340,6 +340,7 @@ OUTPUT:
 const PATTERN_SYSTEM = `You are The Pattern Recognizer — a calm, experienced senior partner providing real-time counterargument during a live podcast interview.
 VOICE: "The precedent here is..." Precedent-driven, evidence-grounded. Low-affect, curious, slightly weary but never nihilistic. You sound like a senior partner leaning over during a board meeting murmuring a concern.
 RULES:
+* The speaker may be the host, co-host, or guest. Use the SPEAKER line in the user message to attribute correctly — don't assume every claim is a guest's.
 * One counterpoint only. No lists, no "also...", no multiple sentences with period + capital.
 * 28-34 words target, 38 hard max. Count carefully.
 * End with a pressure point the interviewer can turn into a follow-up question.
@@ -768,11 +769,12 @@ export async function checkHostContradiction(
 export async function synthesize(
   claim: ClaimClassification,
   sources: RetrievedSource[],
-  recentSegments: TranscriptSegment[]
+  recentSegments: TranscriptSegment[],
+  sessionContext: SessionContext = {}
 ): Promise<SynthesisResult> {
   const tStart = Date.now();
-  const docketContext = formatForDocket(sources, claim, recentSegments);
-  const patternContext = formatForPattern(sources, claim, recentSegments);
+  const docketContext = formatForDocket(sources, claim, recentSegments, sessionContext);
+  const patternContext = formatForPattern(sources, claim, recentSegments, sessionContext);
 
   // Host contradiction runs first — a fired contradiction suppresses Pattern.
   // Currently always returns null (feature disabled), so Pattern always runs.

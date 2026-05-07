@@ -148,8 +148,15 @@
      name keeps its role color so the speaker identity stays visually
      consistent across claim and non-claim segments. */
   .seg .speaker.role-host     { color: #FF5C00; }
+  .seg .speaker.role-cohost   { color: #C084FC; }
   .seg .speaker.role-guest    { color: #818CF8; }
   .seg .speaker.role-unmapped { color: var(--text-faint); }
+
+  /* Same role colors applied to the speaker-pill prefix on claim cards. */
+  .speaker-pill.role-host     { color: #FF5C00; }
+  .speaker-pill.role-cohost   { color: #C084FC; }
+  .speaker-pill.role-guest    { color: #818CF8; }
+  .speaker-pill.role-unmapped { color: var(--text-faint); }
 
   @keyframes pulse-bg {
     0%, 100% { background-color: var(--orange-wash); }
@@ -466,21 +473,44 @@
     return text.slice(0, n).trim() + '…';
   }
 
-  // Resolve a Deepgram speaker id to a display name + role class using the
-  // cached session metadata. Speaker keys round-trip through JSON as strings,
-  // so look up by both forms. CSS upper-cases the rendered text — we leave
-  // capitalization alone here.
+  // Resolve a Deepgram speaker id to a display name + role class. Lookup
+  // priority:
+  //   1. sessionContext.speakerNames[id] — per-id override (handles roundtable
+  //      formats where multiple speaker IDs share the 'guest' role)
+  //   2. role-based fallback from sessionContext.{hostName,cohostName,guestName}
+  //   3. literal "Speaker N" for unmapped (gray)
+  // Speaker keys round-trip through JSON as strings, so look up by both forms.
+  // CSS upper-cases the rendered text — we leave capitalization alone here.
   function resolveSpeaker(speakerId) {
     const map = state.session.speakerMap || {};
     const ctx = state.session.sessionContext || {};
     const role = map[speakerId] ?? map[String(speakerId)];
+    const namesMap = ctx.speakerNames || {};
+    const perId = namesMap[speakerId] ?? namesMap[String(speakerId)];
     if (role === 'host') {
-      return { name: ctx.hostName || 'Host', roleClass: 'role-host' };
+      return { role, name: perId || ctx.hostName || 'Host', roleClass: 'role-host' };
+    }
+    if (role === 'cohost') {
+      return { role, name: perId || ctx.cohostName || 'Cohost', roleClass: 'role-cohost' };
     }
     if (role === 'guest') {
-      return { name: ctx.guestName || 'Guest', roleClass: 'role-guest' };
+      return { role, name: perId || ctx.guestName || 'Guest', roleClass: 'role-guest' };
     }
-    return { name: `Speaker ${speakerId}`, roleClass: 'role-unmapped' };
+    return { role: null, name: `Speaker ${speakerId}`, roleClass: 'role-unmapped' };
+  }
+
+  // Resolve a card's speaker for the claim-quote pill. Format:
+  //   "ROLE (Name)" when card.speakerNumber resolves to a known role
+  //   "GUEST" generic for unmapped ids (per spec Phase 3 — fall back to
+  //          generic GUEST attribution rather than reuse a specific guestName)
+  function resolveCardSpeaker(card) {
+    const id = typeof card.speakerNumber === 'number' ? card.speakerNumber : -1;
+    const r = resolveSpeaker(id);
+    if (r.role === null) {
+      return { label: 'GUEST', roleClass: 'role-guest' };
+    }
+    const tag = r.role === 'host' ? 'HOST' : r.role === 'cohost' ? 'COHOST' : 'GUEST';
+    return { label: `${tag} (${r.name})`, roleClass: r.roleClass };
   }
 
   // Re-paint speaker labels on every existing segment. Called when session
@@ -712,10 +742,13 @@
       el.appendChild(fu);
     }
 
-    // 2) Speaker + claim quote
+    // 2) Speaker + claim quote — use the original Deepgram id (card.speakerNumber)
+    // to resolve the actual person's name. Falls back to "Speaker N" for any
+    // unmapped id (per spec, never reuse guestName for unknown speakers).
     const claimQuote = document.createElement('div');
     claimQuote.className = 'claim-text-quote';
-    claimQuote.innerHTML = `<span class="speaker-pill">${escape(card.speaker)}:</span> "${escape(card.claimText)}"`;
+    const cardSpk = resolveCardSpeaker(card);
+    claimQuote.innerHTML = `<span class="speaker-pill ${cardSpk.roleClass}">${escape(cardSpk.label)}:</span> "${escape(card.claimText)}"`;
     el.appendChild(claimQuote);
 
     // 3) Verdict pill + explanation

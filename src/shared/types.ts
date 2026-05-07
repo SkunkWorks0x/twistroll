@@ -65,16 +65,24 @@ export interface SessionContext {
   showName?: string;
   hostName?: string;
   hostCompany?: string;
+  cohostName?: string;
+  cohostCompany?: string;
   guestName?: string;
   guestCompany?: string;
   guestTitle?: string;
   episodeTopic?: string;
+  // Per-Deepgram-id name override. Takes priority over the role-based names
+  // (hostName / cohostName / guestName) when rendering and when constructing
+  // the synthesis user message. Required for roundtable formats where
+  // multiple speaker IDs share the same role.
+  speakerNames?: Record<number, string>;
 }
 
 export interface ClaimClassification {
   isClaim: boolean;
   claimText: string;       // empty when isClaim=false
-  speaker: 'host' | 'guest';
+  speaker: 'host' | 'cohost' | 'guest';
+  speakerNumber: number;   // raw Deepgram diarization id of the segment that triggered this claim
   confidence: number;      // 0–1
   reason: string;          // brief explanation, ≤15 words
   segmentId: string;       // current segment id (latest in window)
@@ -130,7 +138,8 @@ export interface CardBroadcast {
   type: 'claim_card';
   claimId: string;
   claimText: string;
-  speaker: 'host' | 'guest';
+  speaker: 'host' | 'cohost' | 'guest';
+  speakerNumber: number;       // raw Deepgram id — dashboard resolves per-id name
   timestamp: number;
   docket: DocketPayload | null;
   pattern: PatternPayload | null;

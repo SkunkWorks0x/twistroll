@@ -34,6 +34,7 @@ function makeClaim(
     isClaim: true,
     claimText,
     speaker,
+    speakerNumber: speaker === 'host' ? 0 : 1,
     confidence: 0.9,
     reason: 'test fixture',
     segmentId: id,

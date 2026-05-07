@@ -39,6 +39,7 @@ function makeClaim(opts: {
     isClaim: true,
     claimText: opts.claimText,
     speaker: opts.speaker || 'guest',
+    speakerNumber: (opts.speaker || 'guest') === 'host' ? 0 : 1,
     confidence: 0.9,
     reason: 'test fixture',
     segmentId: id,
