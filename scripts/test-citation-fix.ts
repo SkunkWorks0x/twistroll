@@ -76,12 +76,19 @@ const RECENT: TranscriptSegment[] = [
 interface TestCase {
   label: string;
   claim: ClaimClassification;
+  category: 'retrieval-baseline' | 'fix1-target';
 }
 
 // Fixtures pulled from the live Ep 2285 run (2026-05-06). Verbatim claim text +
 // classifier-emitted primaryEntity / entityType / claimType from the WS log.
 // keyNumbers + searchableNoun derived from the claim text since those fields
 // weren't logged.
+//
+// Category tags split fixtures by what they verify:
+//   - 'retrieval-baseline' — the original 5 from Ep 2285. Exercise the full
+//     retrieval + merge + Docket pipeline. Threshold: ≥2/5 cards-with-citations.
+//   - 'fix1-target' — product/platform/headcount claims that exercise Fix #1's
+//     PARTIAL carve-out specifically. Threshold: full pass (3/3).
 const TESTS: TestCase[] = [
   {
     label: '#1 LP commits 73.1% (guest, financial)',
@@ -94,6 +101,7 @@ const TESTS: TestCase[] = [
       searchableNoun: 'LP commits venture concentration',
       speaker: 'guest',
     }),
+    category: 'retrieval-baseline',
   },
   {
     label: '#2 73.1% all VC funding (host, comparative)',
@@ -106,6 +114,7 @@ const TESTS: TestCase[] = [
       searchableNoun: 'venture capital concentration top firms',
       speaker: 'host',
     }),
+    category: 'retrieval-baseline',
   },
   {
     label: '#3 next 10 firms 15.4% / 11.5% (guest, financial)',
@@ -118,6 +127,7 @@ const TESTS: TestCase[] = [
       searchableNoun: 'LP commits firm concentration',
       speaker: 'guest',
     }),
+    category: 'retrieval-baseline',
   },
   {
     label: '#4 VC Roundtable 9-figure AUM (guest, financial)',
@@ -130,6 +140,7 @@ const TESTS: TestCase[] = [
       searchableNoun: 'VC Roundtable AUM fund',
       speaker: 'guest',
     }),
+    category: 'retrieval-baseline',
   },
   {
     label: '#5 100 days after claw pill (guest, historical)',
@@ -142,11 +153,49 @@ const TESTS: TestCase[] = [
       searchableNoun: '100 days claw pill event',
       speaker: 'guest',
     }),
+    category: 'retrieval-baseline',
+  },
+  {
+    label: 'Fix#1 — Product availability (Wispr Flow on iOS and Android)',
+    claim: makeClaim({
+      claimText: 'Wispr Flow is now available on iOS and Android.',
+      primaryEntity: 'Wispr Flow',
+      entityType: 'company',
+      claimType: 'comparative',
+      keyNumbers: [],
+      searchableNoun: 'Wispr Flow mobile launch',
+    }),
+    category: 'fix1-target',
+  },
+  {
+    label: 'Fix#1 — Platform reach (Cursor 5 million developers)',
+    claim: makeClaim({
+      claimText: 'Cursor has 5 million developers using the platform.',
+      primaryEntity: 'Cursor',
+      entityType: 'company',
+      claimType: 'comparative',
+      keyNumbers: ['5000000'],
+      searchableNoun: 'Cursor developer count',
+    }),
+    category: 'fix1-target',
+  },
+  {
+    label: 'Fix#1 — Headcount (Anthropic 1500 employees 8 countries)',
+    claim: makeClaim({
+      claimText: 'Anthropic has grown to 1500 employees across eight countries.',
+      primaryEntity: 'Anthropic',
+      entityType: 'company',
+      claimType: 'comparative',
+      keyNumbers: ['1500', '8'],
+      searchableNoun: 'Anthropic employee count international offices',
+    }),
+    category: 'fix1-target',
   },
 ];
 
 interface CaseResult {
   label: string;
+  category: 'retrieval-baseline' | 'fix1-target';
   retrievedCount: number;
   retrievedTitles: string[];
   retrievedUrls: Set<string>;
@@ -197,6 +246,7 @@ interface CaseResult {
       console.log(`  DOCKET: null (suppressed${r.merged.length === 0 ? ' — 0 sources' : ''})`);
       results.push({
         label: t.label,
+        category: t.category,
         retrievedCount: r.merged.length,
         retrievedTitles: r.merged.map((s) => s.title),
         retrievedUrls,
@@ -237,6 +287,7 @@ interface CaseResult {
 
     results.push({
       label: t.label,
+      category: t.category,
       retrievedCount: r.merged.length,
       retrievedTitles: r.merged.map((s) => s.title),
       retrievedUrls,
@@ -268,9 +319,25 @@ interface CaseResult {
   }
   console.log('──────────────────────────────────────');
 
-  const passCount = results.filter((r) => r.ok).length;
-  const meetsThreshold = cardsWithCitations >= 3 && totalHallucinated === 0;
-  console.log(`Threshold check: cards-with-citations ${cardsWithCitations}/5 (need ≥3), hallucinations ${totalHallucinated} (need 0)`);
+  // Tagged threshold: baseline floor stays at ≥2/5; Fix#1 fixtures must
+  // ALL get a citation (3/3). Hallucinations always 0.
+  const baselineResults = results.filter((r) => r.category === 'retrieval-baseline');
+  const fix1Results = results.filter((r) => r.category === 'fix1-target');
+  const baselineCitations = baselineResults.filter((r) => r.citationsCount > 0).length;
+  const fix1Citations = fix1Results.filter((r) => r.citationsCount > 0).length;
+  const totalCitations = baselineCitations + fix1Citations;
+
+  const meetsThreshold =
+    fix1Citations >= fix1Results.length &&
+    baselineCitations >= 2 &&
+    totalHallucinated === 0;
+
+  console.log('Threshold check:');
+  console.log(`  Baseline:       ${baselineCitations}/${baselineResults.length} cards with citations (need ≥2)`);
+  console.log(`  Fix#1:          ${fix1Citations}/${fix1Results.length} cards with citations (need ${fix1Results.length}/${fix1Results.length})`);
+  console.log(`  Total:          ${totalCitations}/${TESTS.length} cards with citations`);
+  console.log(`  Hallucinations: ${totalHallucinated} (need 0)`);
+  console.log(`  Result: ${meetsThreshold ? 'PASS' : 'FAIL'}`);
   process.exit(meetsThreshold ? 0 : 1);
 })().catch((err) => {
   console.error('Test runner crashed:', err);
