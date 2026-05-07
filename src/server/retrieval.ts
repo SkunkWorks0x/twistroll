@@ -28,6 +28,16 @@ export interface RetrievedSource {
   };
 }
 
+// Excerpt limits — single source of truth. estimateTokens caps content at the
+// same byte limit formatForDocket actually emits to the prompt, so the budget
+// math reflects real prompt cost rather than full retrieved content. Adding
+// a new source type requires adding its limit here.
+const EXCERPT_LIMITS: Record<RetrievedSource['type'], number> = {
+  lancedb: 400,
+  tavily: 200,
+  grokipedia: 350,
+};
+
 // ─── Tier maps ─────────────────────────────────────────────────────────
 
 const TIER_1_DOMAINS = new Set<string>([
@@ -582,8 +592,10 @@ export async function retrieve(claim: ClaimClassification): Promise<RetrievalRes
 const TOKEN_BUDGET = 1400;
 const MAX_SOURCES = 6;
 
-function estimateTokens(s: RetrievedSource): number {
-  return Math.ceil((s.title.length + s.content.length) / 4);
+export function estimateTokens(s: RetrievedSource): number {
+  const limit = EXCERPT_LIMITS[s.type];
+  const contentLen = Math.min(s.content.length, limit);
+  return Math.ceil((s.title.length + contentLen) / 4);
 }
 
 export function mergeAndRank(
@@ -704,7 +716,7 @@ export function formatForDocket(
       const url = s.url ?? '(LanceDB)';
       // LanceDB chunks need more excerpt for the topical anchor to surface —
       // 200 chars often cut mid-transcript before any anchor word appeared.
-      const limit = s.type === 'lancedb' ? 400 : 200;
+      const limit = EXCERPT_LIMITS[s.type];
       out += `[${i + 1}] ${s.title} | ${url} | Tier ${s.tier}\n`;
       const excerpt = s.content.slice(0, limit);
       out += `Excerpt: "${excerpt}${s.content.length > limit ? '…' : ''}"\n\n`;
