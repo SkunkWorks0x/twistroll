@@ -1,20 +1,14 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
-import { generate } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
-import { SNIPER_CONFIG } from './personas.js';
-import { getRecentUtterances, setCurrentDossier } from './context.js';
+import { setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
-import { logReaction } from './logger.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
 
@@ -33,13 +27,6 @@ app.get('/api/status', (_req, res) => {
       cooldownMs: appConfig.cooldownMs,
     },
   });
-});
-
-// API: Toggle sniper
-app.post('/api/sniper/toggle', (req, res) => {
-  const { enabled } = req.body as { enabled: boolean };
-  sniperEnabled = enabled;
-  res.json({ ok: true, enabled });
 });
 
 // API: Commit episode — flip provisional chunks to committed
@@ -123,74 +110,6 @@ function broadcast(message: TrollReaction | StatusMessage): void {
   }
 }
 
-// ─── Question Sniper ───
-// Disabled by default — not in current April 15 spec. Re-enable post-launch if needed.
-// Note: utterancesSinceSniper increment was driven by the v1 OpenOats watcher (removed in
-// sentinel-v2). Sniper firing is currently unreachable until the new pipeline wires utterances back in.
-let sniperEnabled = false;
-let utterancesSinceSniper = 0;
-let sniperCount = 0;
-
-async function fireSniper(): Promise<void> {
-  if (!sniperEnabled) return;
-  if (utterancesSinceSniper < 2) return;
-
-  const recent = getRecentUtterances();
-  if (recent.length === 0) return;
-
-  utterancesSinceSniper = 0;
-  sniperCount++;
-
-  // Build context from recent utterances
-  let context = '[RECENT CONVERSATION]\n';
-  recent.forEach((u) => {
-    const label = u.speaker === 'you' ? 'Host' : 'Guest';
-    context += `${label}: "${u.text}"\n`;
-  });
-  context += '\n[SUGGEST ONE FOLLOW-UP QUESTION FOR THE HOST]\n';
-
-  try {
-    let { text: response, engine } = await generate(
-      SNIPER_CONFIG.model,
-      SNIPER_CONFIG.systemPrompt,
-      context
-    );
-
-    // Strip wrapping quotes and question marks
-    response = response.replace(/^["'"]+|["'"]+$/g, '');
-    response = response.replace(/\?+$/, '');
-
-    // Take first sentence only
-    const sentenceMatch = response.match(/^(.*?(?:\.\s|\." |[!?]))/);
-    if (sentenceMatch) {
-      response = sentenceMatch[1].trimEnd();
-      response = response.replace(/\?+$/, '');
-    }
-
-    // Hard cap at 120 chars
-    if (response.length > 120) {
-      const truncated = response.slice(0, 120);
-      const lastSpace = truncated.lastIndexOf(' ');
-      response = (lastSpace > 30 ? truncated.slice(0, lastSpace) : truncated.trimEnd());
-    }
-
-    const reaction: TrollReaction = {
-      type: 'troll_comment',
-      persona: 'sniper',
-      text: response,
-      timestamp: Date.now(),
-      utteranceId: `utt_sniper_${String(sniperCount).padStart(3, '0')}`,
-    };
-
-    broadcast(reaction);
-    logReaction('sniper' as any, response, recent[recent.length - 1].text, engine);
-    console.log(`[sniper] [${engine}]: "${response}"`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[sniper] Failed: ${msg}`);
-  }
-}
-
 async function main() {
   // Check Ollama on startup
   const ollamaOk = await checkOllama();
@@ -210,11 +129,6 @@ async function main() {
     console.log(`   WebSocket: ws://localhost:${appConfig.wsPort}`);
     console.log('');
   });
-
-  // Question Sniper timer — fires every 75s independently of utterance pipeline.
-  setInterval(() => {
-    fireSniper().catch((err) => console.error('[sniper] Timer error:', err));
-  }, 75000);
 
   // Periodic Ollama health check
   setInterval(async () => {
