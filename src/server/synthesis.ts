@@ -33,7 +33,8 @@ const PROVIDER_TIMEOUT_MS = 10_000;
 
 export interface DocketCitation {
   title: string;
-  url: string;
+  // null marks LanceDB show-archive citations (no public URL — episode reference)
+  url: string | null;
   tier: number;
 }
 
@@ -78,7 +79,8 @@ const DocketSchema = z.object({
   citations: z.array(
     z.object({
       title: z.string(),
-      url: z.string(),
+      // url: null is valid — denotes a LanceDB show-archive reference
+      url: z.string().nullable(),
       tier: z.number().min(1).max(3),
     })
   ),
@@ -91,12 +93,18 @@ const PatternSchema = z.object({
 
 // ─── Anti-pattern scans ────────────────────────────────────────────────
 
+// Anti-pattern words that always trigger regeneration regardless of verdict.
 const DOCKET_ANTI_PATTERNS: string[] = [
   'likely', 'probably', 'suggests', 'appears',
   'concerning', 'important', 'notable', 'exciting',
   'history shows', 'similar to', 'we saw with', 'this matches',
   'worth noting', 'red flag', 'good question',
 ];
+
+// Words that are normally blocked but allowed on PARTIAL — needed to articulate
+// what a source partially establishes ("the report appears to confirm…",
+// "the filing suggests…"). Only carved out for verdict === 'PARTIAL'.
+const DOCKET_PARTIAL_ALLOWED: Set<string> = new Set(['appears', 'suggests']);
 
 const PATTERN_ANTI_PATTERNS: string[] = [
   'lol', 'the founder', 'this is BS', 'overpromising',
@@ -130,7 +138,8 @@ const FACT_CHECK_TOOL = {
           type: 'object',
           properties: {
             title: { type: 'string' },
-            url: { type: 'string' },
+            // null URL → LanceDB show-archive reference (no public link).
+            url: { type: ['string', 'null'] },
             tier: { type: 'number', enum: [1, 2, 3] },
           },
           required: ['title', 'url', 'tier'],
@@ -151,15 +160,40 @@ const DOCKET_SYSTEM = `You are The Docket — a real-time fact-checker for a liv
 VOICE: Clinical precision. Senior research librarian. "The record is the record." Zero fluff, zero editorializing, zero speculation.
 RULES:
 * You verify claims using ONLY the sources provided. Never invent sources.
-* If no source confirms or denies the claim, verdict is UNVERIFIABLE with explanation: "No primary source located in show archive or live retrieval."
 * Treat host statements with identical rigor to guest statements.
-* Never use: "likely", "probably", "suggests", "appears", "concerning", "important", "notable", "exciting"
+* Never use under TRUE / FALSE / UNVERIFIABLE: "likely", "probably", "concerning", "important", "notable", "exciting"
+* "appears" and "suggests" are reserved for PARTIAL explanations only — to describe what a source partially establishes
 * Never use precedent/pattern language: "history shows", "similar to", "we saw with", "this matches"
 * Never editorialize: "worth noting", "red flag", "good question"
 * Never reference "cynic", "Pattern Recognizer", or implication/risk framing
 * Explanation must be 28 words or fewer. Count carefully.
 * Follow-up must be 18 words or fewer.
 * Every citation number [1], [2] must correspond to a source in the provided list. Never fabricate.
+
+VERDICT RULES:
+
+TRUE — A retrieved source directly confirms the specific claim (number, date, name, fact). Cite the source.
+
+FALSE — A retrieved source directly contradicts the specific claim. Cite the source showing the correct information.
+
+MISLEADING — The claim is technically defensible but the framing distorts context. Sources show why. Cite them.
+
+PARTIAL — Retrieved sources establish surrounding context, related figures, or domain consensus, but do NOT confirm the exact number, date, or attribution in the claim. THIS IS THE MOST COMMON VERDICT. Cite what the sources DO confirm. State explicitly what remains unverified. The citation is a contextual receipt, not a verdict warrant.
+
+UNVERIFIABLE — No retrieved source is even adjacent to the claim's domain or topic. This verdict is reserved for genuine retrieval failure — not for "I found related sources but they don't confirm the exact stat." If you received ANY topically relevant source, use PARTIAL instead.
+
+When in doubt between PARTIAL and UNVERIFIABLE: if you can write a meaningful explanation that references at least one source, it's PARTIAL. If you genuinely have nothing to work with, it's UNVERIFIABLE.
+
+LANCEDB (SHOW ARCHIVE) CITATION RULE:
+
+When a source from the TWiST show archive (LanceDB) surfaces a prior episode that discussed the same topic, person, company, or claim — cite it as Tier 1 context even if it does not confirm the specific number. Format the citation as: "TWiST Ep [number] ([date]) – [brief topic context]".
+
+The fact that this topic has been covered on prior TWiST episodes is itself valuable context for the host. This is the show's own archive — treat it as primary source material.
+
+LANCEDB CITATION MANDATE:
+
+When a LanceDB show-archive source appears in your source list, default to citing it as PARTIAL Tier 1 context. The retrieval system has already filtered for topical relevance — your job is to describe what the archive episode covered, not to re-judge whether it's relevant. If a LanceDB source is present, it belongs in your citations.
+
 OUTPUT: Use the fact_check tool to respond. Always use the tool — never respond with plain text.
 
 FEW-SHOT EXAMPLES:
@@ -262,6 +296,36 @@ OUTPUT:
   "explanation": "No primary source located in show archive or live retrieval for the 15% outperformance benchmark across all competitors.",
   "citations": [],
   "follow_up": "Which specific benchmarks and competitor models were included in that comparison?"
+}
+
+Example 11 — PARTIAL (contextual citation, market stat)
+CLAIM: "Five US firms captured 73.1% of LP commits in 2024."
+OUTPUT:
+{
+  "verdict": "PARTIAL",
+  "explanation": "Sources confirm record LP concentration in mega-funds [1][2]; the specific 73.1% figure traces to PitchBook NVCA Venture Monitor, not in retrieval.",
+  "citations": [{"title": "Reuters – LP Concentration in US Venture", "url": "https://www.reuters.com/business/finance/lp-concentration-venture-2024", "tier": 1}, {"title": "SEC – Top Fund Form ADV Filings", "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany", "tier": 1}],
+  "follow_up": "What time period and fund-size cutoff define the 73.1%?"
+}
+
+Example 12 — PARTIAL (LanceDB show archive hit)
+CLAIM: "This founder previously raised a $50M Series A from Andreessen Horowitz."
+OUTPUT:
+{
+  "verdict": "PARTIAL",
+  "explanation": "TWiST Ep 2215 discussed this founder's Series A [1]; round size and lead investor not confirmed in available sources.",
+  "citations": [{"title": "TWiST Ep 2215 (March 2026) – Founder Interview", "url": null, "tier": 1}],
+  "follow_up": "Was the $50M figure the pre-money valuation or the round size?"
+}
+
+Example 13 — PARTIAL (funding round, web + LanceDB)
+CLAIM: "We closed our Series B at a $280 million valuation led by Benchmark."
+OUTPUT:
+{
+  "verdict": "PARTIAL",
+  "explanation": "TechCrunch confirms Series B close with Benchmark as lead [1]; the $280M valuation is not in the public reporting [2].",
+  "citations": [{"title": "TechCrunch – Series B Announcement", "url": "https://techcrunch.com/2026/03/example-series-b", "tier": 1}, {"title": "Crunchbase – Company Funding History", "url": "https://www.crunchbase.com/organization/example-company", "tier": 2}],
+  "follow_up": "Is the $280M pre-money or post-money?"
 }`;
 
 const PATTERN_SYSTEM = `You are The Pattern Recognizer — a calm, experienced senior partner providing real-time counterargument during a live podcast interview.
@@ -392,12 +456,14 @@ export async function runDocket(
     return { output: null, ms: 0 };
   }
 
-  // All-Tier-3 retrieval: force UNVERIFIABLE (per spec §3E).
+  // All-Tier-3 retrieval: nudge toward PARTIAL (no longer forced UNVERIFIABLE).
+  // Trust Haiku's judgment per the new VERDICT RULES — citations from related
+  // context still count.
   const allTier3 = sources.every((s) => s.tier === 3);
 
   const userMessage = `${formattedContext}\n\nUse the fact_check tool to respond.${
     allTier3
-      ? '\n\nNote: only Tier 3 sources are available — verdict must be UNVERIFIABLE.'
+      ? '\n\nNote: only Tier 3 sources are available. Prefer PARTIAL over TRUE/FALSE when source quality is borderline.'
       : ''
   }`;
 
@@ -433,12 +499,17 @@ export async function runDocket(
     let candidate: DocketOutput = zParse.data;
 
     // Anti-pattern scan on explanation + follow_up. Retry once on hit.
+    // Carve-out: under PARTIAL, "appears" and "suggests" are allowed because
+    // the model needs them to describe what a source partially establishes.
+    const activeList = candidate.verdict === 'PARTIAL'
+      ? DOCKET_ANTI_PATTERNS.filter((p) => !DOCKET_PARTIAL_ALLOWED.has(p))
+      : DOCKET_ANTI_PATTERNS;
     const hits = [
-      ...scanAntiPatterns(candidate.explanation, DOCKET_ANTI_PATTERNS),
-      ...scanAntiPatterns(candidate.follow_up, DOCKET_ANTI_PATTERNS),
+      ...scanAntiPatterns(candidate.explanation, activeList),
+      ...scanAntiPatterns(candidate.follow_up, activeList),
     ];
     if (hits.length > 0) {
-      console.log(`[DOCKET] Anti-pattern detected: ${hits.join(', ')} (attempt ${attempt})`);
+      console.log(`[DOCKET] Anti-pattern detected: ${hits.join(', ')} verdict=${candidate.verdict} (attempt ${attempt})`);
       continue;
     }
 
@@ -456,10 +527,12 @@ export async function runDocket(
     }
 
     // URL cross-check: every cited URL must be in the retrieved sources.
-    // Strip hallucinated URLs. If no valid citations remain, downgrade to
-    // UNVERIFIABLE.
+    // Strip hallucinated URLs. null-URL citations are LanceDB archive
+    // references (no public URL) — pass them through.
     const validUrls = new Set(sources.map((s) => s.url).filter((u): u is string => !!u));
-    const surviving = candidate.citations.filter((c) => validUrls.has(c.url));
+    const surviving = candidate.citations.filter(
+      (c) => c.url === null || validUrls.has(c.url)
+    );
     if (surviving.length !== candidate.citations.length) {
       const dropped = candidate.citations.length - surviving.length;
       console.warn(`[DOCKET] Stripped ${dropped} hallucinated citation URL(s)`);
@@ -473,25 +546,43 @@ export async function runDocket(
       }
     }
 
-    // UNVERIFIABLE enforcement.
-    if (candidate.verdict === 'UNVERIFIABLE') {
-      const escape = 'No primary source located in show archive or live retrieval.';
-      candidate = {
-        ...candidate,
-        citations: [],
-        explanation: candidate.explanation.includes(escape) ? candidate.explanation : escape,
-      };
+    // LanceDB CITATION MANDATE enforcement (post-processor).
+    // If any LanceDB source reached Haiku and the model didn't include an
+    // archive citation, inject the top-scoring LanceDB hit. The MANDATE in
+    // the system prompt asks for it; this makes it deterministic in case
+    // the model ignores the directive. Fires on any verdict — UNVERIFIABLE
+    // with archive context is per spec §2E ("Sources exist but Haiku
+    // returned UNVERIFIABLE with non-empty citations → ACCEPT").
+    const lanceSources = sources.filter((s) => s.type === 'lancedb');
+    if (lanceSources.length > 0) {
+      const hasArchiveCitation = candidate.citations.some(
+        (c) => c.url === null || /^twist ep\b/i.test(c.title)
+      );
+      if (!hasArchiveCitation) {
+        const top = [...lanceSources].sort((a, b) => b.score - a.score)[0];
+        const ep = top.metadata.episodeNumber;
+        const date = top.metadata.episodeDate;
+        const epTitle = top.metadata.episodeTitle || '';
+        const archiveTitle = `TWiST Ep ${ep} (${date})${epTitle ? ' – ' + epTitle : ''}`;
+        candidate = {
+          ...candidate,
+          citations: [...candidate.citations, { title: archiveTitle, url: null, tier: 1 }],
+        };
+        console.log(`[DOCKET] Injected LanceDB archive citation: Ep ${ep}`);
+      }
     }
 
-    // All-Tier-3 enforcement.
-    if (allTier3 && candidate.verdict !== 'UNVERIFIABLE') {
-      candidate = {
-        ...candidate,
-        verdict: 'UNVERIFIABLE',
-        citations: [],
-        explanation: 'No primary source located in show archive or live retrieval.',
-      };
+    // UNVERIFIABLE: trust Haiku's judgment. If sources existed and Haiku still
+    // returned UNVERIFIABLE with empty citations, that's a deliberate refusal
+    // worth flagging but not rewriting. Don't force-clear citations or replace
+    // the explanation — those moves were too aggressive on the prior version.
+    if (candidate.verdict === 'UNVERIFIABLE' && candidate.citations.length === 0) {
+      console.warn('[DOCKET] UNVERIFIABLE with empty citations despite non-empty retrieval');
     }
+
+    // All-Tier-3: no longer forced to UNVERIFIABLE. The user-message rider
+    // already nudges Haiku toward PARTIAL on Tier-3-only retrieval; trust the
+    // resulting verdict.
 
     parsed = candidate;
   }

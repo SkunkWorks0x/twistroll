@@ -102,7 +102,8 @@ export interface ClaimDetectedMessage {
 // ─── Synthesis layer outputs (shipped on the 'claim_card' broadcast) ───
 export interface DocketCitationPayload {
   title: string;
-  url: string;
+  // null marks LanceDB show-archive citations (no public URL — episode reference)
+  url: string | null;
   tier: number;
 }
 export interface DocketPayload {
