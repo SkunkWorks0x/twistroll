@@ -94,7 +94,7 @@ const DocketSchema = z.object({
 });
 
 const CANONICAL_UNVERIFIABLE_PHRASE = 'No primary source located in show archive or live retrieval.';
-const LANCEDB_INJECTION_SCORE_FLOOR = 0.40;
+const LANCEDB_INJECTION_SCORE_FLOOR = 0.45;
 
 const PatternSchema = z.object({
   text: z.string().refine((s) => wordCount(s) <= 38, 'Pattern output exceeds 38 words'),
@@ -453,6 +453,89 @@ function citationsRefInExplanation(text: string): number[] {
   return [...out].sort();
 }
 
+// LanceDB CITATION MANDATE enforcement (post-processor). Pure function —
+// extracted from runDocket so the guardrail ladder is testable in isolation
+// (see scripts/test-injection-guardrails.ts).
+//
+// Guardrails (in order):
+//   1. Verdict gate — fire only on PARTIAL or UNVERIFIABLE. Confident verdicts
+//      (TRUE/FALSE/MISLEADING) don't get diluted with archive context.
+//   2. Score floor — top hit must be ≥ 0.45.
+//   3. Entity-token overlap — top chunk text must contain at least one ≥4-char
+//      token from claim.primaryEntity. Blocks tangential matches that pass the
+//      score floor but don't actually cover the entity (e.g. LinkedIn query
+//      returning a Deel episode at 0.41).
+//   4. Already-cited skip — if Haiku already emitted an archive citation,
+//      don't double-inject.
+//   5. Explanation rewrite — replace the canonical "No primary source…" phrase
+//      with an episode-specific sentence, or append when word-budget allows.
+//   6. Provenance tag — injected citations carry citationSource='post_processor'.
+export function applyLanceDBInjection(
+  candidate: DocketOutput,
+  sources: RetrievedSource[],
+  claim: ClaimClassification
+): DocketOutput {
+  const lanceSources = sources.filter((s) => s.type === 'lancedb');
+  if (lanceSources.length === 0) return candidate;
+
+  const top = [...lanceSources].sort((a, b) => b.score - a.score)[0];
+  console.log(`[DOCKET] Top LanceDB score=${top.score.toFixed(4)} verdict=${candidate.verdict}`);
+
+  const verdictAllowsInjection = candidate.verdict === 'PARTIAL' || candidate.verdict === 'UNVERIFIABLE';
+  if (!verdictAllowsInjection) {
+    console.log(`[DOCKET] LanceDB injection skipped: verdict=${candidate.verdict} (gate: PARTIAL/UNVERIFIABLE only)`);
+    return candidate;
+  }
+  if (top.score < LANCEDB_INJECTION_SCORE_FLOOR) {
+    console.log(`[DOCKET] LanceDB injection skipped: top score ${top.score.toFixed(4)} < ${LANCEDB_INJECTION_SCORE_FLOOR}`);
+    return candidate;
+  }
+
+  const entityTokens = (claim.primaryEntity || '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((t) => t.length >= 4);
+  const chunkText = (top.content || '').toLowerCase();
+  const hasEntityOverlap = entityTokens.some((t) => chunkText.includes(t));
+  if (!hasEntityOverlap) {
+    console.log(`[DOCKET] LanceDB injection skipped: no entity-token overlap`);
+    return candidate;
+  }
+
+  const hasArchiveCitation = candidate.citations.some(
+    (c) => c.url === null || /^twist ep\b/i.test(c.title)
+  );
+  if (hasArchiveCitation) return candidate;
+
+  const ep = top.metadata.episodeNumber;
+  const date = top.metadata.episodeDate;
+  const epTitle = top.metadata.episodeTitle || '';
+  const archiveTitle = `TWiST Ep ${ep} (${date})${epTitle ? ' – ' + epTitle : ''}`;
+  const injectedIdx = candidate.citations.length + 1;
+  let next: DocketOutput = {
+    ...candidate,
+    citations: [
+      ...candidate.citations,
+      { title: archiveTitle, url: null, tier: 1, citationSource: 'post_processor' as const },
+    ],
+  };
+  console.log(`[DOCKET] Injected LanceDB archive citation [${injectedIdx}]: Ep ${ep} (score=${top.score.toFixed(4)})`);
+
+  const replacementSentence = `No direct source confirmed; TWiST Ep ${ep} (${date}) covered this topic [${injectedIdx}].`;
+  const appendSentence = ` TWiST Ep ${ep} (${date}) covered this topic [${injectedIdx}].`;
+  if (next.explanation.includes(CANONICAL_UNVERIFIABLE_PHRASE)) {
+    const replaced = next.explanation.replace(CANONICAL_UNVERIFIABLE_PHRASE, replacementSentence);
+    next = { ...next, explanation: wordCount(replaced) <= 28 ? replaced : replacementSentence };
+  } else {
+    const appended = next.explanation.trimEnd() + appendSentence;
+    if (wordCount(appended) <= 28) {
+      next = { ...next, explanation: appended };
+    }
+  }
+
+  return next;
+}
+
 export async function runDocket(
   claim: ClaimClassification,
   sources: RetrievedSource[],
@@ -566,67 +649,7 @@ export async function runDocket(
       })),
     };
 
-    // LanceDB CITATION MANDATE enforcement (post-processor) — guardrails:
-    //   1. Verdict gate — only fire on PARTIAL or UNVERIFIABLE. TRUE/FALSE/
-    //      MISLEADING are confident verdicts; tangential archive context
-    //      dilutes the message.
-    //   2. Score floor — top hit must be ≥ 0.40. Below that, topical relevance
-    //      is too thin. Score logged either way for tuning.
-    //   3. Explanation rewrite — replace the canonical "No primary source…"
-    //      phrase with a sentence that names the archive episode, or append
-    //      the archive sentence if there's word-budget room.
-    //   4. Provenance tagged 'post_processor' on the injected citation.
-    const lanceSources = sources.filter((s) => s.type === 'lancedb');
-    const verdictAllowsInjection = candidate.verdict === 'PARTIAL' || candidate.verdict === 'UNVERIFIABLE';
-    if (lanceSources.length > 0) {
-      const top = [...lanceSources].sort((a, b) => b.score - a.score)[0];
-      console.log(`[DOCKET] Top LanceDB score=${top.score.toFixed(4)} verdict=${candidate.verdict}`);
-
-      if (!verdictAllowsInjection) {
-        console.log(`[DOCKET] LanceDB injection skipped: verdict=${candidate.verdict} (gate: PARTIAL/UNVERIFIABLE only)`);
-      } else if (top.score < LANCEDB_INJECTION_SCORE_FLOOR) {
-        console.log(`[DOCKET] LanceDB injection skipped: top score ${top.score.toFixed(4)} < ${LANCEDB_INJECTION_SCORE_FLOOR}`);
-      } else {
-        const hasArchiveCitation = candidate.citations.some(
-          (c) => c.url === null || /^twist ep\b/i.test(c.title)
-        );
-        if (!hasArchiveCitation) {
-          const ep = top.metadata.episodeNumber;
-          const date = top.metadata.episodeDate;
-          const epTitle = top.metadata.episodeTitle || '';
-          const archiveTitle = `TWiST Ep ${ep} (${date})${epTitle ? ' – ' + epTitle : ''}`;
-          const injectedIdx = candidate.citations.length + 1; // 1-based after injection
-          candidate = {
-            ...candidate,
-            citations: [
-              ...candidate.citations,
-              { title: archiveTitle, url: null, tier: 1, citationSource: 'post_processor' as const },
-            ],
-          };
-          console.log(`[DOCKET] Injected LanceDB archive citation [${injectedIdx}]: Ep ${ep} (score=${top.score.toFixed(4)})`);
-
-          // Explanation rewrite. If the explanation contains the canonical
-          // "No primary source located…" phrase, replace it with a sentence
-          // that names the archive episode. Otherwise append the archive
-          // sentence when word-budget allows.
-          const replacementSentence = `No direct source confirmed; TWiST Ep ${ep} (${date}) covered this topic [${injectedIdx}].`;
-          const appendSentence = ` TWiST Ep ${ep} (${date}) covered this topic [${injectedIdx}].`;
-          if (candidate.explanation.includes(CANONICAL_UNVERIFIABLE_PHRASE)) {
-            const replaced = candidate.explanation.replace(CANONICAL_UNVERIFIABLE_PHRASE, replacementSentence);
-            candidate = {
-              ...candidate,
-              explanation: wordCount(replaced) <= 28 ? replaced : replacementSentence,
-            };
-          } else {
-            const appended = candidate.explanation.trimEnd() + appendSentence;
-            if (wordCount(appended) <= 28) {
-              candidate = { ...candidate, explanation: appended };
-            }
-            // else leave explanation alone — citation still appears below
-          }
-        }
-      }
-    }
+    candidate = applyLanceDBInjection(candidate, sources, claim);
 
     // UNVERIFIABLE: trust Haiku's judgment. If sources existed and Haiku still
     // returned UNVERIFIABLE with empty citations after injection guards
