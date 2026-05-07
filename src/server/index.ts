@@ -1,40 +1,22 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
-import { startWatcher } from './watcher.js';
-import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression } from './queue.js';
+import { generate } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
-import { checkForSponsor } from './sponsors.js';
 import { SNIPER_CONFIG } from './personas.js';
 import { getRecentUtterances, setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
-import type { TrollReaction, StatusMessage, PersonaId, SoundCueMessage, FredAudioToggleMessage, FredVolumeMessage } from '../shared/types.js';
+import type { TrollReaction, StatusMessage, PersonaId } from '../shared/types.js';
 import { logReaction } from './logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 app.use(express.json());
-
-// ─── Serve Fred's sound effects (static) ───
-// Mounted before the root/overlay routes so /sounds/*.mp3 resolves cleanly.
-app.use('/sounds', express.static(resolve(__dirname, '..', '..', 'public', 'sounds')));
-
-// ─── Serve Overlay at root ───
-app.get('/', (_req, res) => {
-  try {
-    const overlayPath = resolve(__dirname, '..', 'overlay', 'index.html');
-    const html = readFileSync(overlayPath, 'utf-8');
-    res.type('html').send(html);
-  } catch {
-    res.status(404).send('Overlay not found. Check src/overlay/index.html');
-  }
-});
 
 // ─── Express Routes ───
 
@@ -47,84 +29,17 @@ app.get('/config', (_req, res) => {
 app.get('/api/status', (_req, res) => {
   res.json({
     ollama: isOllamaAvailable(),
-    processing: isProcessing(),
-    session: watcher?.getCurrentSession() || null,
     config: {
       cooldownMs: appConfig.cooldownMs,
     },
   });
 });
 
-// API: Toggle persona
-app.post('/api/persona/toggle', (req, res) => {
-  const { persona, enabled } = req.body as { persona: PersonaId; enabled: boolean };
-  togglePersona(persona, enabled);
-  res.json({ ok: true });
-});
-
-// API: Adjust cooldown
-app.post('/api/cooldown', (req, res) => {
-  const { ms } = req.body as { ms: number };
-  setCooldown(ms);
-  res.json({ ok: true, cooldownMs: ms });
-});
-
-
 // API: Toggle sniper
 app.post('/api/sniper/toggle', (req, res) => {
   const { enabled } = req.body as { enabled: boolean };
   sniperEnabled = enabled;
   res.json({ ok: true, enabled });
-});
-
-// API: Fred audio kill switch. Producer-facing. Broadcasts to the overlay
-// which ignores future sound_cue messages when disabled (text bubbles still
-// render). No server-side state — the overlay is the source of truth for
-// whether audio plays.
-app.post('/api/fred/audio_toggle', (req, res) => {
-  const { enabled } = req.body as { enabled: boolean };
-  const msg: FredAudioToggleMessage = { type: 'fred_audio_toggle', enabled: !!enabled };
-  broadcast(msg);
-  res.json({ ok: true, enabled: !!enabled });
-});
-
-// API: Fred volume. Hard-capped at 0.3 on the server regardless of what the
-// client sends — the overlay also caps, but double-defense is cheap.
-app.post('/api/fred/volume', (req, res) => {
-  const { volume } = req.body as { volume: number };
-  const clamped = Math.min(0.3, Math.max(0, Number(volume) || 0));
-  const msg: FredVolumeMessage = { type: 'fred_volume', volume: clamped };
-  broadcast(msg);
-  res.json({ ok: true, volume: clamped });
-});
-
-// API: Manual Fred sound trigger — producer/demo helper. Broadcasts a
-// Fred bubble AND a sound_cue to all overlay clients without waiting for
-// a Fred rotation. Useful for pre-show audio verification and for
-// exercising the sine-wave `.speaking.sound-active` stronger-pulse path
-// (the CSS selector requires both classes present simultaneously).
-app.post('/api/fred/test_cue', (req, res) => {
-  const { sound, text } = req.body as { sound?: string; text?: string };
-  if (!sound || typeof sound !== 'string') {
-    return res.status(400).json({ error: 'sound required' });
-  }
-  const bubbleText = typeof text === 'string' && text.trim().length > 0
-    ? text
-    : `🔊 ${sound.toUpperCase().replace(/-/g, ' ')} — test cue`;
-
-  const bubble: TrollReaction = {
-    type: 'troll_comment',
-    persona: 'not-fred',
-    text: bubbleText,
-    timestamp: Date.now(),
-    utteranceId: `utt_test_${Date.now()}`,
-  };
-  const cue: SoundCueMessage = { type: 'sound_cue', sound };
-
-  // Order matters: bubble first (adds .speaking), then cue (adds .sound-active).
-  broadcast(bubble);
-  broadcast(cue);
-  res.json({ ok: true, sound, text: bubbleText });
 });
 
 // API: Commit episode — flip provisional chunks to committed
@@ -190,7 +105,6 @@ wss.on('connection', (ws) => {
   const status: StatusMessage = {
     type: 'status',
     state: isOllamaAvailable() ? 'connected' : 'ollama_down',
-    session: watcher?.getCurrentSession() || undefined,
   };
   ws.send(JSON.stringify(status));
 
@@ -200,24 +114,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-interface SponsorMessage {
-  type: 'sponsor';
-  name: string;
-  url: string;
-  code: string | null;
-  copy: string;
-  timestamp: number;
-}
-
-function broadcast(
-  message:
-    | TrollReaction
-    | StatusMessage
-    | SponsorMessage
-    | SoundCueMessage
-    | FredAudioToggleMessage
-    | FredVolumeMessage
-): void {
+function broadcast(message: TrollReaction | StatusMessage): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
@@ -226,12 +123,10 @@ function broadcast(
   }
 }
 
-// ─── Watcher Integration ───
-
-let watcher: ReturnType<typeof startWatcher> | null = null;
-
 // ─── Question Sniper ───
 // Disabled by default — not in current April 15 spec. Re-enable post-launch if needed.
+// Note: utterancesSinceSniper increment was driven by the v1 OpenOats watcher (removed in
+// sentinel-v2). Sniper firing is currently unreachable until the new pipeline wires utterances back in.
 let sniperEnabled = false;
 let utterancesSinceSniper = 0;
 let sniperCount = 0;
@@ -302,69 +197,21 @@ async function main() {
   if (!ollamaOk) {
     console.warn('⚠️  Ollama not detected at', appConfig.ollamaBaseUrl);
     console.warn('   Start Ollama and pull the model: ollama pull qwen2.5:7b');
-    console.warn('   TWiSTroll will retry when utterances arrive.');
+    console.warn('   Sentinel will retry when utterances arrive.');
   } else {
     console.log('✅ Ollama connected');
   }
 
-  const handleUtterance = async (utterance: Parameters<Parameters<typeof startWatcher>[0]>[0]) => {
-    // Re-check Ollama if it was down
-    if (!isOllamaAvailable()) {
-      await checkOllama();
-    }
-
-    broadcast({
-      type: 'status',
-      state: 'processing',
-      session: watcher?.getCurrentSession() || undefined,
-    });
-
-    // Track utterances for sniper gate (show utterances only, not viewer chat)
-    if (utterance.speaker !== 'viewer') {
-      utterancesSinceSniper++;
-
-      // Sponsor keyword — only runs on show audio, never on viewer chat
-      const sponsor = checkForSponsor(utterance.text);
-      if (sponsor) {
-        broadcast({
-          type: 'sponsor',
-          name: sponsor.name,
-          url: sponsor.url,
-          code: sponsor.code || null,
-          copy: sponsor.copy,
-          timestamp: Date.now(),
-        });
-        console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
-        startSponsorSuppression();
-      }
-    }
-
-    await processUtterance(utterance, (reaction) => {
-      broadcast(reaction);
-    });
-
-    broadcast({
-      type: 'status',
-      state: 'idle',
-      session: watcher?.getCurrentSession() || undefined,
-    });
-  };
-
-  // Start file watcher (OpenOats transcripts)
-  watcher = startWatcher(handleUtterance);
-
   // Start Express server
   server.listen(appConfig.overlayPort, () => {
     console.log('');
-    console.log('🔴 TWiSTroll is running');
-    console.log(`   Overlay:  http://localhost:${appConfig.overlayPort}`);
-    console.log(`   Config:   http://localhost:${appConfig.overlayPort}/config`);
+    console.log('🔴 TWiST Sentinel is running');
+    console.log(`   Config:    http://localhost:${appConfig.overlayPort}/config`);
     console.log(`   WebSocket: ws://localhost:${appConfig.wsPort}`);
-    console.log(`   Watching: ${appConfig.transcriptDir}`);
     console.log('');
   });
 
-  // Question Sniper timer — fires every 75s independently of troll rotation
+  // Question Sniper timer — fires every 75s independently of utterance pipeline.
   setInterval(() => {
     fireSniper().catch((err) => console.error('[sniper] Timer error:', err));
   }, 75000);
@@ -387,7 +234,7 @@ async function main() {
 
 function configPanelHTML(): string {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>TWiSTroll Config</title>
+<html><head><meta charset="utf-8"><title>Sentinel Config</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #1a1a1e; color: #e8e8e8; padding: 24px; }
@@ -401,42 +248,14 @@ function configPanelHTML(): string {
   button:hover { background: #e64400; }
   .status { font-size: 12px; color: #84CC16; }
   .status.down { color: #ef4444; }
-  #obs-url { font-size: 12px; color: #94A3B8; word-break: break-all; margin-top: 8px; }
 </style></head><body>
-<h1>TWiSTroll Config</h1>
+<h1>Sentinel Config</h1>
 <div class="card">
   <h2>Connection</h2>
   <div id="ollama-status" class="status">Checking Ollama...</div>
-  <div id="session-status" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
-  <div style="margin-top:8px;">
-    <button id="commit-episode-btn" disabled style="opacity:0.5;">Commit episode to memory</button>
-    <div id="commit-result" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
-  </div>
-</div>
-<div class="card">
-  <h2>Personas</h2>
-  <label><input type="checkbox" checked data-persona="not-jamie"> Gary (Fact-checker)</label>
-  <label><input type="checkbox" checked data-persona="not-delinquent"> Troll (Cynical Commentator)</label>
-  <label><input type="checkbox" checked data-persona="not-taco"> Jackie (Comedy Writer)</label>
-  <label><input type="checkbox" checked data-persona="not-fred"> Fred (Sound Effects)</label>
-</div>
-<div class="card">
-  <h2>Timing</h2>
-  <label>Cooldown: <span id="cd-val">15</span>s <input type="range" min="5" max="60" value="15" id="cooldown"></label>
-</div>
-<div class="card">
-  <h2>Sound Effects</h2>
-  <label><input type="checkbox" id="fred-audio-toggle" checked> Fred Audio</label>
-  <label style="margin-top:8px;">Volume: <span id="fred-vol-val">25%</span> <input type="range" min="0" max="0.3" step="0.05" value="0.25" id="fred-volume"></label>
-</div>
-<div class="card">
-  <h2>OBS Setup</h2>
-  <button id="copy-url">Copy OBS URL</button>
-  <div id="obs-url">http://localhost:${appConfig.overlayPort}?mode=prod</div>
 </div>
 <script>
   // Status polling
-  let currentSession=null;
   setInterval(async()=>{
     try{
       const r=await fetch('/api/status');
@@ -444,74 +263,8 @@ function configPanelHTML(): string {
       const el=document.getElementById('ollama-status');
       el.textContent=d.ollama?'Ollama connected':'Ollama not detected';
       el.className=d.ollama?'status':'status down';
-      document.getElementById('session-status').textContent=d.session?'Session: '+d.session:'No active session';
-      currentSession=d.session||null;
-      const btn=document.getElementById('commit-episode-btn');
-      btn.disabled=!currentSession;
-      btn.style.opacity=currentSession?'1':'0.5';
     }catch{}
   },3000);
-
-  // Persona toggles
-  document.querySelectorAll('[data-persona]').forEach(cb=>{
-    cb.addEventListener('change',async(e)=>{
-      const t=e.target;
-      await fetch('/api/persona/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({persona:t.dataset.persona,enabled:t.checked})});
-    });
-  });
-
-  // Cooldown
-  document.getElementById('cooldown').addEventListener('input',async(e)=>{
-    const v=e.target.value;
-    document.getElementById('cd-val').textContent=v;
-    await fetch('/api/cooldown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ms:v*1000})});
-  });
-
-  // Fred audio kill switch — posts to server which broadcasts WS to overlay
-  document.getElementById('fred-audio-toggle').addEventListener('change',async(e)=>{
-    await fetch('/api/fred/audio_toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e.target.checked})});
-  });
-
-  // Fred volume — clamp at 0.3 client-side too; server double-clamps.
-  // Display raw value × 100 so 0.25 → 25%, matching the spec's default label.
-  document.getElementById('fred-volume').addEventListener('input',async(e)=>{
-    const raw=parseFloat(e.target.value);
-    const v=Math.min(0.3,Math.max(0,isNaN(raw)?0.25:raw));
-    document.getElementById('fred-vol-val').textContent=Math.round(v*100)+'%';
-    await fetch('/api/fred/volume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:v})});
-  });
-
-  // Copy URL
-  document.getElementById('copy-url').addEventListener('click',()=>{
-    navigator.clipboard.writeText('http://localhost:${appConfig.overlayPort}?mode=prod');
-    document.getElementById('copy-url').textContent='Copied!';
-    setTimeout(()=>document.getElementById('copy-url').textContent='Copy OBS URL',2000);
-  });
-
-  // Commit episode to memory
-  document.getElementById('commit-episode-btn').addEventListener('click',async()=>{
-    if(!currentSession) return;
-    const btn=document.getElementById('commit-episode-btn');
-    const result=document.getElementById('commit-result');
-    btn.disabled=true;
-    btn.textContent='Committing...';
-    try{
-      const r=await fetch('/api/commit-episode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionFile:currentSession})});
-      const d=await r.json();
-      if(d.success){
-        result.textContent='Committed '+d.count+' chunks to memory';
-        result.style.color='#84CC16';
-      }else{
-        result.textContent='Error: '+(d.error||'unknown');
-        result.style.color='#ef4444';
-      }
-    }catch(e){
-      result.textContent='Error: '+e.message;
-      result.style.color='#ef4444';
-    }
-    btn.disabled=false;
-    btn.textContent='Commit episode to memory';
-  });
 </script></body></html>`;
 }
 

@@ -162,8 +162,9 @@ async function refreshMemoryBlock(summary: string): Promise<void> {
     const latencyMs = Date.now() - start;
 
     // Empirically tuned: tech podcast embeddings cluster in 0.32-0.54 cosine range.
-    // 0.46 captures meaningful matches without injecting noise.
-    const STRONG_MATCH_THRESHOLD = 0.46;
+    // 0.35 captures meaningful matches without injecting noise (post-backfill calibration:
+    // EmbeddingGemma scores ran below the prior 0.46 floor, filtering legitimate matches).
+    const STRONG_MATCH_THRESHOLD = 0.35;
     const strongResults = results.filter((r) => r.score > STRONG_MATCH_THRESHOLD);
     currentMemoryBlock = strongResults.length > 0 ? formatMemoryBlock(strongResults) : '';
     // Stash max score for Gary's confidence gate at inject time.
@@ -198,7 +199,7 @@ export function buildContext(
   }
 
   // Cross-episode memory (populated on summary cadence, not per utterance)
-  // Gary-only: gate on max-score confidence; other personas use the formatted block at the 0.46 floor.
+  // Gary-only: gate on max-score confidence; other personas use the formatted block at the 0.35 floor.
   if (currentMemoryBlock && (persona !== 'not-jamie' || currentMemoryMaxScore >= GARY_MEMORY_CONFIDENCE_THRESHOLD)) {
     context += `${currentMemoryBlock}\n\n`;
   }

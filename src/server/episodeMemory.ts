@@ -229,7 +229,7 @@ export async function queryMemory(
  */
 export function findRelevantResults(
   results: MemoryQueryResult[],
-  minFloor: number = 0.46
+  minFloor: number = 0.35
 ): MemoryQueryResult[] {
   if (results.length === 0) return [];
   const sorted = [...results].sort((a, b) => b.score - a.score);
