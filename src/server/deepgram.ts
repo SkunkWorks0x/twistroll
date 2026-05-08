@@ -16,6 +16,7 @@ export type SessionMode = 'stream' | 'system-audio';
 export interface SessionConfig {
   mode: SessionMode;
   source: string;
+  startOffsetSeconds?: number;
 }
 
 const DG_WS_URL = 'wss://api.deepgram.com/v1/listen';
@@ -85,7 +86,8 @@ export class DeepgramClient extends EventEmitter {
 
     await this.connectDeepgram();
     this.startAudioPipeline();
-    console.log(`[deepgram] session started: mode=${config.mode}, source="${config.source}"`);
+    const offsetSuffix = config.startOffsetSeconds !== undefined ? `, startOffsetSeconds=${config.startOffsetSeconds}` : '';
+    console.log(`[deepgram] session started: mode=${config.mode}, source="${config.source}"${offsetSuffix}`);
   }
 
   async stopSession(): Promise<void> {
@@ -299,12 +301,16 @@ export class DeepgramClient extends EventEmitter {
         return;
       }
       console.log('[deepgram] yt-dlp resolved direct audio URL');
-      this.spawnFfmpegFromUrl(cleanUrl);
+      this.spawnFfmpegFromUrl(cleanUrl, this.sessionConfig?.startOffsetSeconds);
     });
   }
 
-  private spawnFfmpegFromUrl(url: string): void {
-    const ffmpeg = spawn('ffmpeg', [
+  private spawnFfmpegFromUrl(url: string, offsetSeconds?: number): void {
+    const args: string[] = [];
+    if (offsetSeconds !== undefined && offsetSeconds > 0) {
+      args.push('-ss', String(offsetSeconds));
+    }
+    args.push(
       '-i', url,
       '-f', 's16le',
       '-ar', '16000',
@@ -312,7 +318,8 @@ export class DeepgramClient extends EventEmitter {
       '-acodec', 'pcm_s16le',
       '-loglevel', 'warning',
       'pipe:1',
-    ], { stdio: ['ignore', 'pipe', 'pipe'] });
+    );
+    const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.ffmpeg = ffmpeg;
     this.attachFfmpegStreams(ffmpeg);
   }

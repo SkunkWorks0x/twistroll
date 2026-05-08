@@ -341,17 +341,26 @@ app.post('/api/session/start', async (req, res) => {
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
-  const { mode, source, speakerMap, sessionContext } = req.body as {
+  const { mode, source, speakerMap, sessionContext, startOffsetSeconds } = req.body as {
     mode?: SessionMode;
     source?: string;
     speakerMap?: unknown;
     sessionContext?: unknown;
+    startOffsetSeconds?: unknown;
   };
   if (mode !== 'stream' && mode !== 'system-audio') {
     return res.status(400).json({ error: "mode must be 'stream' or 'system-audio'" });
   }
   if (!source || typeof source !== 'string') {
     return res.status(400).json({ error: 'source required' });
+  }
+  if (
+    startOffsetSeconds !== undefined &&
+    (typeof startOffsetSeconds !== 'number' ||
+      !Number.isInteger(startOffsetSeconds) ||
+      startOffsetSeconds < 0)
+  ) {
+    return res.status(400).json({ error: 'startOffsetSeconds must be a non-negative integer' });
   }
   if (deepgram.isActive()) {
     return res.status(409).json({ error: 'Session already active. Stop it first.' });
@@ -365,7 +374,11 @@ app.post('/api/session/start', async (req, res) => {
   currentSessionContext = validateSessionContext(sessionContext);
 
   try {
-    await deepgram.startSession({ mode, source });
+    await deepgram.startSession({
+      mode,
+      source,
+      startOffsetSeconds: typeof startOffsetSeconds === 'number' ? startOffsetSeconds : undefined,
+    });
     res.json({
       ok: true,
       mode,
