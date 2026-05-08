@@ -314,6 +314,14 @@
   }
   .citation .title { flex: 1; color: var(--text); cursor: pointer; }
   .citation .title:hover { color: var(--orange); }
+  .citation.archive .title { cursor: default; }
+  .citation.archive .title:hover { color: var(--text); }
+  .citation .archive-label {
+    color: #8B8F9A;
+    font-style: italic;
+    font-size: 11px;
+    margin-left: 4px;
+  }
   .citation .tier {
     font-family: var(--mono);
     font-size: 8px;
@@ -786,15 +794,25 @@
         docket.citations.forEach((c, i) => {
           const row = document.createElement('div');
           row.className = 'citation';
-          row.innerHTML = `
-            <span class="num">[${i + 1}]</span>
-            <span class="title" title="Click to copy URL">${escape(c.title)}</span>
-            <span class="tier">T${c.tier}</span>
-          `;
-          row.querySelector('.title').addEventListener('click', (e) => {
-            e.stopPropagation();
-            copyToClipboard(c.url, row);
-          });
+          if (c.url) {
+            row.innerHTML = `
+              <span class="num">[${i + 1}]</span>
+              <span class="title" title="Click to copy URL">${escape(c.title)}</span>
+              <span class="tier">T${c.tier}</span>
+            `;
+            row.querySelector('.title').addEventListener('click', (e) => {
+              e.stopPropagation();
+              copyToClipboard(c.url, row);
+            });
+          } else {
+            row.classList.add('archive');
+            row.innerHTML = `
+              <span class="num">[${i + 1}]</span>
+              <span class="title">${escape(c.title)}</span>
+              <span class="archive-label">— show archive</span>
+              <span class="tier">T${c.tier}</span>
+            `;
+          }
           list.appendChild(row);
         });
 
