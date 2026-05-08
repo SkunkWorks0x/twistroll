@@ -391,14 +391,20 @@
     white-space: nowrap;
     flex: 1;
   }
-  .card.collapsed .followup,
-  .card.collapsed .verdict-row,
-  .card.collapsed .claim-text-quote,
-  .card.collapsed .explanation,
-  .card.collapsed .citations-toggle,
-  .card.collapsed .citations-list,
-  .card.collapsed .counterpoint,
-  .card.collapsed .contradiction { display: none; }
+  .card.collapsed:not(.expanded) .followup,
+  .card.collapsed:not(.expanded) .verdict-row,
+  .card.collapsed:not(.expanded) .claim-text-quote,
+  .card.collapsed:not(.expanded) .explanation,
+  .card.collapsed:not(.expanded) .citations-toggle,
+  .card.collapsed:not(.expanded) .citations-list,
+  .card.collapsed:not(.expanded) .counterpoint,
+  .card.collapsed:not(.expanded) .contradiction { display: none; }
+  .card.collapsed.expanded {
+    display: block;
+    padding: 14px;
+  }
+  .card.collapsed.expanded > .pill,
+  .card.collapsed.expanded > .truncated-claim { display: none; }
 </style>
 </head>
 <body>
@@ -839,20 +845,20 @@
   }
 
   function renderCollapsedCard(card) {
-    const el = document.createElement('div');
-    el.className = 'card collapsed';
-    el.dataset.claimId = card.claimId;
+    const el = renderFullCard(card);
+    el.classList.add('collapsed');
     const verdict = card.docket?.verdict || 'UNVERIFIABLE';
-    el.innerHTML = `
-      <span class="pill ${verdictClass(verdict)}">${escape(verdict)}</span>
-      <span class="truncated-claim">${escape(truncate(card.claimText, 60))}</span>
-    `;
-    el.addEventListener('click', () => {
-      const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(card.claimId)}"]`);
-      if (segEl) {
-        segEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        pulse(segEl);
-      }
+    const pill = document.createElement('span');
+    pill.className = `pill ${verdictClass(verdict)}`;
+    pill.textContent = verdict;
+    const truncatedClaim = document.createElement('span');
+    truncatedClaim.className = 'truncated-claim';
+    truncatedClaim.textContent = truncate(card.claimText, 60);
+    el.insertBefore(truncatedClaim, el.firstChild);
+    el.insertBefore(pill, el.firstChild);
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.citations-toggle, .citation, .counterpoint, .contradiction')) return;
+      el.classList.toggle('expanded');
     });
     return el;
   }
