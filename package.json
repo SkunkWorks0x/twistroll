@@ -1,7 +1,7 @@
 {
   "name": "twistroll",
   "version": "1.0.0",
-  "description": "AI Troll Sidebar for Live Podcasts — Built on OpenOats",
+  "description": "Real-time AI fact-checker for live podcasts — two personas, scrollable transcript, structured verdict cards with citations",
   "type": "module",
   "scripts": {
     "dev": "tsx src/server/index.ts",
