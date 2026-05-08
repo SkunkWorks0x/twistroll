@@ -323,34 +323,87 @@ function inferDomain(entity: string): string | null {
   return `${tokens.join('').toLowerCase()}.com`;
 }
 
-// Build the BROAD topical query.
-// Rules (per cc-retrieval-surgical-fix Step 1):
-//   1. Quote primaryEntity in literal double quotes
-//   2. Humanize numbers >= 1M to named-magnitude form
-//   3. Append 2026 for present-tense claims (suppressed on historical markers)
-//   4. Drop claimType tokens — those belong in ranking, not search
+// Relationship keywords describe WHAT is being claimed about WHO. Used by
+// buildTavilyQuery to construct subject-relationship queries rather than
+// stuffing raw dollar/percentage figures (which produce false-positive matches
+// against unrelated articles that happen to cite the same number).
+const RELATIONSHIP_KEYWORDS = new Set([
+  'ownership', 'owns', 'owned', 'owner',
+  'stake', 'equity', 'shares', 'shareholder',
+  'percentage', 'percent',
+  'valuation', 'worth', 'value', 'valued',
+  'acquisition', 'acquired', 'bought', 'merger', 'merged', 'deal', 'sale', 'sold',
+  'funding', 'raised', 'round', 'investment', 'invested', 'investor', 'invests',
+  'revenue', 'sales', 'income', 'earnings', 'profit', 'profits',
+  'launched', 'released', 'announced', 'unveiled', 'introduced',
+  'blocked', 'approved', 'rejected', 'cancelled', 'banned',
+  'partnership', 'partner', 'agreement', 'contract',
+]);
+
+// Capitalized words that aren't proper-noun entities. Filtered out of
+// secondary-entity extraction even though they're capitalized.
+const STOPWORD_CAPS = new Set([
+  'I', 'We', 'They', 'It', 'The', 'A', 'An', 'Is', 'Are', 'Was', 'Were',
+]);
+
+function extractSecondaryEntities(claimText: string, primaryEntity: string, maxOut = 3): string[] {
+  const primaryTokens = new Set(primaryEntity.toLowerCase().split(/\s+/).filter(Boolean));
+  const matches = claimText.match(/\b[A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)*\b/g) || [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of matches) {
+    if (STOPWORD_CAPS.has(m)) continue;
+    const lower = m.toLowerCase();
+    if (seen.has(lower)) continue;
+    const tokens = lower.split(/\s+/);
+    if (tokens.every((t) => primaryTokens.has(t))) continue;
+    seen.add(lower);
+    out.push(m);
+    if (out.length >= maxOut) break;
+  }
+  return out;
+}
+
+function extractRelationshipKeywords(claimText: string, maxOut = 3): string[] {
+  const words = claimText.toLowerCase().match(/\b[a-z]+\b/g) || [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const w of words) {
+    if (RELATIONSHIP_KEYWORDS.has(w) && !seen.has(w)) {
+      seen.add(w);
+      out.push(w);
+      if (out.length >= maxOut) break;
+    }
+  }
+  return out;
+}
+
+// Build the BROAD topical query — relationship-first, no raw figures.
+// Rules:
+//   1. Quote primaryEntity in literal double quotes (always lead).
+//   2. Include up to 3 secondary proper-noun entities lifted from claimText.
+//   3. Include up to 3 relationship keywords (ownership / valuation /
+//      acquisition / etc.) lifted from claimText.
+//   4. Append 2026 for present-tense claims (suppressed on historical markers).
+//   5. NO raw dollar figures, percentages, or numeric strings — they pollute
+//      results with unrelated articles citing the same number.
+//   6. Cap tail (everything after the quoted entity) at <10 words.
 export function buildTavilyQuery(claim: ClaimClassification): string {
   const entity = (claim.primaryEntity || '').trim();
-  const numbers = (claim.keyNumbers || []).map(humanizeNumber).filter((n) => n.length > 0);
+  if (!entity) return '';
 
-  // Strip entity tokens from searchableNoun so they don't double up with the
-  // already-quoted entity term.
-  const entityTokensSet = new Set(
-    entity.toLowerCase().split(/\s+/).filter((t) => t.length > 0)
-  );
-  const descriptorTokens = (claim.searchableNoun || '')
-    .split(/\s+/)
-    .filter((t) => t.length > 0 && !entityTokensSet.has(t.toLowerCase()));
-
-  const year = isPresentTenseClaim(claim.claimText) ? '2026' : '';
+  const claimText = claim.claimText || '';
+  const secondaryEntities = extractSecondaryEntities(claimText, entity);
+  const relationships = extractRelationshipKeywords(claimText);
+  const year = isPresentTenseClaim(claimText) ? '2026' : '';
 
   const parts: string[] = [];
-  if (entity) parts.push(`"${entity}"`);
-  if (numbers.length) parts.push(numbers.join(' '));
-  if (descriptorTokens.length) parts.push(descriptorTokens.join(' '));
+  if (secondaryEntities.length) parts.push(secondaryEntities.join(' '));
+  if (relationships.length) parts.push(relationships.join(' '));
   if (year) parts.push(year);
 
-  return parts.join(' ').trim();
+  const tail = parts.join(' ').split(/\s+/).filter(Boolean).slice(0, 9);
+  return tail.length > 0 ? `"${entity}" ${tail.join(' ')}` : `"${entity}"`;
 }
 
 // Build the NARROW query. Rule 5: site-scope when an entity-domain can be
