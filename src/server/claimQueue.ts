@@ -23,6 +23,8 @@ const GENERIC_TERMS = new Set(
     'venture capital', 'series a', 'series b', 'series c', 'series d',
     'family offices', 'startups', 'investors', 'the market', 'the industry',
     'AI', 'VC',
+    'companies', 'funds', 'founders', 'people', 'US firms', 'our firm',
+    "guest's firm", 'LP base', 'AI company', 'breakout companies',
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
 
@@ -106,6 +108,10 @@ export function enqueueClaim(
 
   const normEntity = normalizeEntity(claim.primaryEntity);
   const tokenCount = claim.primaryEntity.trim().split(/\s+/).length;
+  if (/^Speaker \d+$/i.test(claim.primaryEntity.trim())) {
+    console.log(`[queue-filter] weak-entity: "${claim.primaryEntity}" (reason: speaker_label)`);
+    return { enqueued: false, reason: 'weak entity (speaker label)' };
+  }
   if (tokenCount === 1 && claim.entityType === 'person') {
     console.log(`[queue-filter] weak-entity: "${claim.primaryEntity}" (reason: single_token)`);
     return { enqueued: false, reason: 'weak entity (single-token person)' };
