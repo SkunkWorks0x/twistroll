@@ -1,7 +1,7 @@
 {
   "name": "twistroll",
   "version": "1.0.0",
-  "description": "Real-time AI fact-checker for live podcasts — two personas, scrollable transcript, structured verdict cards with citations",
+  "description": "Real-time AI fact-checker + cynic for live podcasts — built for TWiST",
   "type": "module",
   "scripts": {
     "dev": "tsx src/server/index.ts",
