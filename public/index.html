@@ -330,16 +330,14 @@
     font-size: 9px;
   }
 
-  /* COUNTERPOINT — merged Pattern, collapsed line */
+  /* COUNTERPOINT — merged Pattern, full text */
   .counterpoint {
     margin-top: 12px;
     padding: 8px 10px;
     border-left: 2px solid var(--orange);
     background: rgba(255, 77, 0, 0.04);
     border-radius: 0 4px 4px 0;
-    cursor: pointer;
   }
-  .counterpoint:hover { background: rgba(255, 77, 0, 0.08); }
   .counterpoint .label {
     display: inline-block;
     font-family: var(--mono);
@@ -349,19 +347,13 @@
     letter-spacing: 0.1em;
     margin-right: 6px;
   }
-  .counterpoint .text-collapsed,
-  .counterpoint .text-full {
+  .counterpoint .text {
     font-size: 12px;
     color: var(--text);
-  }
-  .counterpoint .text-full {
-    display: none;
     font-family: var(--serif);
     line-height: 1.5;
     margin-top: 4px;
   }
-  .counterpoint.open .text-collapsed { display: none; }
-  .counterpoint.open .text-full { display: block; }
 
   /* Host contradiction */
   .contradiction {
@@ -449,7 +441,6 @@
   const MAX_SEGMENTS = 250;
   const MAX_CARDS = 10;
   const FULL_CARDS = 2;
-  const COUNTERPOINT_TRUNCATE = 60;
 
   const transcriptEl = document.getElementById('transcript');
   const sidebarEl = document.getElementById('sidebar');
@@ -833,19 +824,14 @@
       el.appendChild(cd);
     }
 
-    // 6) Pattern merged in as collapsed COUNTERPOINT line
+    // 6) Pattern merged in as COUNTERPOINT line — full text, wraps naturally
     if (pattern && pattern.text) {
       const cp = document.createElement('div');
       cp.className = 'counterpoint';
       cp.innerHTML = `
         <span class="label">Counterpoint</span>
-        <span class="text-collapsed">${escape(truncate(pattern.text, COUNTERPOINT_TRUNCATE))}</span>
-        <div class="text-full">${escape(pattern.text)}</div>
+        <div class="text">${escape(pattern.text)}</div>
       `;
-      cp.addEventListener('click', (e) => {
-        e.stopPropagation();
-        cp.classList.toggle('open');
-      });
       el.appendChild(cp);
     }
 
