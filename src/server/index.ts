@@ -23,7 +23,6 @@ import type {
   ClaimDetectedMessage,
   TranscriptSegment,
   ClaimClassification,
-  SessionContext,
   CardBroadcast,
 } from '../shared/types.js';
 
@@ -131,7 +130,6 @@ function recordTtfcAnchor(claimId: string, ms: number): void {
   ttfcUtteranceEndMs.set(claimId, ms);
 }
 let currentSpeakerMap: SpeakerMap = {};
-let currentSessionContext: SessionContext = {};
 
 interface ActiveSpan {
   coveredIds: Set<string>;
@@ -312,48 +310,14 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
   }
 });
 
-function validateSessionContext(input: unknown): SessionContext {
-  if (!input || typeof input !== 'object') return {};
-  const src = input as Record<string, unknown>;
-  const ctx: SessionContext = {};
-  const stringFields: Array<Exclude<keyof SessionContext, 'speakerNames' | 'sponsorNames'>> = [
-    'showName', 'hostName', 'hostCompany', 'cohostName', 'cohostCompany',
-    'guestName', 'guestCompany', 'guestTitle', 'episodeTopic',
-  ];
-  for (const f of stringFields) {
-    if (typeof src[f] === 'string') ctx[f] = src[f] as string;
-  }
-  // speakerNames: per-id name override. Numeric keys, string values.
-  if (src.speakerNames && typeof src.speakerNames === 'object') {
-    const names: Record<number, string> = {};
-    for (const [k, v] of Object.entries(src.speakerNames as Record<string, unknown>)) {
-      const id = parseInt(k, 10);
-      if (!Number.isNaN(id) && typeof v === 'string' && v.trim()) {
-        names[id] = v;
-      }
-    }
-    if (Object.keys(names).length > 0) ctx.speakerNames = names;
-  }
-  // sponsorNames: all-or-nothing string[] (drops whole field if any element is non-string)
-  if (
-    Array.isArray(src.sponsorNames) &&
-    src.sponsorNames.length > 0 &&
-    src.sponsorNames.every((x) => typeof x === 'string')
-  ) {
-    ctx.sponsorNames = src.sponsorNames as string[];
-  }
-  return ctx;
-}
-
 app.post('/api/session/start', async (req, res) => {
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
-  const { mode, source, speakerMap, sessionContext, startOffsetSeconds } = req.body as {
+  const { mode, source, speakerMap, startOffsetSeconds } = req.body as {
     mode?: SessionMode;
     source?: string;
     speakerMap?: unknown;
-    sessionContext?: unknown;
     startOffsetSeconds?: unknown;
   };
   if (mode !== 'stream' && mode !== 'system-audio') {
@@ -379,7 +343,6 @@ app.post('/api/session/start', async (req, res) => {
   lastSegments.length = 0;
   activeSpans.length = 0;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
-  currentSessionContext = validateSessionContext(sessionContext);
 
   try {
     await deepgram.startSession({
@@ -392,7 +355,6 @@ app.post('/api/session/start', async (req, res) => {
       mode,
       source,
       speakerMap: currentSpeakerMap,
-      sessionContext: currentSessionContext,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -425,7 +387,6 @@ app.get('/api/session/status', (_req, res) => {
     uptime: deepgram.getUptime(),
     configured: true,
     speakerMap: currentSpeakerMap,
-    sessionContext: currentSessionContext,
   });
 });
 

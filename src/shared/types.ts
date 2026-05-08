@@ -61,25 +61,6 @@ export interface TranscriptSegmentMessage {
 export type EntityType = 'company' | 'person' | 'product' | 'metric' | 'event' | 'unknown';
 export type ClaimType = 'financial' | 'historical' | 'attribution' | 'comparative' | 'prediction' | 'unknown';
 
-export interface SessionContext {
-  showName?: string;
-  hostName?: string;
-  hostCompany?: string;
-  cohostName?: string;
-  cohostCompany?: string;
-  guestName?: string;
-  guestCompany?: string;
-  guestTitle?: string;
-  episodeTopic?: string;
-  // Sponsor names — future use for classifier-level suppression of promotional copy. Not yet read.
-  sponsorNames?: string[];
-  // Per-Deepgram-id name override. Takes priority over the role-based names
-  // (hostName / cohostName / guestName) when rendering and when constructing
-  // the synthesis user message. Required for roundtable formats where
-  // multiple speaker IDs share the same role.
-  speakerNames?: Record<number, string>;
-}
-
 export interface ClaimClassification {
   isClaim: boolean;
   claimText: string;       // empty when isClaim=false
