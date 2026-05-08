@@ -316,7 +316,7 @@ function validateSessionContext(input: unknown): SessionContext {
   if (!input || typeof input !== 'object') return {};
   const src = input as Record<string, unknown>;
   const ctx: SessionContext = {};
-  const stringFields: Array<Exclude<keyof SessionContext, 'speakerNames'>> = [
+  const stringFields: Array<Exclude<keyof SessionContext, 'speakerNames' | 'sponsorNames'>> = [
     'showName', 'hostName', 'hostCompany', 'cohostName', 'cohostCompany',
     'guestName', 'guestCompany', 'guestTitle', 'episodeTopic',
   ];
@@ -333,6 +333,14 @@ function validateSessionContext(input: unknown): SessionContext {
       }
     }
     if (Object.keys(names).length > 0) ctx.speakerNames = names;
+  }
+  // sponsorNames: all-or-nothing string[] (drops whole field if any element is non-string)
+  if (
+    Array.isArray(src.sponsorNames) &&
+    src.sponsorNames.length > 0 &&
+    src.sponsorNames.every((x) => typeof x === 'string')
+  ) {
+    ctx.sponsorNames = src.sponsorNames as string[];
   }
   return ctx;
 }

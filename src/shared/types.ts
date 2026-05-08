@@ -71,6 +71,8 @@ export interface SessionContext {
   guestCompany?: string;
   guestTitle?: string;
   episodeTopic?: string;
+  // Sponsor names — future use for classifier-level suppression of promotional copy. Not yet read.
+  sponsorNames?: string[];
   // Per-Deepgram-id name override. Takes priority over the role-based names
   // (hostName / cohostName / guestName) when rendering and when constructing
   // the synthesis user message. Required for roundtable formats where
