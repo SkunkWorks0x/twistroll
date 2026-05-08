@@ -270,6 +270,10 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
     console.log(`[ttfc-server] claimId=${claim.segmentId} utteranceEndMs=${utteranceEndMs}`);
     const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
     recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
+    if (!result.docket?.verdict) {
+      console.log(`[synthesis] suppressed card — no Docket verdict claimId=${claim.segmentId} primaryEntity="${claim.primaryEntity}" hasPattern=${!!result.pattern}`);
+      return;
+    }
     const card: CardBroadcast = {
       type: 'claim_card',
       claimId: claim.segmentId,
