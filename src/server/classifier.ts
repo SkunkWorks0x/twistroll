@@ -12,7 +12,6 @@ import type {
   ClaimClassification,
   ClaimType,
   EntityType,
-  SessionContext,
   TranscriptSegment,
 } from '../shared/types.js';
 
@@ -26,16 +25,13 @@ const CLAIM_TYPES: ClaimType[] = ['financial', 'historical', 'attribution', 'com
 
 const SYSTEM_PROMPT_TEMPLATE = `You are a factual claim detector for a live podcast interview. You evaluate a window of recent statements and determine whether they contain a verifiable factual claim.
 
-SESSION CONTEXT:
-Host: {{hostName}} ({{hostCompany}})
-Co-host: {{cohostName}} ({{cohostCompany}})
-Guest: {{guestName}}, {{guestTitle}} at {{guestCompany}}
-
-PRONOUN RESOLUTION:
-- When the guest says "we", "our", "my company" → resolve to {{guestCompany}}
-- When the host says "I", "we" → resolve to {{hostName}} / {{hostCompany}}
-- When the co-host says "I", "we" → resolve to {{cohostName}} / {{cohostCompany}}
-- Use the resolved entity as primary_entity, not the pronoun
+ENTITY EXTRACTION — TRANSCRIPT-GROUNDED ONLY
+- Extract entities ONLY from verbatim text present in the provided transcript segments.
+- primaryEntity must be a substring that appears literally in the current 3-segment window, OR a pronoun resolved to an explicit antecedent within that same window.
+- If a speaker uses "we", "our", "my company" and the company name appears explicitly earlier in the window, resolve it. If the company name does NOT appear in the window, output primaryEntity as empty string.
+- Do NOT import, infer, or bridge entity names from any source outside the transcript segments provided.
+- Do NOT assume speaker identity from speaker IDs. Speaker IDs are arbitrary numbers, not stable identifiers.
+- Treat all speakers with identical rigor. Host claims are extracted with the same rules as guest claims.
 
 A verifiable factual claim contains one or more of:
 - A specific number, percentage, or statistic
@@ -83,20 +79,6 @@ Respond with ONLY this JSON, nothing else:
 
 If is_claim is false: primary_entity and searchable_noun are empty strings, key_numbers is [], entity_type and claim_type are "unknown", and claim_span_start = claim_span_end = the most recent segment label (the last seg in the window).`;
 
-function fillContext(template: string, ctx: SessionContext): string {
-  // Replace each placeholder globally — the system prompt mentions some
-  // placeholders multiple times (e.g. {{hostName}} appears in SESSION CONTEXT
-  // and PRONOUN RESOLUTION). Using replaceAll keeps every reference in sync.
-  return template
-    .replaceAll('{{hostName}}', ctx.hostName || '(unknown)')
-    .replaceAll('{{hostCompany}}', ctx.hostCompany || '(unknown)')
-    .replaceAll('{{cohostName}}', ctx.cohostName || '(unknown)')
-    .replaceAll('{{cohostCompany}}', ctx.cohostCompany || '(unknown)')
-    .replaceAll('{{guestName}}', ctx.guestName || '(unknown)')
-    .replaceAll('{{guestTitle}}', ctx.guestTitle || '(unknown)')
-    .replaceAll('{{guestCompany}}', ctx.guestCompany || '(unknown)');
-}
-
 // Resolve a Deepgram speaker id to its role. Three-tier fallback:
 //   1. Explicit speakerMap entry → use it (host/cohost/guest)
 //   2. speakerMap is non-empty but this id isn't in it → 'guest' (per spec
@@ -112,18 +94,8 @@ export function resolveSpeaker(speaker: number, map: SpeakerMap): SpeakerRole {
   return 'guest';
 }
 
-// Look up the display name for a speaker id. Per-id overrides
-// (speakerNames[id]) take priority over the role-based names.
-export function resolveSpeakerName(
-  speakerId: number,
-  role: SpeakerRole,
-  ctx: SessionContext
-): string {
-  const perId = ctx.speakerNames?.[speakerId];
-  if (perId) return perId;
-  if (role === 'host') return ctx.hostName || 'Host';
-  if (role === 'cohost') return ctx.cohostName || 'Cohost';
-  return ctx.guestName || 'Guest';
+function resolveSpeakerName(speakerId: number, role: string): string {
+  return role; // Bare role tag only — no session-derived names
 }
 
 function emptyClassification(
@@ -161,8 +133,7 @@ function labelToSegmentId(label: unknown, window: TranscriptSegment[], fallbackI
 export async function classifyWindow(
   window: TranscriptSegment[],
   prior: TranscriptSegment[],
-  speakerMap: SpeakerMap,
-  sessionContext: SessionContext
+  speakerMap: SpeakerMap
 ): Promise<{ classification: ClaimClassification; latencyMs: number }> {
   if (window.length === 0) {
     throw new Error('classifyWindow requires non-empty window');
@@ -174,14 +145,6 @@ export async function classifyWindow(
   // Build user message with seg1..segN labels (UUIDs are too noisy for the LLM
   // to echo reliably; we map labels back to real IDs after the call).
   let userMsg = '';
-  if (sessionContext.hostName || sessionContext.cohostName || sessionContext.guestName) {
-    userMsg += 'Session context:\n';
-    userMsg += `Host: ${sessionContext.hostName || '(unknown)'} (${sessionContext.hostCompany || ''})\n`;
-    if (sessionContext.cohostName) {
-      userMsg += `Co-host: ${sessionContext.cohostName} (${sessionContext.cohostCompany || ''})\n`;
-    }
-    userMsg += `Guest: ${sessionContext.guestName || '(unknown)'}, ${sessionContext.guestTitle || ''} at ${sessionContext.guestCompany || ''}\n\n`;
-  }
 
   // Capitalize the role tag for the user message (CSS-like uppercase).
   const tag = (r: SpeakerRole) => (r === 'host' ? 'Host' : r === 'cohost' ? 'Co-host' : 'Guest');
@@ -190,8 +153,7 @@ export async function classifyWindow(
     userMsg += 'Recent context (prior exchanges):\n';
     for (const r of prior.slice(-PRIOR_CONTEXT_SIZE)) {
       const role = resolveSpeaker(r.speaker, speakerMap);
-      const name = resolveSpeakerName(r.speaker, role, sessionContext);
-      userMsg += `[Speaker ${r.speaker} - ${tag(role)} (${name})]: "${r.text}"\n`;
+      userMsg += `[Speaker ${r.speaker} - ${tag(role)}]: "${r.text}"\n`;
     }
     userMsg += '\n';
   }
@@ -200,12 +162,11 @@ export async function classifyWindow(
   for (let i = 0; i < window.length; i++) {
     const seg = window[i];
     const role = resolveSpeaker(seg.speaker, speakerMap);
-    const name = resolveSpeakerName(seg.speaker, role, sessionContext);
     const tail = i === window.length - 1 ? ' (most recent)' : '';
-    userMsg += `[seg${i + 1}] [${seg.timestamp.toFixed(1)}s] [Speaker ${seg.speaker} - ${tag(role)} (${name})]: "${seg.text}"${tail}\n`;
+    userMsg += `[seg${i + 1}] [${seg.timestamp.toFixed(1)}s] [Speaker ${seg.speaker} - ${tag(role)}]: "${seg.text}"${tail}\n`;
   }
 
-  const systemPrompt = fillContext(SYSTEM_PROMPT_TEMPLATE, sessionContext);
+  const systemPrompt = SYSTEM_PROMPT_TEMPLATE;
 
   const start = Date.now();
   let raw = '';

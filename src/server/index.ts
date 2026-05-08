@@ -203,7 +203,7 @@ if (deepgram) {
     const window = lastSegments.slice(-WINDOW_SIZE);
     const prior = lastSegments.slice(0, -WINDOW_SIZE);
 
-    classifyWindow(window, prior, currentSpeakerMap, currentSessionContext)
+    classifyWindow(window, prior, currentSpeakerMap)
       .then(({ classification, latencyMs }) => {
         const classifierEndMs = Date.now();
         classifierStats.segmentsProcessed++;
