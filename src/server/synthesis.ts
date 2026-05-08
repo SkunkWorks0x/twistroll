@@ -764,6 +764,14 @@ export async function runDocket(
     const postCount = candidate.citations.filter((c) => c.citationSource === 'post_processor').length;
     console.log(`[DOCKET] Citation source breakdown: haiku=${haikuCount} post_processor=${postCount}`);
 
+    const citePayload = candidate.citations
+      .map((c) => {
+        const url = c.url === null ? 'null' : (c.url.length > 200 ? c.url.slice(0, 200) + '...' : c.url);
+        return `${url}|${c.tier}|${c.citationSource ?? 'unknown'}`;
+      })
+      .join(', ');
+    console.log(`[DOCKET] Citations: claimId=${claim.segmentId} count=${candidate.citations.length} urls=[${citePayload}]`);
+
     parsed = candidate;
   }
 
