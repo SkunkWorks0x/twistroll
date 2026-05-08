@@ -28,6 +28,14 @@ const GENERIC_TERMS = new Set(
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
 
+const SPONSOR_NAMES = new Set(
+  [
+    'sentry', 'render', 'deel', 'plaud', 'im8 health', 'im8', 'lemon.io',
+    'linkedin', 'northwest registered agent', 'northwest', 'squarespace',
+    'vanta', 'google cloud', 'hubspot', 'gusto', 'gamma', 'netsuite', 'agree',
+  ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
+);
+
 const lastBroadcastByEntity = new Map<string, number>();
 
 function normalizeEntity(s: string): string {
@@ -107,6 +115,11 @@ export function enqueueClaim(
   }
 
   const normEntity = normalizeEntity(claim.primaryEntity);
+  if (SPONSOR_NAMES.has(normEntity)) {
+    console.log(`[queue-filter] sponsor-read: "${claim.primaryEntity}"`);
+    return { enqueued: false, reason: 'sponsor read' };
+  }
+
   const tokenCount = claim.primaryEntity.trim().split(/\s+/).length;
   if (/^Speaker \d+$/i.test(claim.primaryEntity.trim())) {
     console.log(`[queue-filter] weak-entity: "${claim.primaryEntity}" (reason: speaker_label)`);
