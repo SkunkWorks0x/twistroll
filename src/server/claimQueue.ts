@@ -18,6 +18,14 @@ const DEDUP_WINDOW_MS = 10_000;
 const ENTITY_OVERLAP_THRESHOLD = 0.8;
 const ENTITY_COOLDOWN_MS = 90_000;
 
+const GENERIC_TERMS = new Set(
+  [
+    'venture capital', 'series a', 'series b', 'series c', 'series d',
+    'family offices', 'startups', 'investors', 'the market', 'the industry',
+    'AI', 'VC',
+  ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
+);
+
 const lastBroadcastByEntity = new Map<string, number>();
 
 function normalizeEntity(s: string): string {
@@ -97,6 +105,16 @@ export function enqueueClaim(
   }
 
   const normEntity = normalizeEntity(claim.primaryEntity);
+  const tokenCount = claim.primaryEntity.trim().split(/\s+/).length;
+  if (tokenCount === 1 && claim.entityType === 'person') {
+    console.log(`[queue-filter] weak-entity: "${claim.primaryEntity}" (reason: single_token)`);
+    return { enqueued: false, reason: 'weak entity (single-token person)' };
+  }
+  if (GENERIC_TERMS.has(normEntity)) {
+    console.log(`[queue-filter] weak-entity: "${claim.primaryEntity}" (reason: generic_term)`);
+    return { enqueued: false, reason: 'weak entity (generic term)' };
+  }
+
   const lastBroadcast = lastBroadcastByEntity.get(normEntity);
   if (lastBroadcast !== undefined) {
     const elapsed = Date.now() - lastBroadcast;
