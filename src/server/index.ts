@@ -270,7 +270,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
     const utteranceEndMs = triggerSeg ? triggerSeg.createdAt : Date.now();
     recordTtfcAnchor(claim.segmentId, utteranceEndMs);
     console.log(`[ttfc-server] claimId=${claim.segmentId} utteranceEndMs=${utteranceEndMs}`);
-    const result = await synthesize(claim, retrieval.merged, segmentSnapshot, currentSessionContext);
+    const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
     recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
     const card: CardBroadcast = {
       type: 'claim_card',

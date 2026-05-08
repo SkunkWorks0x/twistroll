@@ -19,7 +19,7 @@
 // when the ingestion pipeline starts emitting per-speaker chunks.
 
 import { z } from 'zod';
-import type { ClaimClassification, SessionContext, TranscriptSegment } from '../shared/types.js';
+import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 import type { RetrievedSource } from './retrieval.js';
 import { formatForDocket, formatForPattern } from './retrieval.js';
 
@@ -901,13 +901,12 @@ export async function checkHostContradiction(
 export async function synthesize(
   claim: ClaimClassification,
   sources: RetrievedSource[],
-  recentSegments: TranscriptSegment[],
-  sessionContext: SessionContext = {}
+  recentSegments: TranscriptSegment[]
 ): Promise<SynthesisResult> {
   const tStart = Date.now();
   console.log(`[classifier-pass] claimId=${claim.segmentId} claimType=${claim.claimType} primaryEntity="${claim.primaryEntity}"`);
-  const docketContext = formatForDocket(sources, claim, recentSegments, sessionContext);
-  const patternContext = formatForPattern(sources, claim, recentSegments, sessionContext);
+  const docketContext = formatForDocket(sources, claim, recentSegments);
+  const patternContext = formatForPattern(sources, claim, recentSegments);
 
   // Host contradiction runs first — a fired contradiction suppresses Pattern.
   // Currently always returns null (feature disabled), so Pattern always runs.

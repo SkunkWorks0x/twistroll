@@ -94,10 +94,6 @@ export function resolveSpeaker(speaker: number, map: SpeakerMap): SpeakerRole {
   return 'guest';
 }
 
-function resolveSpeakerName(speakerId: number, role: string): string {
-  return role; // Bare role tag only — no session-derived names
-}
-
 function emptyClassification(
   current: TranscriptSegment,
   fallbackSpeaker: SpeakerRole,

@@ -7,7 +7,7 @@
 
 import { tavily } from '@tavily/core';
 import { queryMemory } from './episodeMemory.js';
-import type { ClaimClassification, SessionContext, TranscriptSegment } from '../shared/types.js';
+import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 
 export interface RetrievedSource {
   id: string;
@@ -683,27 +683,16 @@ export function mergeAndRank(
 
 // ─── 5. Formatters ─────────────────────────────────────────────────────
 
-// Build the "SPEAKER: <role> (<name>)" line, OR bare "SPEAKER: <role>" if no
-// real name is available. Empirically, appending a redundant role-word as
-// the name (e.g. "SPEAKER: guest (Guest)") shifts Haiku toward UNVERIFIABLE
-// on synthesis-layer tests — only attach a name when it's a per-id override
-// or a real sessionContext field, not the role-fallback literal.
-function formatSpeakerLine(claim: ClaimClassification, ctx: SessionContext): string {
-  const role = claim.speaker;
-  const tag = role === 'host' ? 'host' : role === 'cohost' ? 'cohost' : 'guest';
-  const perId = ctx.speakerNames?.[claim.speakerNumber];
-  const fallback = role === 'host' ? ctx.hostName : role === 'cohost' ? ctx.cohostName : ctx.guestName;
-  const realName = perId || fallback;
-  return realName ? `SPEAKER: ${tag} (${realName})` : `SPEAKER: ${tag}`;
+function formatSpeakerLine(speakerId: number, role: string): string {
+  return `SPEAKER: ${role}`;
 }
 
 export function formatForDocket(
   sources: RetrievedSource[],
   claim: ClaimClassification,
-  recentSegments: TranscriptSegment[],
-  sessionContext: SessionContext = {}
+  recentSegments: TranscriptSegment[]
 ): string {
-  let out = `CLAIM: ${claim.claimText}\n${formatSpeakerLine(claim, sessionContext)}\n\n`;
+  let out = `CLAIM: ${claim.claimText}\n${formatSpeakerLine(claim.speakerNumber, claim.speaker)}\n\n`;
   out += 'RECENT CONVERSATION (last 8 segments):\n';
   for (const seg of recentSegments.slice(-8)) {
     out += `[${seg.speakerLabel}] "${seg.text}"\n`;
@@ -728,10 +717,9 @@ export function formatForDocket(
 export function formatForPattern(
   sources: RetrievedSource[],
   claim: ClaimClassification,
-  recentSegments: TranscriptSegment[],
-  sessionContext: SessionContext = {}
+  recentSegments: TranscriptSegment[]
 ): string {
-  let out = `CLAIM: ${claim.claimText}\n${formatSpeakerLine(claim, sessionContext)}\n\n`;
+  let out = `CLAIM: ${claim.claimText}\n${formatSpeakerLine(claim.speakerNumber, claim.speaker)}\n\n`;
   out += 'RECENT CONVERSATION (last 8 segments):\n';
   for (const seg of recentSegments.slice(-8)) {
     out += `[${seg.speakerLabel}] "${seg.text}"\n`;
