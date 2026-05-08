@@ -11,6 +11,7 @@
 
 import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 import { retrieve, RetrievalResult } from './retrieval.js';
+import { recordStage } from './ttfcStages.js';
 
 const MAX_CONCURRENCY = 2;
 const DEDUP_WINDOW_MS = 10_000;
@@ -108,7 +109,9 @@ export function enqueueClaim(
 
   void (async () => {
     try {
+      recordStage(claim.segmentId, 'retrievalStartMs', Date.now());
       const retrieval = await retrieve(claim);
+      recordStage(claim.segmentId, 'retrievalEndMs', Date.now());
       const lanceTitles = retrieval.lance.map((s) => s.title).join('; ') || '(none)';
       const tavilyTitles = retrieval.tavily.map((s) => s.title).join('; ') || '(none)';
       const grokTitles = retrieval.grokipedia.map((s) => s.title).join('; ') || '(none)';

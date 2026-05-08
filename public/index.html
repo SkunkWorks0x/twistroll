@@ -597,9 +597,10 @@
       setStatus('disconnected', 'error');
     });
     ws.addEventListener('message', (event) => {
+      const wsReceivedMs = Date.now();
       let msg;
       try { msg = JSON.parse(event.data); } catch { return; }
-      handleMessage(msg);
+      handleMessage(msg, wsReceivedMs);
     });
   }
 
@@ -608,13 +609,13 @@
     reconnectTimer = setTimeout(connect, 2000);
   }
 
-  function handleMessage(msg) {
+  function handleMessage(msg, wsReceivedMs) {
     switch (msg.type) {
       case 'transcript_segment':
         addSegment(msg.data);
         break;
       case 'claim_card':
-        addCard(msg);
+        addCard(msg, wsReceivedMs);
         break;
       case 'status':
         if (msg.state === 'connected') setStatus('connected', 'live');
@@ -675,7 +676,7 @@
   }
 
   // ─── Card rendering ─────────────────────────────────────────
-  function addCard(card) {
+  function addCard(card, wsReceivedMs) {
     state.cards.unshift(card);
     while (state.cards.length > MAX_CARDS) state.cards.pop();
     markSegmentAsClaim(card.claimId);
@@ -686,6 +687,7 @@
         ws.send(JSON.stringify({
           type: 'card_rendered',
           claimId: card.claimId,
+          wsReceivedMs,
           renderCompleteMs: Date.now(),
         }));
       } catch (e) {

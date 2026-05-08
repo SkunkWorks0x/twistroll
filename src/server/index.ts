@@ -14,6 +14,7 @@ import { classifyWindow, SpeakerMap } from './classifier.js';
 import { enqueueClaim, queueStats, setProcessHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
 import { synthesize } from './synthesis.js';
+import { recordStage, getStages, dropStages } from './ttfcStages.js';
 import type {
   TrollReaction,
   StatusMessage,
@@ -204,6 +205,7 @@ if (deepgram) {
 
     classifyWindow(window, prior, currentSpeakerMap, currentSessionContext)
       .then(({ classification, latencyMs }) => {
+        const classifierEndMs = Date.now();
         classifierStats.segmentsProcessed++;
         classifierStats.sumLatencyMs += latencyMs;
 
@@ -220,6 +222,7 @@ if (deepgram) {
             `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
           );
 
+          recordStage(classification.segmentId, 'classifierEndMs', classifierEndMs);
           // Enqueue for retrieval. Snapshot of last 12 segments captured inside
           // the queue so processing sees fire-time state.
           enqueueClaim(classification, lastSegments);
@@ -268,6 +271,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
     recordTtfcAnchor(claim.segmentId, utteranceEndMs);
     console.log(`[ttfc-server] claimId=${claim.segmentId} utteranceEndMs=${utteranceEndMs}`);
     const result = await synthesize(claim, retrieval.merged, segmentSnapshot, currentSessionContext);
+    recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
     const card: CardBroadcast = {
       type: 'claim_card',
       claimId: claim.segmentId,
@@ -280,7 +284,25 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
       hostContradiction: result.hostContradiction,
       timing: result.timing,
     };
+    recordStage(claim.segmentId, 'broadcastSendMs', Date.now());
     broadcast(card);
+    const stages = getStages(claim.segmentId);
+    const utteranceEnd = ttfcUtteranceEndMs.get(claim.segmentId);
+    if (
+      stages?.classifierEndMs !== undefined &&
+      stages.retrievalStartMs !== undefined &&
+      stages.retrievalEndMs !== undefined &&
+      stages.synthesisEndMs !== undefined &&
+      utteranceEnd !== undefined
+    ) {
+      const classifierMs = stages.classifierEndMs - utteranceEnd;
+      const queueWaitMs = stages.retrievalStartMs - stages.classifierEndMs;
+      const retrievalMs = stages.retrievalEndMs - stages.retrievalStartMs;
+      const synthesisMs = stages.synthesisEndMs - stages.retrievalEndMs;
+      console.log(
+        `[ttfc-stages] claimId=${claim.segmentId} classifierMs=${classifierMs} queueWaitMs=${queueWaitMs} retrievalMs=${retrievalMs} synthesisMs=${synthesisMs}`
+      );
+    }
     console.log(
       `[SYNTHESIS] claim=${claim.segmentId.slice(0, 8)} docket=${result.docket?.verdict ?? 'null'} pattern=${result.pattern ? 'fired' : 'null'} contradiction=${result.hostContradiction ? 'fired' : 'null'} total=${result.timing.totalMs}ms`
     );
@@ -437,6 +459,27 @@ wss.on('connection', (ws) => {
       if (anchor !== undefined) {
         const deltaMs = msg.renderCompleteMs - anchor;
         console.log(`[ttfc-paired] claimId=${msg.claimId} deltaMs=${deltaMs}`);
+        const stages = getStages(msg.claimId);
+        const wsReceivedMs = typeof msg.wsReceivedMs === 'number' ? msg.wsReceivedMs : undefined;
+        if (
+          stages?.classifierEndMs !== undefined &&
+          stages.retrievalStartMs !== undefined &&
+          stages.retrievalEndMs !== undefined &&
+          stages.synthesisEndMs !== undefined &&
+          stages.broadcastSendMs !== undefined &&
+          wsReceivedMs !== undefined
+        ) {
+          const classifierMs = stages.classifierEndMs - anchor;
+          const queueMs = stages.retrievalStartMs - stages.classifierEndMs;
+          const retrievalMs = stages.retrievalEndMs - stages.retrievalStartMs;
+          const synthesisMs = stages.synthesisEndMs - stages.retrievalEndMs;
+          const wsTransitMs = wsReceivedMs - stages.broadcastSendMs;
+          const browserRenderMs = msg.renderCompleteMs - wsReceivedMs;
+          console.log(
+            `[ttfc-attribution] claimId=${msg.claimId} total=${deltaMs} classifier=${classifierMs} queue=${queueMs} retrieval=${retrievalMs} synthesis=${synthesisMs} wsTransit=${wsTransitMs} browserRender=${browserRenderMs}`
+          );
+        }
+        dropStages(msg.claimId);
         ttfcUtteranceEndMs.delete(msg.claimId);
       }
     }
