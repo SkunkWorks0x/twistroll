@@ -79,6 +79,7 @@ export function enqueueClaim(
   // null or UNVERIFIABLE-without-citations on these claims.
   if (!claim.primaryEntity || !claim.primaryEntity.trim()) {
     console.log('[QUEUE] Dropped: empty primaryEntity');
+    console.log(`[classifier-suppress] reason=empty_primary_entity claimText="${claim.claimText.slice(0, 50)}"`);
     return { enqueued: false, reason: 'empty primaryEntity' };
   }
 
@@ -87,12 +88,14 @@ export function enqueueClaim(
     const overlap = entityOverlap(incoming, rec.entities);
     if (overlap > ENTITY_OVERLAP_THRESHOLD) {
       console.log(`[QUEUE] Deduped: ${claim.claimText}`);
+      console.log(`[classifier-suppress] reason=queue_dedupe entity="${claim.primaryEntity}"`);
       return { enqueued: false, reason: `entity overlap ${overlap.toFixed(2)}` };
     }
   }
 
   if (activeCount >= MAX_CONCURRENCY) {
     console.warn(`[QUEUE] Concurrency cap (${MAX_CONCURRENCY}) reached — dropping claim: ${claim.claimText}`);
+    console.log(`[classifier-suppress] reason=concurrency_cap claimText="${claim.claimText.slice(0, 50)}"`);
     return { enqueued: false, reason: 'concurrency cap' };
   }
 

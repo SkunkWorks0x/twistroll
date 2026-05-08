@@ -116,6 +116,19 @@ const WINDOW_SIZE = 3;
 const CLAIM_CONFIDENCE_THRESHOLD = parseFloat(process.env.CLAIM_CONFIDENCE_THRESHOLD || '0.7');
 const CLAIM_SPAN_TTL_MS = 15000;
 const lastSegments: TranscriptSegment[] = [];
+
+// Bounded Map for TTFC pairing. claimId → utteranceEndMs (epoch ms at
+// is_final receipt). Cap at 200 entries; evict oldest on insert when full.
+// JS Map preserves insertion order so .keys().next() yields the oldest.
+const TTFC_MAP_MAX = 200;
+const ttfcUtteranceEndMs = new Map<string, number>();
+function recordTtfcAnchor(claimId: string, ms: number): void {
+  if (ttfcUtteranceEndMs.size >= TTFC_MAP_MAX) {
+    const oldest = ttfcUtteranceEndMs.keys().next().value;
+    if (oldest !== undefined) ttfcUtteranceEndMs.delete(oldest);
+  }
+  ttfcUtteranceEndMs.set(claimId, ms);
+}
 let currentSpeakerMap: SpeakerMap = {};
 let currentSessionContext: SessionContext = {};
 
@@ -181,6 +194,7 @@ if (deepgram) {
     if (isSegmentInActiveSpan(segment.id)) {
       classifierStats.segmentsSkippedBySpan++;
       console.log(`[CLASSIFIER] Segment ${segment.id} within active claimSpan, skipping`);
+      console.log(`[classifier-suppress] reason=span_dedup segmentId=${segment.id}`);
       return;
     }
 
@@ -213,8 +227,10 @@ if (deepgram) {
           console.log(
             `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
           );
+          console.log(`[classifier-suppress] reason=low_confidence confidence=${classification.confidence.toFixed(2)} claimText="${classification.claimText.slice(0, 50)}"`);
         } else {
           console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
+          console.log(`[classifier-suppress] reason=not_a_claim segmentId=${segment.id}`);
         }
       })
       .catch((err: unknown) => {
@@ -247,6 +263,10 @@ function validateSpeakerMap(input: unknown): SpeakerMap {
 // ─── Synthesis pipeline: claim queue → retrieval → synthesis → broadcast ─
 setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
   try {
+    const triggerSeg = segmentSnapshot.find((s) => s.id === claim.segmentId);
+    const utteranceEndMs = triggerSeg ? triggerSeg.createdAt : Date.now();
+    recordTtfcAnchor(claim.segmentId, utteranceEndMs);
+    console.log(`[ttfc-server] claimId=${claim.segmentId} utteranceEndMs=${utteranceEndMs}`);
     const result = await synthesize(claim, retrieval.merged, segmentSnapshot, currentSessionContext);
     const card: CardBroadcast = {
       type: 'claim_card',
@@ -403,6 +423,24 @@ wss.on('connection', (ws) => {
     state: isOllamaAvailable() ? 'connected' : 'ollama_down',
   };
   ws.send(JSON.stringify(status));
+
+  ws.on('message', (data) => {
+    let msg: any;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch {
+      return;
+    }
+    if (msg && msg.type === 'card_rendered' && typeof msg.claimId === 'string' && typeof msg.renderCompleteMs === 'number') {
+      console.log(`[ttfc-client] claimId=${msg.claimId} renderCompleteMs=${msg.renderCompleteMs}`);
+      const anchor = ttfcUtteranceEndMs.get(msg.claimId);
+      if (anchor !== undefined) {
+        const deltaMs = msg.renderCompleteMs - anchor;
+        console.log(`[ttfc-paired] claimId=${msg.claimId} deltaMs=${deltaMs}`);
+        ttfcUtteranceEndMs.delete(msg.claimId);
+      }
+    }
+  });
 
   ws.on('close', () => {
     clients.delete(ws);

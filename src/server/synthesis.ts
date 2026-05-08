@@ -897,6 +897,7 @@ export async function synthesize(
   sessionContext: SessionContext = {}
 ): Promise<SynthesisResult> {
   const tStart = Date.now();
+  console.log(`[classifier-pass] claimId=${claim.segmentId} claimType=${claim.claimType} primaryEntity="${claim.primaryEntity}"`);
   const docketContext = formatForDocket(sources, claim, recentSegments, sessionContext);
   const patternContext = formatForPattern(sources, claim, recentSegments, sessionContext);
 
@@ -913,6 +914,11 @@ export async function synthesize(
     : runPattern(claim, patternContext, sources.length > 0);
 
   const [docketRes, patternRes] = await Promise.all([docketP, patternP]);
+
+  const patternFired = patternRes.output !== null;
+  const patternFireReason: 'emit' | 'null' | 'suppressed_by_contradiction' =
+    patternFired ? 'emit' : suppressPattern ? 'suppressed_by_contradiction' : 'null';
+  console.log(`[pattern-fire] claimId=${claim.segmentId} fired=${patternFired} reason=${patternFireReason}`);
 
   return {
     docket: docketRes.output,

@@ -216,6 +216,7 @@ export async function classifyWindow(
     const latencyMs = Date.now() - start;
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[classifier] LLM call failed (${latencyMs}ms): ${msg}`);
+    console.log(`[classifier-suppress] reason=llm_call_failed segmentId=${current.id}`);
     return {
       classification: emptyClassification(current, fallbackSpeaker, 'classifier call failed'),
       latencyMs,
@@ -237,6 +238,7 @@ export async function classifyWindow(
 
   if (!parsed || typeof parsed !== 'object') {
     console.warn(`[classifier] malformed JSON for segment ${current.id}: "${raw.slice(0, 120)}"`);
+    console.log(`[classifier-suppress] reason=malformed_output segmentId=${current.id}`);
     return {
       classification: emptyClassification(current, fallbackSpeaker, 'malformed classifier output'),
       latencyMs,

@@ -680,6 +680,18 @@
     while (state.cards.length > MAX_CARDS) state.cards.pop();
     markSegmentAsClaim(card.claimId);
     renderSidebar();
+    // Notify server that the card DOM is mounted, for TTFC delta computation.
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({
+          type: 'card_rendered',
+          claimId: card.claimId,
+          renderCompleteMs: Date.now(),
+        }));
+      } catch (e) {
+        // Non-fatal — server-side TTFC pairing will just miss this claim.
+      }
+    }
   }
 
   function renderSidebar() {
