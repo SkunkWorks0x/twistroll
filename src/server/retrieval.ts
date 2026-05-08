@@ -387,41 +387,26 @@ export async function queryTavily(claim: ClaimClassification): Promise<Retrieved
     return [];
   }
 
-  const broadQuery = buildTavilyQuery(claim);
-  const { query: narrowQuery, domain: narrowDomain } = buildTavilyNarrowQuery(claim);
+  const query = buildTavilyQuery(claim);
+  console.log(`[RETRIEVAL] tavily query: "${query}"`);
 
-  if (narrowDomain) console.log(`[RETRIEVAL] site-scope: ${narrowDomain}`);
-  console.log(`[RETRIEVAL] tavily broad: "${broadQuery}"`);
-  console.log(`[RETRIEVAL] tavily narrow: "${narrowQuery}"`);
-
-  if (!broadQuery && !narrowQuery) return [];
+  if (!query) return [];
 
   try {
     const client = tavily({ apiKey });
 
-    // Two queries in parallel. Broad: tier-1-biased, basic depth. Narrow:
-    // entity + raw numbers, no domain filter, deeper search — let Tavily
-    // surface the actual stat-bearing pages. Cost: ~$0.005 extra per claim.
-    const [broadResp, narrowResp] = await Promise.all([
-      broadQuery
-        ? client.search(broadQuery, {
-            searchDepth: 'basic',
-            maxResults: 5,
-            includeDomains: TAVILY_TIER1_BIAS,
-          })
-        : Promise.resolve({ results: [] as any[] }),
-      narrowQuery && narrowQuery !== broadQuery
-        ? client.search(narrowQuery, {
-            searchDepth: 'advanced',
-            maxResults: 5,
-          })
-        : Promise.resolve({ results: [] as any[] }),
-    ]);
+    // Single tier-1-biased query at basic depth. The previous narrow site:-scoped
+    // query produced garbage domains and Tavily failures and was dropped.
+    const resp = await client.search(query, {
+      searchDepth: 'basic',
+      maxResults: 5,
+      includeDomains: TAVILY_TIER1_BIAS,
+    });
     recordSuccess('tavily');
 
-    // Merge by URL, keeping first occurrence's score; drop Tier-4.
+    // Dedup by URL, drop Tier-4.
     const byUrl = new Map<string, RetrievedSource>();
-    for (const r of [...(broadResp.results || []), ...(narrowResp.results || [])]) {
+    for (const r of resp.results || []) {
       if (!r?.url) continue;
       const tier = classifyDomain(r.url);
       if (tier === 4) continue;
