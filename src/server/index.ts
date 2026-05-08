@@ -1,40 +1,41 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
-import { startWatcher } from './watcher.js';
-import { processUtterance, togglePersona, setCooldown, isProcessing, generate, startSponsorSuppression } from './queue.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
-import { checkForSponsor } from './sponsors.js';
-import { SNIPER_CONFIG } from './personas.js';
-import { getRecentUtterances, setCurrentDossier } from './context.js';
+import { setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
-import type { TrollReaction, StatusMessage, PersonaId, SoundCueMessage, FredAudioToggleMessage, FredVolumeMessage } from '../shared/types.js';
-import { logReaction } from './logger.js';
+import { DeepgramClient, SessionMode } from './deepgram.js';
+import { classifyWindow, SpeakerMap } from './classifier.js';
+import { enqueueClaim, queueStats, recordBroadcast, setProcessHandler } from './claimQueue.js';
+import { getBreakerState } from './retrieval.js';
+import { synthesize } from './synthesis.js';
+import { recordStage, getStages, dropStages } from './ttfcStages.js';
+import type {
+  TrollReaction,
+  StatusMessage,
+  PersonaId,
+  TranscriptSegmentMessage,
+  ClaimDetectedMessage,
+  TranscriptSegment,
+  ClaimClassification,
+  CardBroadcast,
+} from '../shared/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = resolve(__dirname, '..', '..', 'public');
+
 const app = express();
 app.use(express.json());
 
-// ─── Serve Fred's sound effects (static) ───
-// Mounted before the root/overlay routes so /sounds/*.mp3 resolves cleanly.
-app.use('/sounds', express.static(resolve(__dirname, '..', '..', 'public', 'sounds')));
-
-// ─── Serve Overlay at root ───
-app.get('/', (_req, res) => {
-  try {
-    const overlayPath = resolve(__dirname, '..', 'overlay', 'index.html');
-    const html = readFileSync(overlayPath, 'utf-8');
-    res.type('html').send(html);
-  } catch {
-    res.status(404).send('Overlay not found. Check src/overlay/index.html');
-  }
-});
+// Serve the producer dashboard (public/index.html) at GET /. Static middleware
+// runs before the API routes, so / and any /assets fall through here while
+// /api/* and /config still hit their handlers below.
+app.use(express.static(PUBLIC_DIR));
 
 // ─── Express Routes ───
 
@@ -47,84 +48,10 @@ app.get('/config', (_req, res) => {
 app.get('/api/status', (_req, res) => {
   res.json({
     ollama: isOllamaAvailable(),
-    processing: isProcessing(),
-    session: watcher?.getCurrentSession() || null,
     config: {
       cooldownMs: appConfig.cooldownMs,
     },
   });
-});
-
-// API: Toggle persona
-app.post('/api/persona/toggle', (req, res) => {
-  const { persona, enabled } = req.body as { persona: PersonaId; enabled: boolean };
-  togglePersona(persona, enabled);
-  res.json({ ok: true });
-});
-
-// API: Adjust cooldown
-app.post('/api/cooldown', (req, res) => {
-  const { ms } = req.body as { ms: number };
-  setCooldown(ms);
-  res.json({ ok: true, cooldownMs: ms });
-});
-
-
-// API: Toggle sniper
-app.post('/api/sniper/toggle', (req, res) => {
-  const { enabled } = req.body as { enabled: boolean };
-  sniperEnabled = enabled;
-  res.json({ ok: true, enabled });
-});
-
-// API: Fred audio kill switch. Producer-facing. Broadcasts to the overlay
-// which ignores future sound_cue messages when disabled (text bubbles still
-// render). No server-side state — the overlay is the source of truth for
-// whether audio plays.
-app.post('/api/fred/audio_toggle', (req, res) => {
-  const { enabled } = req.body as { enabled: boolean };
-  const msg: FredAudioToggleMessage = { type: 'fred_audio_toggle', enabled: !!enabled };
-  broadcast(msg);
-  res.json({ ok: true, enabled: !!enabled });
-});
-
-// API: Fred volume. Hard-capped at 0.3 on the server regardless of what the
-// client sends — the overlay also caps, but double-defense is cheap.
-app.post('/api/fred/volume', (req, res) => {
-  const { volume } = req.body as { volume: number };
-  const clamped = Math.min(0.3, Math.max(0, Number(volume) || 0));
-  const msg: FredVolumeMessage = { type: 'fred_volume', volume: clamped };
-  broadcast(msg);
-  res.json({ ok: true, volume: clamped });
-});
-
-// API: Manual Fred sound trigger — producer/demo helper. Broadcasts a
-// Fred bubble AND a sound_cue to all overlay clients without waiting for
-// a Fred rotation. Useful for pre-show audio verification and for
-// exercising the sine-wave `.speaking.sound-active` stronger-pulse path
-// (the CSS selector requires both classes present simultaneously).
-app.post('/api/fred/test_cue', (req, res) => {
-  const { sound, text } = req.body as { sound?: string; text?: string };
-  if (!sound || typeof sound !== 'string') {
-    return res.status(400).json({ error: 'sound required' });
-  }
-  const bubbleText = typeof text === 'string' && text.trim().length > 0
-    ? text
-    : `🔊 ${sound.toUpperCase().replace(/-/g, ' ')} — test cue`;
-
-  const bubble: TrollReaction = {
-    type: 'troll_comment',
-    persona: 'not-fred',
-    text: bubbleText,
-    timestamp: Date.now(),
-    utteranceId: `utt_test_${Date.now()}`,
-  };
-  const cue: SoundCueMessage = { type: 'sound_cue', sound };
-
-  // Order matters: bubble first (adds .speaking), then cue (adds .sound-active).
-  broadcast(bubble);
-  broadcast(cue);
-  res.json({ ok: true, sound, text: bubbleText });
 });
 
 // API: Commit episode — flip provisional chunks to committed
@@ -175,6 +102,319 @@ app.get('/api/feedback', (_req, res) => {
   res.json(loadFeedback());
 });
 
+// ─── Deepgram session ───
+// Singleton — null if DEEPGRAM_API_KEY missing at boot. Endpoints below
+// 503 in that case so the failure mode is visible rather than silent.
+const deepgramApiKey = process.env.DEEPGRAM_API_KEY || '';
+const deepgram: DeepgramClient | null = deepgramApiKey
+  ? new DeepgramClient(deepgramApiKey)
+  : null;
+
+// ─── Classifier state ───
+const SEGMENT_BUFFER_MAX = 12;
+const WINDOW_SIZE = 3;
+const CLAIM_CONFIDENCE_THRESHOLD = parseFloat(process.env.CLAIM_CONFIDENCE_THRESHOLD || '0.7');
+const CLAIM_SPAN_TTL_MS = 15000;
+const lastSegments: TranscriptSegment[] = [];
+
+// Bounded Map for TTFC pairing. claimId → utteranceEndMs (epoch ms at
+// is_final receipt). Cap at 200 entries; evict oldest on insert when full.
+// JS Map preserves insertion order so .keys().next() yields the oldest.
+const TTFC_MAP_MAX = 200;
+const ttfcUtteranceEndMs = new Map<string, number>();
+function recordTtfcAnchor(claimId: string, ms: number): void {
+  if (ttfcUtteranceEndMs.size >= TTFC_MAP_MAX) {
+    const oldest = ttfcUtteranceEndMs.keys().next().value;
+    if (oldest !== undefined) ttfcUtteranceEndMs.delete(oldest);
+  }
+  ttfcUtteranceEndMs.set(claimId, ms);
+}
+let currentSpeakerMap: SpeakerMap = {};
+
+interface ActiveSpan {
+  coveredIds: Set<string>;
+  expiresAt: number;
+}
+const activeSpans: ActiveSpan[] = [];
+
+const classifierStats = {
+  segmentsProcessed: 0,
+  segmentsSkippedBySpan: 0,
+  claimsDetected: 0,
+  claimsByHost: 0,
+  claimsByCohost: 0,
+  claimsByGuest: 0,
+  sumConfidence: 0,
+  sumLatencyMs: 0,
+};
+
+function pruneExpiredSpans(): void {
+  const now = Date.now();
+  for (let i = activeSpans.length - 1; i >= 0; i--) {
+    if (activeSpans[i].expiresAt <= now) activeSpans.splice(i, 1);
+  }
+}
+
+function isSegmentInActiveSpan(segId: string): boolean {
+  pruneExpiredSpans();
+  return activeSpans.some((s) => s.coveredIds.has(segId));
+}
+
+function markSpanActive(window: TranscriptSegment[], span: ClaimClassification['claimSpan']): void {
+  // Translate the LLM-reported start/end IDs to the set of window IDs they cover.
+  const startIdx = window.findIndex((s) => s.id === span.startSegmentId);
+  const endIdx = window.findIndex((s) => s.id === span.endSegmentId);
+  let covered: string[];
+  if (startIdx === -1 || endIdx === -1) {
+    // Fallback: only the current segment.
+    covered = [window[window.length - 1].id];
+  } else {
+    const lo = Math.min(startIdx, endIdx);
+    const hi = Math.max(startIdx, endIdx);
+    covered = window.slice(lo, hi + 1).map((s) => s.id);
+  }
+  activeSpans.push({
+    coveredIds: new Set(covered),
+    expiresAt: Date.now() + CLAIM_SPAN_TTL_MS,
+  });
+}
+
+if (deepgram) {
+  deepgram.on('segment', (segment: TranscriptSegment) => {
+    // Broadcast first — never gate transcript visibility on classifier latency.
+    broadcast({ type: 'transcript_segment', data: segment });
+
+    // Roll the context buffer.
+    lastSegments.push(segment);
+    while (lastSegments.length > SEGMENT_BUFFER_MAX) lastSegments.shift();
+
+    // Dedup: if this segment is already inside an active claimSpan, the prior
+    // claim covered it — don't re-classify.
+    if (isSegmentInActiveSpan(segment.id)) {
+      classifierStats.segmentsSkippedBySpan++;
+      console.log(`[CLASSIFIER] Segment ${segment.id} within active claimSpan, skipping`);
+      console.log(`[classifier-suppress] reason=span_dedup segmentId=${segment.id}`);
+      return;
+    }
+
+    // Build the 3-segment evaluation window plus prior context behind it.
+    const window = lastSegments.slice(-WINDOW_SIZE);
+    const prior = lastSegments.slice(0, -WINDOW_SIZE);
+
+    classifyWindow(window, prior, currentSpeakerMap)
+      .then(({ classification, latencyMs }) => {
+        const classifierEndMs = Date.now();
+        classifierStats.segmentsProcessed++;
+        classifierStats.sumLatencyMs += latencyMs;
+
+        if (classification.isClaim && classification.confidence >= CLAIM_CONFIDENCE_THRESHOLD) {
+          classifierStats.claimsDetected++;
+          classifierStats.sumConfidence += classification.confidence;
+          if (classification.speaker === 'host') classifierStats.claimsByHost++;
+          else if (classification.speaker === 'cohost') classifierStats.claimsByCohost++;
+          else classifierStats.claimsByGuest++;
+
+          markSpanActive(window, classification.claimSpan);
+          broadcast({ type: 'claim_detected', data: classification });
+          console.log(
+            `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
+          );
+
+          recordStage(classification.segmentId, 'classifierEndMs', classifierEndMs);
+          // Enqueue for retrieval. Snapshot of last 12 segments captured inside
+          // the queue so processing sees fire-time state.
+          enqueueClaim(classification, lastSegments);
+        } else if (classification.isClaim) {
+          console.log(
+            `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
+          );
+          console.log(`[classifier-suppress] reason=low_confidence confidence=${classification.confidence.toFixed(2)} claimText="${classification.claimText.slice(0, 50)}"`);
+        } else {
+          console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
+          console.log(`[classifier-suppress] reason=not_a_claim segmentId=${segment.id}`);
+        }
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[classifier] unhandled error: ${msg}`);
+      });
+  });
+  deepgram.on('error', (err: Error) => {
+    console.error(`[deepgram] error event: ${err.message}`);
+  });
+  deepgram.on('reconnecting', ({ attempt }: { attempt: number }) => {
+    console.warn(`[deepgram] reconnecting (attempt ${attempt})`);
+  });
+} else {
+  console.warn('[deepgram] DEEPGRAM_API_KEY not set — session endpoints will return 503');
+}
+
+function validateSpeakerMap(input: unknown): SpeakerMap {
+  if (!input || typeof input !== 'object') return {};
+  const out: SpeakerMap = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    const id = parseInt(k, 10);
+    if (!Number.isNaN(id) && (v === 'host' || v === 'cohost' || v === 'guest')) {
+      out[id] = v;
+    }
+  }
+  return out;
+}
+
+// ─── Synthesis pipeline: claim queue → retrieval → synthesis → broadcast ─
+setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
+  try {
+    const triggerSeg = segmentSnapshot.find((s) => s.id === claim.segmentId);
+    const utteranceEndMs = triggerSeg ? triggerSeg.createdAt : Date.now();
+    recordTtfcAnchor(claim.segmentId, utteranceEndMs);
+    console.log(`[ttfc-server] claimId=${claim.segmentId} utteranceEndMs=${utteranceEndMs}`);
+    const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
+    recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
+    if (!result.docket?.verdict) {
+      console.log(`[synthesis] suppressed card — no Docket verdict claimId=${claim.segmentId} primaryEntity="${claim.primaryEntity}" hasPattern=${!!result.pattern}`);
+      return;
+    }
+    const card: CardBroadcast = {
+      type: 'claim_card',
+      claimId: claim.segmentId,
+      claimText: claim.claimText,
+      speaker: claim.speaker,
+      speakerNumber: claim.speakerNumber,
+      timestamp: claim.timestamp,
+      docket: result.docket,
+      pattern: result.pattern,
+      hostContradiction: result.hostContradiction,
+      timing: result.timing,
+    };
+    recordStage(claim.segmentId, 'broadcastSendMs', Date.now());
+    broadcast(card);
+    recordBroadcast(claim.primaryEntity);
+    const stages = getStages(claim.segmentId);
+    const utteranceEnd = ttfcUtteranceEndMs.get(claim.segmentId);
+    if (
+      stages?.classifierEndMs !== undefined &&
+      stages.retrievalStartMs !== undefined &&
+      stages.retrievalEndMs !== undefined &&
+      stages.synthesisEndMs !== undefined &&
+      utteranceEnd !== undefined
+    ) {
+      const classifierMs = stages.classifierEndMs - utteranceEnd;
+      const queueWaitMs = stages.retrievalStartMs - stages.classifierEndMs;
+      const retrievalMs = stages.retrievalEndMs - stages.retrievalStartMs;
+      const synthesisMs = stages.synthesisEndMs - stages.retrievalEndMs;
+      console.log(
+        `[ttfc-stages] claimId=${claim.segmentId} classifierMs=${classifierMs} queueWaitMs=${queueWaitMs} retrievalMs=${retrievalMs} synthesisMs=${synthesisMs}`
+      );
+    }
+    console.log(
+      `[SYNTHESIS] claim=${claim.segmentId.slice(0, 8)} docket=${result.docket?.verdict ?? 'null'} pattern=${result.pattern ? 'fired' : 'null'} contradiction=${result.hostContradiction ? 'fired' : 'null'} total=${result.timing.totalMs}ms`
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[SYNTHESIS] failed: ${msg}`);
+  }
+});
+
+app.post('/api/session/start', async (req, res) => {
+  if (!deepgram) {
+    return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
+  }
+  const { mode, source, speakerMap, startOffsetSeconds } = req.body as {
+    mode?: SessionMode;
+    source?: string;
+    speakerMap?: unknown;
+    startOffsetSeconds?: unknown;
+  };
+  if (mode !== 'stream' && mode !== 'system-audio') {
+    return res.status(400).json({ error: "mode must be 'stream' or 'system-audio'" });
+  }
+  if (!source || typeof source !== 'string') {
+    return res.status(400).json({ error: 'source required' });
+  }
+  if (
+    startOffsetSeconds !== undefined &&
+    (typeof startOffsetSeconds !== 'number' ||
+      !Number.isInteger(startOffsetSeconds) ||
+      startOffsetSeconds < 0)
+  ) {
+    return res.status(400).json({ error: 'startOffsetSeconds must be a non-negative integer' });
+  }
+  if (deepgram.isActive()) {
+    return res.status(409).json({ error: 'Session already active. Stop it first.' });
+  }
+
+  // Reset per-session classifier state. Stats are intentionally cumulative
+  // across sessions — clear with a fresh process if the producer wants to.
+  lastSegments.length = 0;
+  activeSpans.length = 0;
+  currentSpeakerMap = validateSpeakerMap(speakerMap);
+
+  try {
+    await deepgram.startSession({
+      mode,
+      source,
+      startOffsetSeconds: typeof startOffsetSeconds === 'number' ? startOffsetSeconds : undefined,
+    });
+    res.json({
+      ok: true,
+      mode,
+      source,
+      speakerMap: currentSpeakerMap,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[session/start] ${msg}`);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.post('/api/session/stop', async (_req, res) => {
+  if (!deepgram) {
+    return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
+  }
+  try {
+    await deepgram.stopSession();
+    res.json({ ok: true });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[session/stop] ${msg}`);
+    res.status(500).json({ error: msg });
+  }
+});
+
+app.get('/api/session/status', (_req, res) => {
+  if (!deepgram) {
+    return res.json({ active: false, mode: null, uptime: null, configured: false });
+  }
+  res.json({
+    active: deepgram.isActive(),
+    mode: deepgram.getMode(),
+    uptime: deepgram.getUptime(),
+    configured: true,
+    speakerMap: currentSpeakerMap,
+  });
+});
+
+app.get('/api/queue/stats', (_req, res) => {
+  res.json({ queue: queueStats(), breakers: getBreakerState() });
+});
+
+app.get('/api/classifier/stats', (_req, res) => {
+  const { segmentsProcessed, segmentsSkippedBySpan, claimsDetected, claimsByHost, claimsByCohost, claimsByGuest, sumConfidence, sumLatencyMs } = classifierStats;
+  res.json({
+    segmentsProcessed,
+    segmentsSkippedBySpan,
+    claimsDetected,
+    claimsByHost,
+    claimsByCohost,
+    claimsByGuest,
+    averageConfidence: claimsDetected > 0 ? sumConfidence / claimsDetected : 0,
+    averageLatencyMs: segmentsProcessed > 0 ? sumLatencyMs / segmentsProcessed : 0,
+    confidenceThreshold: CLAIM_CONFIDENCE_THRESHOLD,
+    activeSpans: activeSpans.length,
+  });
+});
+
 // ─── WebSocket Server ───
 
 const server = createServer(app);
@@ -190,9 +430,47 @@ wss.on('connection', (ws) => {
   const status: StatusMessage = {
     type: 'status',
     state: isOllamaAvailable() ? 'connected' : 'ollama_down',
-    session: watcher?.getCurrentSession() || undefined,
   };
   ws.send(JSON.stringify(status));
+
+  ws.on('message', (data) => {
+    let msg: any;
+    try {
+      msg = JSON.parse(data.toString());
+    } catch {
+      return;
+    }
+    if (msg && msg.type === 'card_rendered' && typeof msg.claimId === 'string' && typeof msg.renderCompleteMs === 'number') {
+      console.log(`[ttfc-client] claimId=${msg.claimId} renderCompleteMs=${msg.renderCompleteMs}`);
+      const anchor = ttfcUtteranceEndMs.get(msg.claimId);
+      if (anchor !== undefined) {
+        const deltaMs = msg.renderCompleteMs - anchor;
+        console.log(`[ttfc-paired] claimId=${msg.claimId} deltaMs=${deltaMs}`);
+        const stages = getStages(msg.claimId);
+        const wsReceivedMs = typeof msg.wsReceivedMs === 'number' ? msg.wsReceivedMs : undefined;
+        if (
+          stages?.classifierEndMs !== undefined &&
+          stages.retrievalStartMs !== undefined &&
+          stages.retrievalEndMs !== undefined &&
+          stages.synthesisEndMs !== undefined &&
+          stages.broadcastSendMs !== undefined &&
+          wsReceivedMs !== undefined
+        ) {
+          const classifierMs = stages.classifierEndMs - anchor;
+          const queueMs = stages.retrievalStartMs - stages.classifierEndMs;
+          const retrievalMs = stages.retrievalEndMs - stages.retrievalStartMs;
+          const synthesisMs = stages.synthesisEndMs - stages.retrievalEndMs;
+          const wsTransitMs = wsReceivedMs - stages.broadcastSendMs;
+          const browserRenderMs = msg.renderCompleteMs - wsReceivedMs;
+          console.log(
+            `[ttfc-attribution] claimId=${msg.claimId} total=${deltaMs} classifier=${classifierMs} queue=${queueMs} retrieval=${retrievalMs} synthesis=${synthesisMs} wsTransit=${wsTransitMs} browserRender=${browserRenderMs}`
+          );
+        }
+        dropStages(msg.claimId);
+        ttfcUtteranceEndMs.delete(msg.claimId);
+      }
+    }
+  });
 
   ws.on('close', () => {
     clients.delete(ws);
@@ -200,23 +478,8 @@ wss.on('connection', (ws) => {
   });
 });
 
-interface SponsorMessage {
-  type: 'sponsor';
-  name: string;
-  url: string;
-  code: string | null;
-  copy: string;
-  timestamp: number;
-}
-
 function broadcast(
-  message:
-    | TrollReaction
-    | StatusMessage
-    | SponsorMessage
-    | SoundCueMessage
-    | FredAudioToggleMessage
-    | FredVolumeMessage
+  message: TrollReaction | StatusMessage | TranscriptSegmentMessage | ClaimDetectedMessage | CardBroadcast
 ): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
@@ -226,148 +489,37 @@ function broadcast(
   }
 }
 
-// ─── Watcher Integration ───
-
-let watcher: ReturnType<typeof startWatcher> | null = null;
-
-// ─── Question Sniper ───
-// Disabled by default — not in current April 15 spec. Re-enable post-launch if needed.
-let sniperEnabled = false;
-let utterancesSinceSniper = 0;
-let sniperCount = 0;
-
-async function fireSniper(): Promise<void> {
-  if (!sniperEnabled) return;
-  if (utterancesSinceSniper < 2) return;
-
-  const recent = getRecentUtterances();
-  if (recent.length === 0) return;
-
-  utterancesSinceSniper = 0;
-  sniperCount++;
-
-  // Build context from recent utterances
-  let context = '[RECENT CONVERSATION]\n';
-  recent.forEach((u) => {
-    const label = u.speaker === 'you' ? 'Host' : 'Guest';
-    context += `${label}: "${u.text}"\n`;
-  });
-  context += '\n[SUGGEST ONE FOLLOW-UP QUESTION FOR THE HOST]\n';
-
-  try {
-    let { text: response, engine } = await generate(
-      SNIPER_CONFIG.model,
-      SNIPER_CONFIG.systemPrompt,
-      context
-    );
-
-    // Strip wrapping quotes and question marks
-    response = response.replace(/^["'"]+|["'"]+$/g, '');
-    response = response.replace(/\?+$/, '');
-
-    // Take first sentence only
-    const sentenceMatch = response.match(/^(.*?(?:\.\s|\." |[!?]))/);
-    if (sentenceMatch) {
-      response = sentenceMatch[1].trimEnd();
-      response = response.replace(/\?+$/, '');
-    }
-
-    // Hard cap at 120 chars
-    if (response.length > 120) {
-      const truncated = response.slice(0, 120);
-      const lastSpace = truncated.lastIndexOf(' ');
-      response = (lastSpace > 30 ? truncated.slice(0, lastSpace) : truncated.trimEnd());
-    }
-
-    const reaction: TrollReaction = {
-      type: 'troll_comment',
-      persona: 'sniper',
-      text: response,
-      timestamp: Date.now(),
-      utteranceId: `utt_sniper_${String(sniperCount).padStart(3, '0')}`,
-    };
-
-    broadcast(reaction);
-    logReaction('sniper' as any, response, recent[recent.length - 1].text, engine);
-    console.log(`[sniper] [${engine}]: "${response}"`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[sniper] Failed: ${msg}`);
-  }
-}
-
 async function main() {
   // Check Ollama on startup
   const ollamaOk = await checkOllama();
   if (!ollamaOk) {
     console.warn('⚠️  Ollama not detected at', appConfig.ollamaBaseUrl);
     console.warn('   Start Ollama and pull the model: ollama pull qwen2.5:7b');
-    console.warn('   TWiSTroll will retry when utterances arrive.');
+    console.warn('   Sentinel will retry when utterances arrive.');
   } else {
     console.log('✅ Ollama connected');
   }
 
-  const handleUtterance = async (utterance: Parameters<Parameters<typeof startWatcher>[0]>[0]) => {
-    // Re-check Ollama if it was down
-    if (!isOllamaAvailable()) {
-      await checkOllama();
-    }
-
-    broadcast({
-      type: 'status',
-      state: 'processing',
-      session: watcher?.getCurrentSession() || undefined,
-    });
-
-    // Track utterances for sniper gate (show utterances only, not viewer chat)
-    if (utterance.speaker !== 'viewer') {
-      utterancesSinceSniper++;
-
-      // Sponsor keyword — only runs on show audio, never on viewer chat
-      const sponsor = checkForSponsor(utterance.text);
-      if (sponsor) {
-        broadcast({
-          type: 'sponsor',
-          name: sponsor.name,
-          url: sponsor.url,
-          code: sponsor.code || null,
-          copy: sponsor.copy,
-          timestamp: Date.now(),
-        });
-        console.log(`[sponsor] ${sponsor.name}: ${sponsor.copy}`);
-        startSponsorSuppression();
-      }
-    }
-
-    await processUtterance(utterance, (reaction) => {
-      broadcast(reaction);
-    });
-
-    broadcast({
-      type: 'status',
-      state: 'idle',
-      session: watcher?.getCurrentSession() || undefined,
-    });
-  };
-
-  // Start file watcher (OpenOats transcripts)
-  watcher = startWatcher(handleUtterance);
+  // Warmup LanceDB embedding path so the first claim doesn't hit 300ms
+  // cold-start timeout. context.ts opens the connection at module load,
+  // but the embedding side stays cold until the first queryMemory call.
+  try {
+    const { queryMemory } = await import('./episodeMemory.js');
+    await queryMemory('startup funding venture capital', 1);
+    console.log('[LANCEDB] Warmup complete');
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[LANCEDB] Warmup failed — first query may timeout: ${msg}`);
+  }
 
   // Start Express server
   server.listen(appConfig.overlayPort, () => {
     console.log('');
-    console.log('🔴 TWiSTroll is running');
-    console.log(`   Overlay:  http://localhost:${appConfig.overlayPort}`);
-    console.log(`   Config:   http://localhost:${appConfig.overlayPort}/config`);
+    console.log('🔴 TWiST Sentinel is running');
+    console.log(`   Config:    http://localhost:${appConfig.overlayPort}/config`);
     console.log(`   WebSocket: ws://localhost:${appConfig.wsPort}`);
-    console.log(`   Watching: ${appConfig.transcriptDir}`);
     console.log('');
   });
-
-  // Question Sniper timer — fires every 75s independently of troll rotation
-  setInterval(() => {
-    fireSniper().catch((err) => console.error('[sniper] Timer error:', err));
-  }, 75000);
 
   // Periodic Ollama health check
   setInterval(async () => {
@@ -387,7 +539,7 @@ async function main() {
 
 function configPanelHTML(): string {
   return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>TWiSTroll Config</title>
+<html><head><meta charset="utf-8"><title>Sentinel Config</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, sans-serif; background: #1a1a1e; color: #e8e8e8; padding: 24px; }
@@ -401,42 +553,14 @@ function configPanelHTML(): string {
   button:hover { background: #e64400; }
   .status { font-size: 12px; color: #84CC16; }
   .status.down { color: #ef4444; }
-  #obs-url { font-size: 12px; color: #94A3B8; word-break: break-all; margin-top: 8px; }
 </style></head><body>
-<h1>TWiSTroll Config</h1>
+<h1>Sentinel Config</h1>
 <div class="card">
   <h2>Connection</h2>
   <div id="ollama-status" class="status">Checking Ollama...</div>
-  <div id="session-status" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
-  <div style="margin-top:8px;">
-    <button id="commit-episode-btn" disabled style="opacity:0.5;">Commit episode to memory</button>
-    <div id="commit-result" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
-  </div>
-</div>
-<div class="card">
-  <h2>Personas</h2>
-  <label><input type="checkbox" checked data-persona="not-jamie"> Gary (Fact-checker)</label>
-  <label><input type="checkbox" checked data-persona="not-delinquent"> Troll (Cynical Commentator)</label>
-  <label><input type="checkbox" checked data-persona="not-taco"> Jackie (Comedy Writer)</label>
-  <label><input type="checkbox" checked data-persona="not-fred"> Fred (Sound Effects)</label>
-</div>
-<div class="card">
-  <h2>Timing</h2>
-  <label>Cooldown: <span id="cd-val">15</span>s <input type="range" min="5" max="60" value="15" id="cooldown"></label>
-</div>
-<div class="card">
-  <h2>Sound Effects</h2>
-  <label><input type="checkbox" id="fred-audio-toggle" checked> Fred Audio</label>
-  <label style="margin-top:8px;">Volume: <span id="fred-vol-val">25%</span> <input type="range" min="0" max="0.3" step="0.05" value="0.25" id="fred-volume"></label>
-</div>
-<div class="card">
-  <h2>OBS Setup</h2>
-  <button id="copy-url">Copy OBS URL</button>
-  <div id="obs-url">http://localhost:${appConfig.overlayPort}?mode=prod</div>
 </div>
 <script>
   // Status polling
-  let currentSession=null;
   setInterval(async()=>{
     try{
       const r=await fetch('/api/status');
@@ -444,74 +568,8 @@ function configPanelHTML(): string {
       const el=document.getElementById('ollama-status');
       el.textContent=d.ollama?'Ollama connected':'Ollama not detected';
       el.className=d.ollama?'status':'status down';
-      document.getElementById('session-status').textContent=d.session?'Session: '+d.session:'No active session';
-      currentSession=d.session||null;
-      const btn=document.getElementById('commit-episode-btn');
-      btn.disabled=!currentSession;
-      btn.style.opacity=currentSession?'1':'0.5';
     }catch{}
   },3000);
-
-  // Persona toggles
-  document.querySelectorAll('[data-persona]').forEach(cb=>{
-    cb.addEventListener('change',async(e)=>{
-      const t=e.target;
-      await fetch('/api/persona/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({persona:t.dataset.persona,enabled:t.checked})});
-    });
-  });
-
-  // Cooldown
-  document.getElementById('cooldown').addEventListener('input',async(e)=>{
-    const v=e.target.value;
-    document.getElementById('cd-val').textContent=v;
-    await fetch('/api/cooldown',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ms:v*1000})});
-  });
-
-  // Fred audio kill switch — posts to server which broadcasts WS to overlay
-  document.getElementById('fred-audio-toggle').addEventListener('change',async(e)=>{
-    await fetch('/api/fred/audio_toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:e.target.checked})});
-  });
-
-  // Fred volume — clamp at 0.3 client-side too; server double-clamps.
-  // Display raw value × 100 so 0.25 → 25%, matching the spec's default label.
-  document.getElementById('fred-volume').addEventListener('input',async(e)=>{
-    const raw=parseFloat(e.target.value);
-    const v=Math.min(0.3,Math.max(0,isNaN(raw)?0.25:raw));
-    document.getElementById('fred-vol-val').textContent=Math.round(v*100)+'%';
-    await fetch('/api/fred/volume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:v})});
-  });
-
-  // Copy URL
-  document.getElementById('copy-url').addEventListener('click',()=>{
-    navigator.clipboard.writeText('http://localhost:${appConfig.overlayPort}?mode=prod');
-    document.getElementById('copy-url').textContent='Copied!';
-    setTimeout(()=>document.getElementById('copy-url').textContent='Copy OBS URL',2000);
-  });
-
-  // Commit episode to memory
-  document.getElementById('commit-episode-btn').addEventListener('click',async()=>{
-    if(!currentSession) return;
-    const btn=document.getElementById('commit-episode-btn');
-    const result=document.getElementById('commit-result');
-    btn.disabled=true;
-    btn.textContent='Committing...';
-    try{
-      const r=await fetch('/api/commit-episode',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionFile:currentSession})});
-      const d=await r.json();
-      if(d.success){
-        result.textContent='Committed '+d.count+' chunks to memory';
-        result.style.color='#84CC16';
-      }else{
-        result.textContent='Error: '+(d.error||'unknown');
-        result.style.color='#ef4444';
-      }
-    }catch(e){
-      result.textContent='Error: '+e.message;
-      result.style.color='#ef4444';
-    }
-    btn.disabled=false;
-    btn.textContent='Commit episode to memory';
-  });
 </script></body></html>`;
 }
 

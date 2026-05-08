@@ -1,101 +1,89 @@
-# TWiSTroll
+# TWiST Sentinel
 
-**The viewer-facing AI commentary layer for live podcasts.**
+**Real-time AI fact-checker + cynic for live podcasts.**
 
-**Status: 8/8 spec compliance against the bounty brief.**
+Two AI personas watch your show and surface verified facts, counterarguments, and follow-up questions — in real time, with citations from Reuters, Bloomberg, and TechCrunch.
 
-Five AI personas react to your show in real time, displayed as floating bubbles over the broadcast. Built as an OBS browser source — drag, drop, on air. Tested live against multiple TWiST episodes.
-
-Built for the [April 15, 2026 TWiST bounty](https://x.com/twistartups/status/2044437861668171974). Released under MIT for any podcast to use.
-
-![TWiSTroll Demo](https://github.com/SkunkWorks0x/twistroll/raw/main/demo/twistroll-demo.gif)
-
-[**Watch the 7-minute uncut demo →**](https://github.com/SkunkWorks0x/twistroll/raw/main/demo/twistroll-live-demo.mov)
-
----
-
-## Spec compliance
-
-All 8 requirements from the [@twistartups April 15, 2026 bounty post](https://x.com/twistartups/status/2044437861668171974) are shipped and live-tested.
-
-- [x] **Real-time capabilities** — Listens to the show in real time and provides live feedback through a sidebar
-- [x] **Gary (Fact-checker)** → *Not Jamie* — Monitors conversation for factual claims and provides corrections or background data
-- [x] **Fred (Sound Effects/Context)** → *Not Fred* — Supplies background context and sound effects (12-sound library, 0.25 volume cap, producer kill switch)
-- [x] **Jackie (Comedy Writer)** → *Not Taco* — Generates one-liners or jokes related to the current discussion
-- [x] **Troll (Cynical Commentator)** → *Not Delinquent* — Chaotic / negative cynical persona providing troll feedback
-- [x] **Bubble UI with profile picture** — Pop-and-vanish bubbles with character SVG avatars per persona
-- [x] **Visual sine wave** — Animates per-persona color when speaking/active
-- [x] **Two-stream output** — OBS scene structure produces both regular and enhanced streams
+Built for the [TWiST bounty](https://x.com/twistartups) announced live on air by Jason Calacanis, April 27, 2026. Two personas, scrollable transcript, runs on any stream or Zoom. Jason's spec, built to Jason's spec.
 
 ---
 
 ## What it does
 
-TWiSTroll watches your live transcript via OpenOats and generates live AI reactions from four persona agents. Reactions appear as floating overlay bubbles on your stream — visible to viewers, not hidden in a host window. One reaction every ~15 seconds in round-robin rotation. Each reaction uses ~200 characters max so the bubble never overwhelms the frame.
+Sentinel listens to a live podcast stream, detects verifiable claims in real time, and produces structured fact-check cards with:
 
-This is the **viewer-side** layer. Host-facing tools live in a producer's private app window. TWiSTroll lives on the broadcast itself — the second feed Jason described on the bounty stream.
+- **Verdicts** — TRUE, FALSE, MISLEADING, PARTIAL, or UNVERIFIABLE on every claim
+- **Citations** — sourced from Reuters, Bloomberg, TechCrunch, SEC filings, and 127 TWiST episodes in memory
+- **Counterpoints** — precedent-driven "the other side of it" on every card
+- **Follow-up questions** — the next question the host should ask
+- **Scrollable transcript** — the full conversation with highlighted claim segments
 
----
-
-## Live memory (the part Jason was drooling over)
-
-TWiSTroll maintains episode-level memory in three layers — addressing the archive concern from a different angle than cross-episode tools:
-
-**Rolling episode summary.** A background Claude Haiku call regenerates a 3-sentence episode summary every 10 utterances or 5 minutes. Every persona sees this summary in their context, so reactions stay aware of the full conversation arc, not just the last few seconds.
-
-**Callback Engine.** Personas can reference earlier moments from the same episode. In live testing, Not Taco caught Jason saying "no bueno" twenty minutes apart — "'No bueno' — you literally just said it two minutes ago." That's within-episode callback memory firing on unscripted natural conversation.
-
-**Contradiction Catcher.** Not Jamie scans the rolling episode summary for conflicting claims and surfaces them. In live testing against today's TWiST episode: "Guest claims these are suggestions 'you provided Jason' — but the episode summary shows Jason created the initial agent configurations, not provided them to the guest." Continuity-checking in real time.
-
-This is episode-scoped memory, not cross-episode archive. Different approach, real teeth. The cross-episode archive layer is roadmap (see below).
+The host scrolls up, sees what was said, sees the fact-check, sees the counterargument, sees the follow-up question. That's the product.
 
 ---
 
-## Production features (live tested)
+## The two personas
 
-- **Sponsor Guardian.** Detects sponsor mentions and instantly fires a sponsor-styled bubble with the promo URL. Bypasses cooldown. 45-second ad break suppression after firing so the personas don't talk over the read. 12 TWiST sponsors pre-loaded.
-- **Jason-ism Detector.** Server-side detection of Jason Calacanis catchphrases. When Jason says one of his signature lines, Not Taco gets forced into the next slot to roast it.
-- **Flat reaction filter.** 30+ regex patterns suppress meta-commentary, "I can't fact-check this" leaks, transcription complaints, and out-of-character outputs before they ever reach the WebSocket.
-- **Hybrid LLM with three fallbacks.** Claude Haiku primary, Groq llama-3.3-70b fallback, Ollama qwen2.5:7b last resort. The pipeline never dies.
-- **Server-side truncation.** Hard 200-character ceiling, first-sentence cut, word-boundary aware. Reactions stay tight, bubbles stay legible.
+| Persona | Role | Voice |
+|---------|------|-------|
+| **The Docket** | Fact-checker | Clinical precision. Verdict + explanation + citations + follow-up question. "The record is the record." |
+| **The Pattern Recognizer** | Cynic | Calm senior partner. Precedent-driven counterarguments. "The precedent here is..." |
 
----
-
-## Production controls
-
-A config panel at `localhost:3000/config` (never visible in OBS) lets the production team:
-
-- Toggle personas on/off mid-stream
-- Adjust cooldown timing in real time
-- Thumbs-up / thumbs-down on each reaction
-- Monitor connection status and current session
-- Copy production OBS URL to clipboard with one click
+No comedy. No sound effects. No entertainment framing. Jason said "you don't have to try to get the jokes — that's my job." These two personas do the work Jason described: real-time fact checking and real-time cynic.
 
 ---
 
-## OBS setup (5 minutes)
+## What the demo shows
 
-1. Add a **Browser** source → URL: `http://localhost:3000?mode=prod`
-2. Set width: **340**, height: **1080**
-3. Position on the right edge of your canvas, layered above your video source
-4. Uncheck "Shutdown source when not visible" and "Refresh browser when scene becomes active"
-5. Set FPS to **30**
-6. On the source's **Advanced Audio Properties**, set monitoring to **"Monitor and Output"** — required so Fred's sound cues reach both the host and the broadcast.
+8 minutes uncut against TWiST E2281 (China Kills Meta/Manus Deal). No narration, no editing. What you see is what you get.
 
-The overlay background is fully transparent. Bubbles float directly over your video feed.
+Cards that fired during the demo:
+
+- **FALSE** — "Google owns DeepSeek" → debunked with Reuters and TechCrunch, naming the actual owner
+- **MISLEADING** — "Apple and Microsoft are the two furthest behind in AI" → corrected with three sources
+- **TRUE** — "Manus founders relocated to Singapore in 2025" → confirmed with two Reuters sources
+- **PARTIAL** — Microsoft $900B revenue claim → fact-checked with Bloomberg and The Information
+- **TRUE** — "OpenAI models on Bedrock in coming weeks" → confirmed with Ars Technica
+
+80% citation rate. Zero hallucinated URLs. Zero crashes.
 
 ---
 
-## OBS setup for Fred sound effects
+## Cross-episode memory
 
-OBS's browser source runs on CEF (Chromium Embedded Framework), which enforces Chrome's autoplay policy. `Audio.play()` is blocked until the page receives a user gesture. The overlay auto-detects OBS via `window.obsstudio` and **never shows the unlock prompt inside OBS** — instead, the producer unlocks audio with a single click on the scene preview.
+127 TWiST episodes (Ep 2007 through Ep 2285) indexed in LanceDB. When a guest makes a claim, Sentinel cross-references what was said on prior shows.
 
-1. **Click the rendered overlay once in your scene preview** after adding the source. This single click satisfies CEF's autoplay policy and enables Fred's sound effects for the session.
-2. In the browser source properties, check **"Control audio via OBS"**. This routes Fred's audio through OBS's audio mixer so you can control volume independently of the show's main audio. Note: this setting handles audio *routing*, not autoplay unlock — step 1 is still required.
-3. In the OBS Audio Mixer, the browser source appears under whatever name you gave it. Set the slider to a comfortable level. Fred's sounds are already capped at 25% by the overlay code, but OBS gives you a master override on top of that.
-4. If you reload the browser source or restart OBS, repeat step 1 (single click on the source preview) to re-enable audio for the new session.
+In the demo, a claim about Microsoft's OpenAI stake surfaced a TWiST archive citation from Ep 2201 (October 2025). The card rendered with "— show archive" label, distinguishing internal memory from external sources.
 
-When the overlay is loaded in a regular browser for testing (not OBS), a compact centered **"Click to enable Fred audio"** prompt appears if Layer A silent unlock fails. Click it once — audio is unlocked for the rest of the session.
+This is the feature Jason described: "we can feed in our full docket and it can say, hey, this guest posted about this on X that we already have in the docket."
+
+---
+
+## Architecture
+Audio source (YouTube via yt-dlp, or Zoom via BlackHole)
+→ Deepgram Nova-3 streaming (diarization, smart_format)
+→ Sliding 3-segment window
+→ Claim Classifier (Claude Haiku 4.5, structured extraction)
+→ Gate chain: empty-entity → sponsor → weak-entity → cooldown → dedup
+→ Parallel Retrieval: LanceDB + Tavily (relationship-first queries)
+→ Parallel Synthesis: Docket (tool_use JSON) + Pattern Recognizer (text)
+→ Post-processing: Zod validation, citation cross-check, word limits
+→ WebSocket → Browser dashboard
+
+Typical claim-to-card latency: 5-7 seconds.
+
+---
+
+## Dashboard
+
+The browser dashboard at `localhost:3000` is the primary interface:
+
+- **Left (65%)** — Scrollable transcript with speaker labels and claim highlights
+- **Right (35%)** — Pinned sidebar with fact-check cards, auto-collapsing older cards
+- **Click-to-expand** — Collapsed cards expand to show full verdict, citations, and counterpoint
+- **Bidirectional sync** — Click a card to highlight the transcript segment, click a segment to scroll to the card
+
+Design language: Bloomberg terminal meets teleprompter. JetBrains Mono for system chrome, Source Serif 4 for human content. Engineered for 2-3 second glance reads under studio lighting.
 
 ---
 
@@ -105,182 +93,74 @@ When the overlay is loaded in a regular browser for testing (not OBS), a compact
 git clone https://github.com/SkunkWorks0x/twistroll.git
 cd twistroll
 npm install
-
 cp .env.example .env
-# Add your Anthropic API key (or set LLM_MODE=ollama for fully local)
+# Add your Anthropic API key and Tavily API key
 
+# Pull the embedding model
+ollama pull embeddinggemma
+
+# Start
 npm run dev
+# Open http://localhost:3000
 ```
 
-For live use: install [OpenOats](https://github.com/yazinsai/openoats), start a session, play audio. TWiSTroll watches the transcript automatically.
-
-For testing without OpenOats:
+Start a session:
 ```bash
-./scripts/simulate-session.sh
+curl -X POST http://localhost:3000/api/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"source": "https://youtube.com/watch?v=YOUR_VIDEO_ID"}'
 ```
 
----
-
-## The 4 personas
-
-Each persona reacts in round-robin rotation: Jamie → Delinquent → Taco → Fred. One fresh pop-up every ~15 seconds.
-
-| Persona | Role | Color | Voice |
-|---------|------|-------|-------|
-| **Not Jamie** | Fact-checker | Teal (`#2DD4BF`) | Dry, precise, deadpan. Always cites a specific fact, number, or correction. |
-| **Not Delinquent** | Chaotic troll | Orange (`#F97316`) | Conspiracy-comedy. ALL CAPS emphasis. Excited about insane connections. |
-| **Not Taco** | Comedy writer | Lime (`#84CC16`) | Tight punchlines, callbacks, roasts. No emojis, no setup, no buddy/bro. |
-| **Not Fred** | Sound effects + context | Crimson (`#EF4444`) | Producer energy — drops a sound cue plus one line of archival color. |
-
-### Why these names?
-
-**Not Jamie** — Jamie Vernon runs the board for Joe Rogan. Every great podcast has a fact-checker.
-
-**Not Delinquent** — Lon Harris played a heel character called "The Delinquent" on Movie Trivia Schmoedown. Our Not Delinquent channels that energy into conspiracy-adjacent takes about startup culture.
-
-**Not Taco** — Lon's foster chihuahua. The funniest persona in the sidebar is named after a tiny rescue dog.
-
-**Not Fred** — Jason literally said "not Fred" on the bounty stream as a name to avoid. We took it literally, made it the sound-effects operator, and gave it the crimson accent. The joke writes itself.
-
-Jason said "not Jackie, not Bob, not Fred — so we don't get in trouble." We took that literally and made every name an Easter egg for the show's actual world.
+No configuration screen, no guest names to type in, no setup wizard. URL in, facts out.
 
 ---
 
-## Architecture
+## LLM stack
 
-```
-Audio → OpenOats (Whisper) → JSONL transcript
-  ↓
-chokidar watcher
-  ↓
-parser (10-word min filter)
-  ↓
-cooldown gate (15s minimum)
-  ↓
-Sponsor Guardian check (instant fire if matched)
-  ↓
-rotation selector (round-robin: 1 of 4)
-  ↓
-context builder (8 utterances + rolling episode summary)
-  ↓
-LLM call (Claude Haiku → Groq → Ollama)
-  ↓
-truncation (first sentence, 200 char max)
-  ↓
-flat reaction filter (30+ patterns)
-  ↓
-WebSocket broadcast
-  ↓
-OBS browser source overlay (floating transparent bubbles)
-```
-
-One persona fires per utterance in round-robin order: Jamie → Delinquent → Taco → Fred → repeat. Each reaction takes ~2-4 seconds end-to-end.
+| Component | Model | Role |
+|-----------|-------|------|
+| Claim Classifier | Claude Haiku 4.5 | Structured claim extraction from transcript |
+| The Docket | Claude Haiku 4.5 | Fact-check verdict + citations via tool_use |
+| The Pattern Recognizer | Claude Haiku 4.5 | Precedent-driven counterargument |
+| Fallback classifier | Groq llama-3.3-70b | Cloud fallback |
+| Last-resort classifier | Ollama qwen2.5:7b | Local fallback — pipeline never dies |
+| Embeddings | EmbeddingGemma 308M | LanceDB vector search |
 
 ---
 
-## LLM modes
+## Source credibility
 
-| Mode | Speed | Cost | Quality |
-|------|-------|------|---------|
-| `hybrid` (default) | ~2-4s | ~$0.01/reaction | Best — Claude Haiku |
-| `groq` | ~1-2s | Free tier | Good — llama-3.3-70b |
-| `ollama` | ~8-15s | Free | Good — qwen2.5:7b, runs 100% local |
+Citations are tier-filtered before rendering:
 
-Hybrid mode tries Claude Haiku first, falls back to Groq, then Ollama. The pipeline never dies — if cloud is down, local catches it.
+| Tier | Sources | Treatment |
+|------|---------|-----------|
+| 1 (Primary) | SEC, BLS, FRED, company IR, Reuters, Bloomberg, NYT, WSJ, TechCrunch, AP | Full confidence |
+| 2 (Credible) | Wikipedia, Crunchbase, PitchBook, SaaStr, FT, Economist, Ars Technica | Normal confidence |
+| 3 (Secondary) | Everything else not blocked | "Unverified source" flag |
+| 4 (Blocked) | Reddit, Quora, Medium blogs, SEO farms | Never rendered |
 
-### Per-persona routing (locked)
-
-Each persona has a primary model plus a multi-tier fallback. Jamie and Fred want factual precision; Delinquent and Taco want speed and comedic timing.
-
-| Persona | Primary | Fallback chain |
-|---------|---------|----------------|
-| Not Jamie | Claude Haiku 4.5 | Groq → Ollama |
-| Not Fred | Claude Haiku 4.5 | Groq → Ollama |
-| Not Delinquent | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
-| Not Taco | xAI Grok 4.1 Fast | Haiku → Groq → Ollama |
-
-Each step has a hard timeout; if the primary misses the window, the next tier takes over in under a second.
-
----
-
-## Bonus features beyond spec
-
-Shipped beyond the bounty requirements:
-
-- **Cross-Episode Memory** — LanceDB vector store of prior-episode highlights for future callback work.
-- **Pre-show Guest Dossier** — Claude-generated background pack on each booked guest, dropped into `data/dossiers/`.
-- **Hybrid LLM fallback chain** — Haiku ↔ Grok ↔ Groq ↔ Ollama; the pipeline never dies.
+Hard rule: no URL = no citation card. Silence over fabrication.
 
 ---
 
 ## System requirements
 
-- **macOS** with Apple Silicon recommended (M1/M2/M3/M4/M5)
+- macOS with Apple Silicon (M1/M2/M3/M4/M5), 32GB RAM recommended
 - Node.js 20+
-- OBS Studio 30+
-- For hybrid mode: Anthropic API key
-- For local mode: Ollama with `qwen2.5:7b` pulled, 32GB RAM recommended
+- Ollama (for embeddings and local fallback)
+- Anthropic API key
+- Tavily API key
 
 ---
 
-## Configuration
+## What's next
 
-Copy `.env.example` to `.env`. Defaults work out of the box with a Claude API key.
+Built and shipping now. If this earns the bounty, here's where it goes:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LLM_MODE` | `hybrid` | `hybrid`, `groq`, or `ollama` |
-| `ANTHROPIC_API_KEY` | — | Required for hybrid/cloud mode |
-| `GROQ_API_KEY` | — | Optional fallback |
-| `OPENOATS_TRANSCRIPT_DIR` | `~/Library/Application Support/OpenOats/sessions` | Where OpenOats writes JSONL files |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API endpoint |
-| `OLLAMA_MODEL` | `qwen2.5:7b` | Model for local inference |
-| `WS_PORT` | `3001` | WebSocket broadcast port |
-| `OVERLAY_PORT` | `3000` | Overlay + config panel port |
-| `COOLDOWN_MS` | `15000` | Minimum ms between reactions |
-| `CONTEXT_BUFFER_SIZE` | `8` | Recent utterances in context |
-
----
-
-## Roadmap
-
-Built and shipping:
-
-- [x] 4-persona overlay with live reactions (Jamie, Delinquent, Taco, Fred)
-- [x] Per-persona LLM routing (Haiku for fact-check/sound, Grok for comedy)
-- [x] Hybrid LLM with multi-tier fallback (Haiku ↔ Grok ↔ Groq ↔ Ollama)
-- [x] Not Fred sound-effects system with 12 curated cues
-- [x] Rolling episode summary memory
-- [x] Callback Engine (within-episode memory)
-- [x] Contradiction Catcher
-- [x] Sponsor Guardian with ad break suppression
-- [x] Jason-ism Detector
-- [x] Pre-show guest dossier
-- [x] Audience Pulse tracking
-- [x] 30+ pattern flat reaction filter
-- [x] Production config panel with feedback controls
-- [x] Timestamped reaction log for editors
-- [x] Server-side truncation (220 char ceiling)
-
-Next:
-
-- [ ] Producer approval queue (approve/reject before air, 2-3s buffer)
-- [ ] Cross-episode archive memory
-- [ ] Audience participation — viewers submit reactions via chat
-- [ ] Sponsor integration with custom URLs per show
-- [ ] Multi-podcast support — package as "Green Room" for any creator
-
----
-
-## Built with
-
-- [OpenOats](https://github.com/yazinsai/openoats) — real-time speech transcription
-- [Claude Haiku](https://anthropic.com) — fast, high-quality AI reactions (primary)
-- [Groq](https://groq.com) — llama-3.3-70b fallback
-- [Ollama](https://ollama.com) — local LLM fallback, zero cloud costs
-- Node.js + TypeScript — server pipeline
-- WebSocket — real-time reaction broadcast
-- Vanilla HTML/CSS/JS — OBS browser source overlay
+- **Zoom mode** — BlackHole audio capture for private calls
+- **Per-guest social context** — pull guest's recent X posts and prior interviews into memory
+- **Host contradiction card** — surface when the host contradicts their own prior statements
+- **Laughter detection** — audio-aware feature for the broadcast experience
 
 ---
 
@@ -292,4 +172,4 @@ MIT — do whatever you want with it.
 
 Built by [@SkunkWorks0x](https://x.com/SkunkWorks0x)
 
-*Built for the show. Released for everyone.*
+*Built for the show. Ready for air.*

@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TWiST Sentinel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@500&family=Inter:wght@400;500;600&display=swap" />
+<style>
+  :root {
+    --bg: #1a1a1e;
+    --bg-elevated: #232328;
+    --surface: rgba(255, 255, 255, 0.04);
+    --surface-hover: rgba(255, 255, 255, 0.07);
+    --text: #e8e8e8;
+    --text-dim: #94a3b8;
+    --text-faint: #6b7280;
+    --orange: #ff4d00;
+    --orange-wash: rgba(255, 77, 0, 0.08);
+    --orange-bright: rgba(255, 77, 0, 0.22);
+    --border: rgba(255, 255, 255, 0.06);
+    --true: #10b981;
+    --false: #ef4444;
+    --misleading: #f59e0b;
+    --partial: #3b82f6;
+    --unverifiable: #6b7280;
+    --serif: "Source Serif 4", Georgia, serif;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* ─── Header ─────────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elevated);
+  }
+  .brand {
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .brand .accent { color: var(--orange); font-style: italic; }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .status .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .status.connected .dot { background: var(--true); box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+  .status.disconnected .dot { background: var(--false); }
+
+  /* ─── Layout grid ─────────────────────────────────────────── */
+  main {
+    display: grid;
+    grid-template-columns: 65fr 35fr;
+    overflow: hidden;
+    min-height: 0;
+  }
+  #transcript-pane,
+  #sidebar-pane {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 20px;
+    min-height: 0;
+  }
+  #transcript-pane { border-right: 1px solid var(--border); }
+
+  #transcript-pane::-webkit-scrollbar,
+  #sidebar-pane::-webkit-scrollbar { width: 8px; }
+  #transcript-pane::-webkit-scrollbar-thumb,
+  #sidebar-pane::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+  }
+
+  /* ─── Transcript ─────────────────────────────────────────── */
+  .empty-state {
+    color: var(--text-faint);
+    font-style: italic;
+    text-align: center;
+    padding: 80px 20px;
+    font-size: 12px;
+  }
+
+  .seg {
+    display: flex;
+    gap: 10px;
+    padding: 6px 8px;
+    margin-bottom: 2px;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    transition: background 100ms;
+  }
+  .seg:hover { background: rgba(255, 255, 255, 0.02); }
+  .seg .speaker {
+    flex-shrink: 0;
+    width: 76px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding-top: 3px;
+  }
+  .seg .text { flex: 1; color: var(--text); }
+  .seg .ts {
+    flex-shrink: 0;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-faint);
+    padding-top: 3px;
+    opacity: 0.5;
+  }
+  .seg.has-claim {
+    background: var(--orange-wash);
+    border-left-color: var(--orange);
+    cursor: pointer;
+  }
+  .seg.has-claim:hover { background: rgba(255, 77, 0, 0.13); }
+
+  /* Role-based speaker name colors. With these in place, the has-claim
+     orange wash + left border still flag claim segments — the speaker
+     name keeps its role color so the speaker identity stays visually
+     consistent across claim and non-claim segments. */
+  .seg .speaker.role-host     { color: #FF5C00; }
+  .seg .speaker.role-cohost   { color: #C084FC; }
+  .seg .speaker.role-guest    { color: #818CF8; }
+  .seg .speaker.role-unmapped { color: var(--text-faint); }
+
+  /* Same role colors applied to the speaker-pill prefix on claim cards. */
+  .speaker-pill.role-host     { color: #FF5C00; }
+  .speaker-pill.role-cohost   { color: #C084FC; }
+  .speaker-pill.role-guest    { color: #818CF8; }
+  .speaker-pill.role-unmapped { color: var(--text-faint); }
+
+  @keyframes pulse-bg {
+    0%, 100% { background-color: var(--orange-wash); }
+    50%      { background-color: var(--orange-bright); }
+  }
+  .pulse { animation: pulse-bg 120ms ease-in-out; }
+  .seg.pulse { background: var(--orange-bright); }
+
+  /* ─── Sidebar / cards ─────────────────────────────────────── */
+  .earlier-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 4px 0 8px;
+    padding-left: 4px;
+  }
+  .earlier-divider {
+    border: none;
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: background 100ms, border-color 100ms;
+  }
+  .card:hover { background: var(--surface-hover); border-color: rgba(255, 255, 255, 0.1); }
+  .card.pulse {
+    animation: card-pulse 120ms ease-in-out;
+  }
+  @keyframes card-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 0, 0); }
+    50%      { box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.4); }
+  }
+
+  /* Follow-up — top of card, the highest-value element */
+  .followup {
+    font-family: var(--serif);
+    font-size: 14px;
+    font-style: italic;
+    line-height: 1.4;
+    color: var(--text);
+    border-left: 2px solid var(--orange);
+    background: var(--orange-wash);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    border-radius: 0 6px 6px 0;
+  }
+  .followup .arrow {
+    font-style: normal;
+    color: var(--orange);
+    font-weight: 600;
+    margin-right: 6px;
+  }
+
+  /* Verdict + explanation */
+  .verdict-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    color: #fff;
+  }
+  .pill.true        { background: var(--true); }
+  .pill.false       { background: var(--false); }
+  .pill.misleading  { background: var(--misleading); color: #1a1a1e; }
+  .pill.partial     { background: var(--partial); }
+  .pill.unverifiable{ background: var(--unverifiable); }
+
+  .speaker-pill {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+
+  .explanation {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .citation-ref {
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .claim-text-quote {
+    font-family: var(--serif);
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  /* Citations: collapsed by default */
+  .citations-toggle {
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+  }
+  .citations-toggle:hover { color: var(--orange); }
+  .citations-toggle .caret { display: inline-block; transition: transform 120ms; }
+  .citations-toggle.open .caret { transform: rotate(90deg); }
+
+  .citations-list {
+    display: none;
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 6px;
+  }
+  .citations-list.open { display: block; }
+  .citation {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 11px;
+  }
+  .citation:last-child { border-bottom: none; }
+  .citation .num {
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .citation .title { flex: 1; color: var(--text); cursor: pointer; }
+  .citation .title:hover { color: var(--orange); }
+  .citation.archive .title { cursor: default; }
+  .citation.archive .title:hover { color: var(--text); }
+  .citation .archive-label {
+    color: #8B8F9A;
+    font-style: italic;
+    font-size: 11px;
+    margin-left: 4px;
+  }
+  .citation .tier {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .citation.copied .title::after {
+    content: "  copied!";
+    color: var(--true);
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+
+  /* COUNTERPOINT — merged Pattern, full text */
+  .counterpoint {
+    margin-top: 12px;
+    padding: 8px 10px;
+    border-left: 2px solid var(--orange);
+    background: rgba(255, 77, 0, 0.04);
+    border-radius: 0 4px 4px 0;
+  }
+  .counterpoint .label {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--orange);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-right: 6px;
+  }
+  .counterpoint .text {
+    font-size: 12px;
+    color: var(--text);
+    font-family: var(--serif);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+
+  /* Host contradiction */
+  .contradiction {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-left: 2px solid var(--partial);
+    background: rgba(59, 130, 246, 0.06);
+    border-radius: 0 6px 6px 0;
+  }
+  .contradiction .label {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--partial);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+  .contradiction .episode { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .contradiction .paraphrase { font-style: italic; font-size: 12px; margin-bottom: 6px; line-height: 1.4; }
+  .contradiction .followup-ctx { font-size: 11px; color: var(--text-dim); }
+
+  /* Collapsed (older) card form */
+  .card.collapsed {
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card.collapsed .pill { flex-shrink: 0; }
+  .card.collapsed .truncated-claim {
+    font-size: 12px;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .card.collapsed:not(.expanded) .followup,
+  .card.collapsed:not(.expanded) .verdict-row,
+  .card.collapsed:not(.expanded) .claim-text-quote,
+  .card.collapsed:not(.expanded) .explanation,
+  .card.collapsed:not(.expanded) .citations-toggle,
+  .card.collapsed:not(.expanded) .citations-list,
+  .card.collapsed:not(.expanded) .counterpoint,
+  .card.collapsed:not(.expanded) .contradiction { display: none; }
+  .card.collapsed.expanded {
+    display: block;
+    padding: 14px;
+  }
+  .card.collapsed.expanded > .pill,
+  .card.collapsed.expanded > .truncated-claim { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">TWiST <span class="accent">Sentinel</span></div>
+  <div id="status" class="status disconnected">
+    <span class="dot"></span><span class="label">connecting…</span>
+  </div>
+</header>
+
+<main>
+  <section id="transcript-pane">
+    <div id="transcript">
+      <div class="empty-state">Waiting for transcript…</div>
+    </div>
+  </section>
+  <aside id="sidebar-pane">
+    <div id="sidebar">
+      <div class="empty-state">No claims yet.</div>
+    </div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  // ─── State ──────────────────────────────────────────────────
+  const state = {
+    segments: [],          // append-only ring of TranscriptSegment
+    cards: [],             // newest-first cards (max 10)
+    segmentsWithClaims: new Set(), // segmentId → true
+    // Session metadata cached from /api/session/status — drives the
+    // speaker name/role rendering on each transcript segment.
+    session: {
+      speakerMap: {},          // { [speakerId]: 'host' | 'guest' }
+      sessionContext: {},      // { hostName, guestName, … }
+    },
+  };
+
+  const MAX_SEGMENTS = 250;
+  const MAX_CARDS = 10;
+  const FULL_CARDS = 2;
+
+  const transcriptEl = document.getElementById('transcript');
+  const sidebarEl = document.getElementById('sidebar');
+  const statusEl = document.getElementById('status');
+  const statusLabelEl = statusEl.querySelector('.label');
+
+  // ─── Utilities ──────────────────────────────────────────────
+  const escape = (s) =>
+    String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+
+  function formatExplanationWithRefs(text) {
+    // Replace [N] with styled citation ref spans.
+    return escape(text).replace(/\[(\d+)\]/g, '<span class="citation-ref">[$1]</span>');
+  }
+
+  function truncate(text, n) {
+    if (!text) return '';
+    if (text.length <= n) return text;
+    return text.slice(0, n).trim() + '…';
+  }
+
+  // Resolve a Deepgram speaker id to a display name + role class. Lookup
+  // priority:
+  //   1. sessionContext.speakerNames[id] — per-id override (handles roundtable
+  //      formats where multiple speaker IDs share the 'guest' role)
+  //   2. role-based fallback from sessionContext.{hostName,cohostName,guestName}
+  //   3. literal "Speaker N" for unmapped (gray)
+  // Speaker keys round-trip through JSON as strings, so look up by both forms.
+  // CSS upper-cases the rendered text — we leave capitalization alone here.
+  function resolveSpeaker(speakerId) {
+    const map = state.session.speakerMap || {};
+    const ctx = state.session.sessionContext || {};
+    const role = map[speakerId] ?? map[String(speakerId)];
+    const namesMap = ctx.speakerNames || {};
+    const perId = namesMap[speakerId] ?? namesMap[String(speakerId)];
+    if (role === 'host') {
+      return { role, name: perId || ctx.hostName || 'Host', roleClass: 'role-host' };
+    }
+    if (role === 'cohost') {
+      return { role, name: perId || ctx.cohostName || 'Cohost', roleClass: 'role-cohost' };
+    }
+    if (role === 'guest') {
+      return { role, name: perId || ctx.guestName || 'Guest', roleClass: 'role-guest' };
+    }
+    return { role: null, name: `Speaker ${speakerId}`, roleClass: 'role-unmapped' };
+  }
+
+  // Resolve a card's speaker for the claim-quote pill. Format:
+  //   "ROLE (Name)" when card.speakerNumber resolves to a known role
+  //   "GUEST" generic for unmapped ids (per spec Phase 3 — fall back to
+  //          generic GUEST attribution rather than reuse a specific guestName)
+  function resolveCardSpeaker(card) {
+    const id = typeof card.speakerNumber === 'number' ? card.speakerNumber : -1;
+    const r = resolveSpeaker(id);
+    if (r.role === null) {
+      return { label: 'GUEST', roleClass: 'role-guest' };
+    }
+    const tag = r.role === 'host' ? 'HOST' : r.role === 'cohost' ? 'COHOST' : 'GUEST';
+    return { label: `${tag} (${r.name})`, roleClass: r.roleClass };
+  }
+
+  // Re-paint speaker labels on every existing segment. Called when session
+  // metadata changes (e.g., a producer hits /api/session/start mid-show).
+  function applyMetaToTranscript() {
+    const els = transcriptEl.querySelectorAll('.seg[data-speaker]');
+    for (const el of els) {
+      const id = parseInt(el.dataset.speaker, 10);
+      if (!Number.isFinite(id)) continue;
+      const speakerEl = el.querySelector('.speaker');
+      if (!speakerEl) continue;
+      const { name, roleClass } = resolveSpeaker(id);
+      speakerEl.textContent = name;
+      speakerEl.className = `speaker ${roleClass}`;
+    }
+  }
+
+  async function refreshSessionMeta() {
+    try {
+      const r = await fetch('/api/session/status');
+      if (!r.ok) return;
+      const d = await r.json();
+      let changed = false;
+      if (d.speakerMap && JSON.stringify(d.speakerMap) !== JSON.stringify(state.session.speakerMap)) {
+        state.session.speakerMap = d.speakerMap;
+        changed = true;
+      }
+      if (d.sessionContext && JSON.stringify(d.sessionContext) !== JSON.stringify(state.session.sessionContext)) {
+        state.session.sessionContext = d.sessionContext;
+        changed = true;
+      }
+      if (changed) applyMetaToTranscript();
+    } catch { /* tolerate transient fetch failures */ }
+  }
+
+  function fmtTimestamp(seconds) {
+    if (typeof seconds !== 'number') return '';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  function pulse(el) {
+    if (!el) return;
+    el.classList.remove('pulse');
+    void el.offsetWidth;
+    el.classList.add('pulse');
+    setTimeout(() => el.classList.remove('pulse'), 240);
+  }
+
+  // ─── WebSocket ──────────────────────────────────────────────
+  function wsUrl() {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    // Server WS port is one above the HTTP port by convention (3000→3001).
+    const httpPort = parseInt(window.location.port, 10) || 3000;
+    const wsPort = httpPort + 1;
+    return `${proto}://${window.location.hostname}:${wsPort}`;
+  }
+
+  let ws;
+  let reconnectTimer;
+
+  function setStatus(state, label) {
+    statusEl.classList.remove('connected', 'disconnected');
+    statusEl.classList.add(state);
+    statusLabelEl.textContent = label;
+  }
+
+  function connect() {
+    if (ws && ws.readyState !== WebSocket.CLOSED) return;
+    setStatus('disconnected', 'connecting…');
+    try {
+      ws = new WebSocket(wsUrl());
+    } catch (e) {
+      scheduleReconnect();
+      return;
+    }
+    ws.addEventListener('open', () => setStatus('connected', 'live'));
+    ws.addEventListener('close', () => {
+      setStatus('disconnected', 'disconnected');
+      scheduleReconnect();
+    });
+    ws.addEventListener('error', () => {
+      setStatus('disconnected', 'error');
+    });
+    ws.addEventListener('message', (event) => {
+      const wsReceivedMs = Date.now();
+      let msg;
+      try { msg = JSON.parse(event.data); } catch { return; }
+      handleMessage(msg, wsReceivedMs);
+    });
+  }
+
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, 2000);
+  }
+
+  function handleMessage(msg, wsReceivedMs) {
+    switch (msg.type) {
+      case 'transcript_segment':
+        addSegment(msg.data);
+        break;
+      case 'claim_card':
+        addCard(msg, wsReceivedMs);
+        break;
+      case 'status':
+        if (msg.state === 'connected') setStatus('connected', 'live');
+        else if (msg.state === 'ollama_down') setStatus('connected', 'live · ollama down');
+        break;
+      // claim_detected is informational; we wait for the synthesized card.
+    }
+  }
+
+  // ─── Transcript rendering ──────────────────────────────────
+  function addSegment(seg) {
+    state.segments.push(seg);
+    while (state.segments.length > MAX_SEGMENTS) state.segments.shift();
+
+    if (state.segments.length === 1) transcriptEl.innerHTML = '';
+
+    const el = document.createElement('div');
+    el.className = 'seg';
+    el.dataset.segmentId = seg.id;
+    el.dataset.speaker = String(seg.speaker);
+    const { name: speakerName, roleClass: speakerRoleClass } = resolveSpeaker(seg.speaker);
+    el.innerHTML = `
+      <span class="speaker ${speakerRoleClass}">${escape(speakerName)}</span>
+      <span class="text">${escape(seg.text)}</span>
+      <span class="ts">${fmtTimestamp(seg.timestamp)}</span>
+    `;
+    el.addEventListener('click', () => {
+      // Only react if this segment has a claim attached.
+      if (!el.classList.contains('has-claim')) return;
+      const card = sidebarEl.querySelector(`[data-claim-id="${CSS.escape(seg.id)}"]`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pulse(card);
+      }
+    });
+    transcriptEl.appendChild(el);
+
+    // If a claim already arrived for this segment id (rare race), mark it.
+    if (state.segmentsWithClaims.has(seg.id)) {
+      el.classList.add('has-claim');
+    }
+
+    // Trim DOM to match state.segments length.
+    while (transcriptEl.children.length > state.segments.length) {
+      transcriptEl.removeChild(transcriptEl.firstChild);
+    }
+
+    // Auto-scroll to bottom unless the user has scrolled up.
+    const pane = document.getElementById('transcript-pane');
+    const atBottom = pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 80;
+    if (atBottom) pane.scrollTop = pane.scrollHeight;
+  }
+
+  function markSegmentAsClaim(segmentId) {
+    state.segmentsWithClaims.add(segmentId);
+    const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(segmentId)}"]`);
+    if (segEl) segEl.classList.add('has-claim');
+  }
+
+  // ─── Card rendering ─────────────────────────────────────────
+  function addCard(card, wsReceivedMs) {
+    state.cards.unshift(card);
+    while (state.cards.length > MAX_CARDS) state.cards.pop();
+    markSegmentAsClaim(card.claimId);
+    renderSidebar();
+    // Notify server that the card DOM is mounted, for TTFC delta computation.
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(JSON.stringify({
+          type: 'card_rendered',
+          claimId: card.claimId,
+          wsReceivedMs,
+          renderCompleteMs: Date.now(),
+        }));
+      } catch (e) {
+        // Non-fatal — server-side TTFC pairing will just miss this claim.
+      }
+    }
+  }
+
+  function renderSidebar() {
+    if (state.cards.length === 0) {
+      sidebarEl.innerHTML = '<div class="empty-state">No claims yet.</div>';
+      return;
+    }
+    sidebarEl.innerHTML = '';
+
+    const recent = state.cards.slice(0, FULL_CARDS);
+    const earlier = state.cards.slice(FULL_CARDS);
+
+    for (const card of recent) {
+      sidebarEl.appendChild(renderFullCard(card));
+    }
+
+    if (earlier.length > 0) {
+      const divider = document.createElement('hr');
+      divider.className = 'earlier-divider';
+      sidebarEl.appendChild(divider);
+
+      const label = document.createElement('div');
+      label.className = 'earlier-label';
+      label.textContent = `Earlier (${earlier.length})`;
+      sidebarEl.appendChild(label);
+
+      for (const card of earlier) {
+        sidebarEl.appendChild(renderCollapsedCard(card));
+      }
+    }
+  }
+
+  function verdictClass(v) {
+    return (v || 'unverifiable').toLowerCase();
+  }
+
+  function renderFullCard(card) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.claimId = card.claimId;
+    el.addEventListener('click', (e) => {
+      // Don't sync-scroll when clicking interactive children.
+      if (e.target.closest('.citations-toggle, .citation, .counterpoint, .contradiction')) return;
+      const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(card.claimId)}"]`);
+      if (segEl) {
+        segEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pulse(segEl);
+      }
+    });
+
+    const docket = card.docket;
+    const pattern = card.pattern;
+    const contradiction = card.hostContradiction;
+
+    // 1) Follow-up FIRST — the highest-value element
+    if (docket?.follow_up) {
+      const fu = document.createElement('div');
+      fu.className = 'followup';
+      fu.innerHTML = `<span class="arrow">→</span>${escape(docket.follow_up)}`;
+      el.appendChild(fu);
+    }
+
+    // 2) Speaker + claim quote — use the original Deepgram id (card.speakerNumber)
+    // to resolve the actual person's name. Falls back to "Speaker N" for any
+    // unmapped id (per spec, never reuse guestName for unknown speakers).
+    const claimQuote = document.createElement('div');
+    claimQuote.className = 'claim-text-quote';
+    const cardSpk = resolveCardSpeaker(card);
+    claimQuote.innerHTML = `<span class="speaker-pill ${cardSpk.roleClass}">${escape(cardSpk.label)}:</span> "${escape(card.claimText)}"`;
+    el.appendChild(claimQuote);
+
+    // 3) Verdict pill + explanation
+    if (docket) {
+      const vrow = document.createElement('div');
+      vrow.className = 'verdict-row';
+      vrow.innerHTML = `<span class="pill ${verdictClass(docket.verdict)}">${escape(docket.verdict)}</span>`;
+      el.appendChild(vrow);
+
+      const exp = document.createElement('div');
+      exp.className = 'explanation';
+      exp.innerHTML = formatExplanationWithRefs(docket.explanation);
+      el.appendChild(exp);
+
+      // 4) Citations — collapsed by default
+      if (docket.citations && docket.citations.length > 0) {
+        const toggle = document.createElement('div');
+        toggle.className = 'citations-toggle';
+        const n = docket.citations.length;
+        toggle.innerHTML = `<span class="caret">▸</span> ${n} ${n === 1 ? 'source' : 'sources'}`;
+
+        const list = document.createElement('div');
+        list.className = 'citations-list';
+        docket.citations.forEach((c, i) => {
+          const row = document.createElement('div');
+          row.className = 'citation';
+          if (c.url) {
+            row.innerHTML = `
+              <span class="num">[${i + 1}]</span>
+              <span class="title" title="Click to copy URL">${escape(c.title)}</span>
+              <span class="tier">T${c.tier}</span>
+            `;
+            row.querySelector('.title').addEventListener('click', (e) => {
+              e.stopPropagation();
+              copyToClipboard(c.url, row);
+            });
+          } else {
+            row.classList.add('archive');
+            row.innerHTML = `
+              <span class="num">[${i + 1}]</span>
+              <span class="title">${escape(c.title)}</span>
+              <span class="archive-label">— show archive</span>
+              <span class="tier">T${c.tier}</span>
+            `;
+          }
+          list.appendChild(row);
+        });
+
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggle.classList.toggle('open');
+          list.classList.toggle('open');
+        });
+
+        el.appendChild(toggle);
+        el.appendChild(list);
+      }
+    } else {
+      // Docket suppressed — show a small note
+      const note = document.createElement('div');
+      note.className = 'explanation';
+      note.style.color = 'var(--text-faint)';
+      note.style.fontStyle = 'italic';
+      note.textContent = 'No fact-check available (no sources retrieved).';
+      el.appendChild(note);
+    }
+
+    // 5) Host contradiction (currently disabled server-side; render if it ever fires)
+    if (contradiction) {
+      const cd = document.createElement('div');
+      cd.className = 'contradiction';
+      cd.innerHTML = `
+        <div class="label">Host context — Ep ${escape(String(contradiction.episodeNumber))}</div>
+        <div class="episode">${escape(contradiction.episodeDate)}</div>
+        <div class="paraphrase">"${escape(contradiction.paraphrase)}"</div>
+        <div class="followup-ctx">→ ${escape(contradiction.followUp)}</div>
+      `;
+      el.appendChild(cd);
+    }
+
+    // 6) Pattern merged in as COUNTERPOINT line — full text, wraps naturally
+    if (pattern && pattern.text) {
+      const cp = document.createElement('div');
+      cp.className = 'counterpoint';
+      cp.innerHTML = `
+        <span class="label">Counterpoint</span>
+        <div class="text">${escape(pattern.text)}</div>
+      `;
+      el.appendChild(cp);
+    }
+
+    return el;
+  }
+
+  function renderCollapsedCard(card) {
+    const el = renderFullCard(card);
+    el.classList.add('collapsed');
+    const verdict = card.docket?.verdict || 'UNVERIFIABLE';
+    const pill = document.createElement('span');
+    pill.className = `pill ${verdictClass(verdict)}`;
+    pill.textContent = verdict;
+    const truncatedClaim = document.createElement('span');
+    truncatedClaim.className = 'truncated-claim';
+    truncatedClaim.textContent = truncate(card.claimText, 60);
+    el.insertBefore(truncatedClaim, el.firstChild);
+    el.insertBefore(pill, el.firstChild);
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.citations-toggle, .citation, .counterpoint, .contradiction')) return;
+      el.classList.toggle('expanded');
+    });
+    return el;
+  }
+
+  // ─── Clipboard ──────────────────────────────────────────────
+  async function copyToClipboard(text, rowEl) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      ta.remove();
+    }
+    rowEl.classList.add('copied');
+    setTimeout(() => rowEl.classList.remove('copied'), 1500);
+  }
+
+  // ─── Boot ───────────────────────────────────────────────────
+  refreshSessionMeta();
+  setInterval(refreshSessionMeta, 10000);
+  connect();
+})();
+</script>
+</body>
+</html>
