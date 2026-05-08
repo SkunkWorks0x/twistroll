@@ -16,6 +16,18 @@ import { recordStage } from './ttfcStages.js';
 const MAX_CONCURRENCY = 2;
 const DEDUP_WINDOW_MS = 10_000;
 const ENTITY_OVERLAP_THRESHOLD = 0.8;
+const ENTITY_COOLDOWN_MS = 90_000;
+
+const lastBroadcastByEntity = new Map<string, number>();
+
+function normalizeEntity(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function recordBroadcast(entity: string): void {
+  if (!entity) return;
+  lastBroadcastByEntity.set(normalizeEntity(entity), Date.now());
+}
 
 interface ProcessedRecord {
   entities: Set<string>;
@@ -82,6 +94,16 @@ export function enqueueClaim(
     console.log('[QUEUE] Dropped: empty primaryEntity');
     console.log(`[classifier-suppress] reason=empty_primary_entity claimText="${claim.claimText.slice(0, 50)}"`);
     return { enqueued: false, reason: 'empty primaryEntity' };
+  }
+
+  const normEntity = normalizeEntity(claim.primaryEntity);
+  const lastBroadcast = lastBroadcastByEntity.get(normEntity);
+  if (lastBroadcast !== undefined) {
+    const elapsed = Date.now() - lastBroadcast;
+    if (elapsed < ENTITY_COOLDOWN_MS) {
+      console.log(`[queue-dedup] entity-cooldown: ${claim.primaryEntity} (last card ${elapsed}ms ago)`);
+      return { enqueued: false, reason: `entity cooldown ${elapsed}ms` };
+    }
   }
 
   const incoming = extractEntities(claim);

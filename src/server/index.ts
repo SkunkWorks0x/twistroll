@@ -11,7 +11,7 @@ import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
 import { classifyWindow, SpeakerMap } from './classifier.js';
-import { enqueueClaim, queueStats, setProcessHandler } from './claimQueue.js';
+import { enqueueClaim, queueStats, recordBroadcast, setProcessHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
 import { synthesize } from './synthesis.js';
 import { recordStage, getStages, dropStages } from './ttfcStages.js';
@@ -284,6 +284,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
     };
     recordStage(claim.segmentId, 'broadcastSendMs', Date.now());
     broadcast(card);
+    recordBroadcast(claim.primaryEntity);
     const stages = getStages(claim.segmentId);
     const utteranceEnd = ttfcUtteranceEndMs.get(claim.segmentId);
     if (
