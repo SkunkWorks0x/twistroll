@@ -10,6 +10,26 @@ export const TABLE_NAME = 'episodes';
 export const EMBED_MODEL = 'embeddinggemma';
 export const OLLAMA_EMBED_URL = 'http://localhost:11434/api/embeddings';
 
+// EXCLUDE_EPISODE_ID — env-gated filter for live runs against in-window
+// episodes. When set to a numeric episode ID, queryMemory excludes that
+// episode's chunks from retrieval results (prevents same-episode self-
+// citation). Default: unset.
+const EXCLUDE_EPISODE_ID: number | null = (() => {
+  const raw = process.env.EXCLUDE_EPISODE_ID?.trim();
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) {
+    console.warn(`[lancedb] EXCLUDE_EPISODE_ID="${raw}" is not a valid integer — ignoring.`);
+    return null;
+  }
+  return n;
+})();
+if (EXCLUDE_EPISODE_ID !== null) {
+  console.log(`[lancedb] Episode exclusion active: ${EXCLUDE_EPISODE_ID}`);
+} else if (process.env.EXCLUDE_EPISODE_ID) {
+  console.log(`[lancedb] Episode exclusion INACTIVE (env var present but invalid).`);
+}
+
 export interface EpisodeChunk {
   id: string;
   vector: number[];
@@ -206,6 +226,10 @@ export async function queryMemory(
   }
   if (filter?.sinceDate) {
     clauses.push(`episodeDate >= '${filter.sinceDate.replace(/'/g, "''")}'`);
+  }
+  // Same-episode exclusion for live-run integrity. Off by default.
+  if (EXCLUDE_EPISODE_ID !== null) {
+    clauses.push(`episodeNumber != ${EXCLUDE_EPISODE_ID}`);
   }
   q = q.where(clauses.join(' AND '));
 
