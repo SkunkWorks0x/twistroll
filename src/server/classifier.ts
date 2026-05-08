@@ -32,6 +32,8 @@ ENTITY EXTRACTION — TRANSCRIPT-GROUNDED ONLY
 - Do NOT import, infer, or bridge entity names from any source outside the transcript segments provided.
 - Do NOT assume speaker identity from speaker IDs. Speaker IDs are arbitrary numbers, not stable identifiers.
 - Treat all speakers with identical rigor. Host claims are extracted with the same rules as guest claims.
+- primaryEntity must be a proper noun — the name of a specific company, person, product, or organization. Do NOT extract descriptive phrases ("polyamorous agreement", "biggest deal"), news source names used as attribution ("Bloomberg reports", "according to Reuters"), or generic category labels.
+- If the claim is ABOUT company X but REPORTED BY source Y, extract X as primaryEntity, not Y. Example: "Bloomberg reports Microsoft transferred capital" → primaryEntity is "Microsoft", not "Bloomberg".
 
 A verifiable factual claim contains one or more of:
 - A specific number, percentage, or statistic
