@@ -105,7 +105,6 @@ export interface DocketPayload {
   verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIAL' | 'UNVERIFIABLE';
   explanation: string;
   citations: DocketCitationPayload[];
-  follow_up: string;
 }
 export interface HostContradictionPayload {
   episodeNumber: number;

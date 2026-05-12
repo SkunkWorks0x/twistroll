@@ -200,26 +200,6 @@
     50%      { box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.4); }
   }
 
-  /* Follow-up — top of card, the highest-value element */
-  .followup {
-    font-family: var(--serif);
-    font-size: 14px;
-    font-style: italic;
-    line-height: 1.4;
-    color: var(--text);
-    border-left: 2px solid var(--orange);
-    background: var(--orange-wash);
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border-radius: 0 6px 6px 0;
-  }
-  .followup .arrow {
-    font-style: normal;
-    color: var(--orange);
-    font-weight: 600;
-    margin-right: 6px;
-  }
-
   /* Verdict + explanation */
   .verdict-row {
     display: flex;
@@ -356,7 +336,6 @@
   }
   .contradiction .episode { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
   .contradiction .paraphrase { font-style: italic; font-size: 12px; margin-bottom: 6px; line-height: 1.4; }
-  .contradiction .followup-ctx { font-size: 11px; color: var(--text-dim); }
 
   /* Collapsed (older) card form */
   .card.collapsed {
@@ -374,7 +353,6 @@
     white-space: nowrap;
     flex: 1;
   }
-  .card.collapsed:not(.expanded) .followup,
   .card.collapsed:not(.expanded) .verdict-row,
   .card.collapsed:not(.expanded) .claim-text-quote,
   .card.collapsed:not(.expanded) .explanation,
@@ -724,15 +702,6 @@
     });
 
     const docket = card.docket;
-    const contradiction = card.hostContradiction;
-
-    // 1) Follow-up FIRST — the highest-value element
-    if (docket?.follow_up) {
-      const fu = document.createElement('div');
-      fu.className = 'followup';
-      fu.innerHTML = `<span class="arrow">→</span>${escape(docket.follow_up)}`;
-      el.appendChild(fu);
-    }
 
     // 2) Speaker + claim quote — use the original Deepgram id (card.speakerNumber)
     // to resolve the actual person's name. Falls back to "Speaker N" for any
@@ -806,19 +775,6 @@
       note.style.fontStyle = 'italic';
       note.textContent = 'No fact-check available (no sources retrieved).';
       el.appendChild(note);
-    }
-
-    // 5) Host contradiction (currently disabled server-side; render if it ever fires)
-    if (contradiction) {
-      const cd = document.createElement('div');
-      cd.className = 'contradiction';
-      cd.innerHTML = `
-        <div class="label">Host context — Ep ${escape(String(contradiction.episodeNumber))}</div>
-        <div class="episode">${escape(contradiction.episodeDate)}</div>
-        <div class="paraphrase">"${escape(contradiction.paraphrase)}"</div>
-        <div class="followup-ctx">→ ${escape(contradiction.followUp)}</div>
-      `;
-      el.appendChild(cd);
     }
 
     return el;
