@@ -271,7 +271,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
     const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
     recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
     if (!result.docket?.verdict) {
-      console.log(`[synthesis] suppressed card — no Docket verdict claimId=${claim.segmentId} primaryEntity="${claim.primaryEntity}" hasPattern=${!!result.pattern}`);
+      console.log(`[synthesis] suppressed card — no Docket verdict claimId=${claim.segmentId} primaryEntity="${claim.primaryEntity}"`);
       return;
     }
     const card: CardBroadcast = {
@@ -282,7 +282,6 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
       speakerNumber: claim.speakerNumber,
       timestamp: claim.timestamp,
       docket: result.docket,
-      pattern: result.pattern,
       hostContradiction: result.hostContradiction,
       timing: result.timing,
     };
@@ -307,7 +306,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
       );
     }
     console.log(
-      `[SYNTHESIS] claim=${claim.segmentId.slice(0, 8)} docket=${result.docket?.verdict ?? 'null'} pattern=${result.pattern ? 'fired' : 'null'} contradiction=${result.hostContradiction ? 'fired' : 'null'} total=${result.timing.totalMs}ms`
+      `[SYNTHESIS] claim=${claim.segmentId.slice(0, 8)} docket=${result.docket?.verdict ?? 'null'} contradiction=${result.hostContradiction ? 'fired' : 'null'} total=${result.timing.totalMs}ms`
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -338,31 +338,6 @@
     font-size: 9px;
   }
 
-  /* COUNTERPOINT — merged Pattern, full text */
-  .counterpoint {
-    margin-top: 12px;
-    padding: 8px 10px;
-    border-left: 2px solid var(--orange);
-    background: rgba(255, 77, 0, 0.04);
-    border-radius: 0 4px 4px 0;
-  }
-  .counterpoint .label {
-    display: inline-block;
-    font-family: var(--mono);
-    font-size: 8px;
-    color: var(--orange);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-right: 6px;
-  }
-  .counterpoint .text {
-    font-size: 12px;
-    color: var(--text);
-    font-family: var(--serif);
-    line-height: 1.5;
-    margin-top: 4px;
-  }
-
   /* Host contradiction */
   .contradiction {
     margin-top: 12px;
@@ -405,7 +380,6 @@
   .card.collapsed:not(.expanded) .explanation,
   .card.collapsed:not(.expanded) .citations-toggle,
   .card.collapsed:not(.expanded) .citations-list,
-  .card.collapsed:not(.expanded) .counterpoint,
   .card.collapsed:not(.expanded) .contradiction { display: none; }
   .card.collapsed.expanded {
     display: block;
@@ -741,7 +715,7 @@
     el.dataset.claimId = card.claimId;
     el.addEventListener('click', (e) => {
       // Don't sync-scroll when clicking interactive children.
-      if (e.target.closest('.citations-toggle, .citation, .counterpoint, .contradiction')) return;
+      if (e.target.closest('.citations-toggle, .citation, .contradiction')) return;
       const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(card.claimId)}"]`);
       if (segEl) {
         segEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -750,7 +724,6 @@
     });
 
     const docket = card.docket;
-    const pattern = card.pattern;
     const contradiction = card.hostContradiction;
 
     // 1) Follow-up FIRST — the highest-value element
@@ -848,17 +821,6 @@
       el.appendChild(cd);
     }
 
-    // 6) Pattern merged in as COUNTERPOINT line — full text, wraps naturally
-    if (pattern && pattern.text) {
-      const cp = document.createElement('div');
-      cp.className = 'counterpoint';
-      cp.innerHTML = `
-        <span class="label">Counterpoint</span>
-        <div class="text">${escape(pattern.text)}</div>
-      `;
-      el.appendChild(cp);
-    }
-
     return el;
   }
 
@@ -875,7 +837,7 @@
     el.insertBefore(truncatedClaim, el.firstChild);
     el.insertBefore(pill, el.firstChild);
     el.addEventListener('click', (e) => {
-      if (e.target.closest('.citations-toggle, .citation, .counterpoint, .contradiction')) return;
+      if (e.target.closest('.citations-toggle, .citation, .contradiction')) return;
       el.classList.toggle('expanded');
     });
     return el;

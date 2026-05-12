@@ -107,9 +107,6 @@ export interface DocketPayload {
   citations: DocketCitationPayload[];
   follow_up: string;
 }
-export interface PatternPayload {
-  text: string;
-}
 export interface HostContradictionPayload {
   episodeNumber: number;
   episodeDate: string;
@@ -125,11 +122,9 @@ export interface CardBroadcast {
   speakerNumber: number;       // raw Deepgram id — dashboard resolves per-id name
   timestamp: number;
   docket: DocketPayload | null;
-  pattern: PatternPayload | null;
   hostContradiction: HostContradictionPayload | null;
   timing: {
     docketMs: number;
-    patternMs: number;
     contradictionMs: number;
     totalMs: number;
   };

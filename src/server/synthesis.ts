@@ -1,27 +1,23 @@
 // Sentinel synthesis layer — Stage 2 of the two-stage pipeline.
 //
-// Three Haiku calls per claim:
+// One Haiku call per claim:
 //   - Docket  (tool_use, deterministic, 5-verdict fact-check + citations)
-//   - Pattern (plain text, slight temperature, precedent counterargument)
-//   - Host Contradiction (DISABLED at this layer — see note below)
 //
-// Patterns reused from elsewhere in the codebase: raw fetch for the Anthropic
-// Messages API (matches llm-router.ts; the project does not currently depend on
-// @anthropic-ai/sdk and the claude-api skill prohibits mixing raw fetch + SDK
-// inside one codebase). Prompt caching is applied to the static system prompts
-// + tool defs via cache_control: { type: 'ephemeral' } so repeated claims hit
-// the cache rather than re-billing the few-shot block on every fire.
+// checkHostContradiction is wired in but always returns null today — see the
+// inline comment on that function.
 //
-// Host contradiction note: the spec gates this feature on per-chunk speaker
-// metadata in LanceDB. EpisodeChunk does not carry a speaker field — chunks
-// are mixed-speaker conversation slices. So checkHostContradiction is wired
-// in but logs the disabled message and returns null. The feature can light up
-// when the ingestion pipeline starts emitting per-speaker chunks.
+// Conventions reused from elsewhere in the codebase: raw fetch for the
+// Anthropic Messages API (matches llm-router.ts; the project does not currently
+// depend on @anthropic-ai/sdk and the claude-api skill prohibits mixing raw
+// fetch + SDK inside one codebase). Prompt caching is applied to the static
+// system prompt + tool def via cache_control: { type: 'ephemeral' } so
+// repeated claims hit the cache rather than re-billing the few-shot block on
+// every fire.
 
 import { z } from 'zod';
 import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 import type { RetrievedSource } from './retrieval.js';
-import { formatForDocket, formatForPattern } from './retrieval.js';
+import { formatForDocket } from './retrieval.js';
 
 // Match the Haiku ID already used elsewhere in the codebase (llm-router.ts,
 // classifier.ts). One model string, one place to update.
@@ -49,10 +45,6 @@ export interface DocketOutput {
   follow_up: string;
 }
 
-export interface PatternOutput {
-  text: string;
-}
-
 export interface HostContradictionOutput {
   episodeNumber: number;
   episodeDate: string;
@@ -63,11 +55,9 @@ export interface HostContradictionOutput {
 
 export interface SynthesisResult {
   docket: DocketOutput | null;
-  pattern: PatternOutput | null;
   hostContradiction: HostContradictionOutput | null;
   timing: {
     docketMs: number;
-    patternMs: number;
     contradictionMs: number;
     totalMs: number;
   };
@@ -96,26 +86,6 @@ const DocketSchema = z.object({
 const CANONICAL_UNVERIFIABLE_PHRASE = 'No primary source located in show archive or live retrieval.';
 const LANCEDB_INJECTION_SCORE_FLOOR = 0.45;
 
-// Pattern Recognizer word limits — single source of truth. Used by:
-//   - PATTERN_SYSTEM prompt (target stated to Haiku)
-//   - truncateToWordLimit call site in runPattern (hard max enforced)
-//   - PatternSchema Zod refine (post-truncation safety net)
-// Target band 22-28 keeps outputs glance-readable under studio lighting
-// while preserving room for evidence + pressure point. Hard max 32 gives
-// Haiku 4 words of overshoot tolerance before truncation fires.
-export const PATTERN_WORD_LIMITS = {
-  targetMin: 22,
-  targetMax: 28,
-  hardMax: 32,
-} as const;
-
-export const PatternSchema = z.object({
-  text: z.string().refine(
-    (s) => wordCount(s) <= PATTERN_WORD_LIMITS.hardMax,
-    `Pattern output exceeds ${PATTERN_WORD_LIMITS.hardMax} words`
-  ),
-});
-
 // ─── Anti-pattern scans ────────────────────────────────────────────────
 
 // Anti-pattern words that always trigger regeneration regardless of verdict.
@@ -131,12 +101,7 @@ const DOCKET_ANTI_PATTERNS: string[] = [
 // "the filing suggests…"). Only carved out for verdict === 'PARTIAL'.
 const DOCKET_PARTIAL_ALLOWED: Set<string> = new Set(['appears', 'suggests']);
 
-const PATTERN_ANTI_PATTERNS: string[] = [
-  'lol', 'the founder', 'this is BS', 'overpromising',
-];
-const PATTERN_CORRECTIVE_OPENERS: string[] = ['actually', 'but', 'however'];
-
-function scanAntiPatterns(text: string, list: string[]): string[] {
+function scanBlocklist(text: string, list: string[]): string[] {
   const lower = text.toLowerCase();
   return list.filter((p) => lower.includes(p));
 }
@@ -190,7 +155,7 @@ RULES:
 * "appears" and "suggests" are reserved for PARTIAL explanations only — to describe what a source partially establishes
 * Never use precedent/pattern language: "history shows", "similar to", "we saw with", "this matches"
 * Never editorialize: "worth noting", "red flag", "good question"
-* Never reference "cynic", "Pattern Recognizer", or implication/risk framing
+* Never reference "cynic" or implication/risk framing
 * Explanation must be 28 words or fewer. Count carefully.
 * Follow-up must be 18 words or fewer.
 * Every citation number [1], [2] must correspond to a source in the provided list. Never fabricate.
@@ -386,53 +351,6 @@ OUTPUT:
   "follow_up": "Is the one billion figure monthly active users or total registered accounts?"
 }`;
 
-export const PATTERN_SYSTEM = `You are The Pattern Recognizer — a calm, experienced senior partner providing real-time counterargument during a live podcast interview.
-VOICE: "The precedent here is..." Precedent-driven, evidence-grounded. Low-affect, curious, slightly weary but never nihilistic. You sound like a senior partner leaning over during a board meeting murmuring a concern.
-RULES:
-* The speaker may be the host, co-host, or guest. Use the SPEAKER line in the user message to attribute correctly — don't assume every claim is a guest's.
-* One counterpoint only. No lists, no "also...", no multiple sentences with period + capital.
-* 22-28 words target, 32 hard max. Count carefully.
-* End with a pressure point the interviewer can turn into a follow-up question.
-* Use retrieval context to ground your counterargument. If no retrieval, reason from general knowledge and flag uncertainty.
-* Never start with "Actually," "But," "However," or any corrective adverb.
-* Never correct facts or numbers — that's the fact-checker's job.
-* Never attack the founder/guest personally.
-* Never use sarcasm, irony, emojis, exclamation points.
-* Never use: "lol", "the founder", "this is BS", "overpromising", "just something to consider"
-* Never reference "Docket", "fact-checker", or verification framing.
-* Rotate openers naturally. Available openers: "The precedent here..." "Market history at this scale shows..." "Unit economics at this velocity typically..." "The pattern we've seen across [category] is..." "Smart capital would flag that..."
-OUTPUT: Plain text. One paragraph. No JSON, no labels, no bullet points.
-
-FEW-SHOT EXAMPLES:
-
-Example 1
-CLAIM: "We're growing 180% year over year and expect to triple revenue again next year with the new AI features."
-OUTPUT: The precedent here is vertical SaaS sustaining triple-digit growth past $20M ARR without margin expansion. That path forces valuation compression or a much larger next round.
-
-Example 2
-CLAIM: "Our proprietary data moat from five years of customer signals is impossible for anyone to copy."
-OUTPUT: Market history at this scale shows SaaS data moats erode within 18-24 months once reverse-engineered. The pressure point is whether defensibility cost stays below value created.
-
-Example 3
-CLAIM: "We're burning $3M a month but the LTV to CAC ratio is 5x so we're fine."
-OUTPUT: Unit economics at this velocity break when burn exceeds 40% of forward revenue. The question is whether 5x LTV/CAC holds when cycles lengthen past 90 days.
-
-Example 4
-CLAIM: "Every law firm will have our AI assistant inside their workflow within three years."
-OUTPUT: The pattern across vertical AI tools is that 80%+ penetration claims at Series B rarely survive procurement cycles. The pressure point is whether timeline assumes zero friction.
-
-Example 5
-CLAIM: "We're the only company combining real-time transcription with automated follow-up intelligence for this exact workflow."
-OUTPUT: Smart capital would flag that "only company" claims in workflow automation rarely survive a funded competitor. The pressure point is how long the differentiation window stays open.
-
-Example 6
-CLAIM: "Our expansion revenue from existing customers will more than offset any new logo slowdown this year."
-OUTPUT: The precedent here is SaaS companies relying on 120%+ net retention to mask logo weakness face a cliff at base saturation. What if retention drops 10 points?
-
-Example 7
-CLAIM: "We can maintain 40%+ gross margins while scaling to $100M ARR because our AI stack is so efficient."
-OUTPUT: Market history at this scale shows vertical SaaS promising 40%+ margins at $100M ARR see compression as support and model costs scale.`;
-
 // ─── Anthropic call helper (raw fetch — matches llm-router.ts pattern) ─
 
 interface HaikuCallOptions {
@@ -452,9 +370,9 @@ async function callHaiku(opts: HaikuCallOptions): Promise<any> {
     model: HAIKU_MODEL,
     max_tokens: opts.maxTokens,
     temperature: opts.temperature ?? 0,
-    // Cache the static system prompt block — the Docket and Pattern prompts
-    // are identical across every claim, so cache_control yields ~10x cost
-    // reduction on input tokens for hot sessions.
+    // Cache the static system prompt block — the Docket prompt is identical
+    // across every claim, so cache_control yields ~10x cost reduction on
+    // input tokens for hot sessions.
     system: [{ type: 'text', text: opts.systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: opts.userMessage }],
   };
@@ -484,7 +402,7 @@ async function callHaiku(opts: HaikuCallOptions): Promise<any> {
   }
 }
 
-// ─── 3. The Docket ─────────────────────────────────────────────────────
+// ─── The Docket ────────────────────────────────────────────────────────
 
 function extractToolUseInput(response: any): any | null {
   const blocks = response?.content;
@@ -699,8 +617,8 @@ export async function runDocket(
       ? DOCKET_ANTI_PATTERNS.filter((p) => !DOCKET_PARTIAL_ALLOWED.has(p))
       : DOCKET_ANTI_PATTERNS;
     const hits = [
-      ...scanAntiPatterns(candidate.explanation, activeList),
-      ...scanAntiPatterns(candidate.follow_up, activeList),
+      ...scanBlocklist(candidate.explanation, activeList),
+      ...scanBlocklist(candidate.follow_up, activeList),
     ];
     if (hits.length > 0) {
       console.log(`[DOCKET] Anti-pattern detected: ${hits.join(', ')} verdict=${candidate.verdict} (attempt ${attempt})`);
@@ -778,107 +696,7 @@ export async function runDocket(
   return { output: parsed, ms: Date.now() - start };
 }
 
-// ─── 4. The Pattern Recognizer ─────────────────────────────────────────
-
-function extractText(response: any): string {
-  const blocks = response?.content;
-  if (!Array.isArray(blocks)) return '';
-  let out = '';
-  for (const b of blocks) {
-    if (b?.type === 'text' && typeof b.text === 'string') out += b.text;
-  }
-  return out.trim();
-}
-
-export function truncateToWordLimit(text: string, maxWords: number): { text: string; truncated: boolean; from: number; to: number } {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return { text, truncated: false, from: words.length, to: words.length };
-  // Try to end on a sentence boundary that fits.
-  const sentences = text.split(/(?<=[.!?])\s+/);
-  let acc = '';
-  let accWords = 0;
-  for (const s of sentences) {
-    const sw = s.split(/\s+/).filter(Boolean).length;
-    if (accWords + sw > maxWords) break;
-    acc += (acc ? ' ' : '') + s;
-    accWords += sw;
-  }
-  if (acc.trim().length === 0) {
-    // No complete sentence fits — hard cut at word boundary.
-    acc = words.slice(0, maxWords).join(' ');
-    accWords = maxWords;
-  }
-  return { text: acc.trim(), truncated: true, from: words.length, to: accWords };
-}
-
-export async function runPattern(
-  claim: ClaimClassification,
-  formattedContext: string,
-  hasSources: boolean
-): Promise<{ output: PatternOutput | null; ms: number }> {
-  const start = Date.now();
-
-  const userMessage = hasSources
-    ? formattedContext
-    : `${formattedContext}\n\nNo retrieval sources were available — reason from general knowledge only and clearly flag uncertainty.`;
-
-  let parsed: PatternOutput | null = null;
-  for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
-    let raw: any;
-    try {
-      raw = await callHaiku({
-        systemPrompt: PATTERN_SYSTEM,
-        userMessage,
-        maxTokens: 200,
-        temperature: 0.3,
-      });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[PATTERN] Haiku call failed (attempt ${attempt}): ${msg}`);
-      continue;
-    }
-
-    const text = extractText(raw);
-    if (!text) {
-      console.warn(`[PATTERN] empty response (attempt ${attempt})`);
-      continue;
-    }
-
-    // Word-count cap with sentence-aware truncation (don't suppress, just trim).
-    const t = truncateToWordLimit(text, PATTERN_WORD_LIMITS.hardMax);
-    if (t.truncated) console.log(`[PATTERN] Truncated from ${t.from} to ${t.to} words.`);
-
-    // Anti-pattern scan: corrective opener (retry) and content blocklist (retry).
-    const firstWord = t.text.split(/\s+/)[0]?.toLowerCase().replace(/[^a-z]/g, '') ?? '';
-    const correctiveOpener = PATTERN_CORRECTIVE_OPENERS.includes(firstWord);
-    const contentHits = scanAntiPatterns(t.text, PATTERN_ANTI_PATTERNS);
-    if (correctiveOpener) {
-      console.log(`[PATTERN] Corrective opener "${firstWord}" — retrying (attempt ${attempt})`);
-      continue;
-    }
-    if (contentHits.length > 0) {
-      console.log(`[PATTERN] Anti-pattern detected: ${contentHits.join(', ')} (attempt ${attempt})`);
-      continue;
-    }
-
-    // Multi-sentence warning (don't suppress).
-    const sentenceCount = (t.text.match(/(?<=[.!?])\s+[A-Z]/g) || []).length + 1;
-    if (sentenceCount > 2) {
-      console.warn(`[PATTERN] ${sentenceCount} sentences detected (target ≤2)`);
-    }
-
-    const zParse = PatternSchema.safeParse({ text: t.text });
-    if (!zParse.success) {
-      console.warn(`[PATTERN] Zod validation failed (attempt ${attempt})`);
-      continue;
-    }
-    parsed = { text: zParse.data.text };
-  }
-
-  return { output: parsed, ms: Date.now() - start };
-}
-
-// ─── 5. Host Contradiction (DISABLED at this layer) ────────────────────
+// ─── Host Contradiction (DISABLED at this layer) ──────────────────────
 
 let contradictionDisabledLogged = false;
 
@@ -906,34 +724,15 @@ export async function synthesize(
   const tStart = Date.now();
   console.log(`[classifier-pass] claimId=${claim.segmentId} claimType=${claim.claimType} primaryEntity="${claim.primaryEntity}"`);
   const docketContext = formatForDocket(sources, claim, recentSegments);
-  const patternContext = formatForPattern(sources, claim, recentSegments);
 
-  // Host contradiction runs first — a fired contradiction suppresses Pattern.
-  // Currently always returns null (feature disabled), so Pattern always runs.
-  const contradictionPromise = checkHostContradiction(claim, recentSegments);
-  const { output: contradictionOutput, ms: contradictionMs } = await contradictionPromise;
-
-  const suppressPattern = contradictionOutput !== null;
-
-  const docketP = runDocket(claim, sources, docketContext);
-  const patternP = suppressPattern
-    ? Promise.resolve({ output: null as PatternOutput | null, ms: 0 })
-    : runPattern(claim, patternContext, sources.length > 0);
-
-  const [docketRes, patternRes] = await Promise.all([docketP, patternP]);
-
-  const patternFired = patternRes.output !== null;
-  const patternFireReason: 'emit' | 'null' | 'suppressed_by_contradiction' =
-    patternFired ? 'emit' : suppressPattern ? 'suppressed_by_contradiction' : 'null';
-  console.log(`[pattern-fire] claimId=${claim.segmentId} fired=${patternFired} reason=${patternFireReason}`);
+  const { output: contradictionOutput, ms: contradictionMs } = await checkHostContradiction(claim, recentSegments);
+  const { output: docketOutput, ms: docketMs } = await runDocket(claim, sources, docketContext);
 
   return {
-    docket: docketRes.output,
-    pattern: patternRes.output,
+    docket: docketOutput,
     hostContradiction: contradictionOutput,
     timing: {
-      docketMs: docketRes.ms,
-      patternMs: patternRes.ms,
+      docketMs,
       contradictionMs,
       totalMs: Date.now() - tStart,
     },
