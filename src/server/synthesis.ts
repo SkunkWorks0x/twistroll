@@ -39,6 +39,7 @@ export interface DocketCitation {
 }
 
 export interface DocketOutput {
+  grounding: string;
   verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIAL' | 'UNVERIFIABLE';
   explanation: string;
   citations: DocketCitation[];
@@ -67,6 +68,7 @@ export interface SynthesisResult {
 const wordCount = (s: string): number => s.split(/\s+/).filter(Boolean).length;
 
 const DocketSchema = z.object({
+  grounding: z.string().refine((s) => wordCount(s) <= 40, 'Grounding exceeds 40 words'),
   verdict: z.enum(['TRUE', 'FALSE', 'MISLEADING', 'PARTIAL', 'UNVERIFIABLE']),
   explanation: z.string().refine((s) => wordCount(s) <= 28, 'Explanation exceeds 28 words'),
   citations: z.array(
@@ -112,6 +114,10 @@ const FACT_CHECK_TOOL = {
   input_schema: {
     type: 'object',
     properties: {
+      grounding: {
+        type: 'string',
+        description: "One sentence stating what the retrieved evidence directly says about the claim's specific assertion. Must reference at least one source. If evidence does not address the assertion, say so explicitly.",
+      },
       verdict: {
         type: 'string',
         enum: ['TRUE', 'FALSE', 'MISLEADING', 'PARTIAL', 'UNVERIFIABLE'],
@@ -134,7 +140,7 @@ const FACT_CHECK_TOOL = {
         },
       },
     },
-    required: ['verdict', 'explanation', 'citations'],
+    required: ['grounding', 'verdict', 'explanation', 'citations'],
   },
 };
 
@@ -150,8 +156,13 @@ RULES:
 * Never use precedent/pattern language: "history shows", "similar to", "we saw with", "this matches"
 * Never editorialize: "worth noting", "red flag", "good question"
 * Never reference "cynic" or implication/risk framing
+* Grounding must be 40 words or fewer. Count carefully.
 * Explanation must be 28 words or fewer. Count carefully.
 * Every citation number [1], [2] must correspond to a source in the provided list. Never fabricate.
+
+GROUNDING:
+
+Before assigning a verdict, populate the grounding field: state in one sentence what the retrieved evidence directly says about the specific assertion in the claim. Do not restate the claim. Do not summarize the topic. If the evidence does not directly address the assertion, say so explicitly and assign UNVERIFIABLE. The grounding must reference at least one citation by number.
 
 VERDICT RULES:
 
@@ -188,6 +199,7 @@ Example 1 — TRUE (guest claim)
 CLAIM: "We're at $12M ARR with 85% net revenue retention and the enterprise segment is driving most of the expansion."
 OUTPUT:
 {
+  "grounding": "Q1 2026 investor deck [1] reports $12M ARR and 85% net revenue retention for the latest quarter.",
   "verdict": "TRUE",
   "explanation": "ARR of $12M with 85% net revenue retention for the latest quarter is stated in the Q1 2026 investor deck [1].",
   "citations": [{"title": "Q1 2026 Investor Deck", "url": "https://investors.example.com/deck-q1-2026", "tier": 1}]
@@ -197,6 +209,7 @@ Example 2 — TRUE (Jason self-reference)
 CLAIM: "As I said on the last episode, this founder's prior company was acquired by Microsoft for $800M."
 OUTPUT:
 {
+  "grounding": "March 2025 SEC 8-K filing [1] confirms Microsoft's $800M acquisition of the founder's prior company.",
   "verdict": "TRUE",
   "explanation": "The $800M acquisition of the founder's prior company by Microsoft is confirmed in the March 2025 SEC filing [1].",
   "citations": [{"title": "Microsoft 8-K Filing – March 2025", "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312525012345/d12345d8k.htm", "tier": 1}]
@@ -206,6 +219,7 @@ Example 3 — FALSE (overstating metric)
 CLAIM: "Our annual churn is under 3%, which is best in class for this stage."
 OUTPUT:
 {
+  "grounding": "Form 10-K Fiscal Year 2025 [1] reports annual churn at 9%, contradicting the stated under-3% figure.",
   "verdict": "FALSE",
   "explanation": "Public customer disclosures show annual churn at 9% for the most recent fiscal year, not under 3% [1].",
   "citations": [{"title": "Form 10-K – Fiscal Year 2025", "url": "https://www.sec.gov/Archives/edgar/data/1234567/0001234567250000123/annualreport.htm", "tier": 1}]
@@ -215,6 +229,7 @@ Example 4 — FALSE (misnaming person/company)
 CLAIM: "Our lead investor is Marc Andreessen and the board chair is from Sequoia."
 OUTPUT:
 {
+  "grounding": "Cap table summary [1] lists Benchmark as lead investor; Marc Andreessen is not present on the cap table.",
   "verdict": "FALSE",
   "explanation": "Marc Andreessen is not an investor or board member; the lead is Benchmark per the cap table [1].",
   "citations": [{"title": "Cap Table Summary – Series B", "url": "https://www.crunchbase.com/organization/example-company", "tier": 2}]
@@ -224,6 +239,7 @@ Example 5 — MISLEADING (cherry-picked)
 CLAIM: "We grew revenue 250% year over year while keeping headcount flat."
 OUTPUT:
 {
+  "grounding": "Q4 2025 earnings call [1] and acquisition 8-K [2] confirm the 250% growth excludes a recent acquisition that also added headcount.",
   "verdict": "MISLEADING",
   "explanation": "The 250% revenue growth excludes contribution from the recent acquisition which also added headcount [1][2].",
   "citations": [{"title": "Q4 2025 Earnings Call Transcript", "url": "https://investors.example.com/transcripts/q4-2025", "tier": 1}, {"title": "Acquisition 8-K Filing", "url": "https://www.sec.gov/Archives/edgar/data/1234567/0001234567250000456/8k.htm", "tier": 1}]
@@ -233,6 +249,7 @@ Example 6 — MISLEADING (context-dependent)
 CLAIM: "Our CAC payback period is 4 months, which is exceptional for enterprise software."
 OUTPUT:
 {
+  "grounding": "Internal metrics review [1] shows fully-loaded CAC payback at 11 months when sales team costs are included, not 4 months.",
   "verdict": "MISLEADING",
   "explanation": "The 4-month payback uses only paid acquisition spend; fully loaded CAC including sales team costs extends it to 11 months [1].",
   "citations": [{"title": "Internal Metrics Review – Q4 2025", "url": "https://example.com/metrics-q4", "tier": 2}]
@@ -242,6 +259,7 @@ Example 7 — PARTIAL (compound claim)
 CLAIM: "The product is SOC 2 compliant and we have 40 enterprise customers including two Fortune 500 companies."
 OUTPUT:
 {
+  "grounding": "SOC 2 attestation [1] confirms compliance; public customer disclosures [2] show 40 enterprise customers but none on the Fortune 500.",
   "verdict": "PARTIAL",
   "explanation": "SOC 2 compliance is confirmed [1]; customer count is accurate but neither is a Fortune 500 company per public records [2].",
   "citations": [{"title": "SOC 2 Attestation Report", "url": "https://example.com/compliance", "tier": 2}, {"title": "Public Customer Disclosures", "url": "https://example.com/customers", "tier": 2}]
@@ -251,6 +269,7 @@ Example 8 — PARTIAL (attribution error)
 CLAIM: "Jason mentioned last week that this is the fastest growing vertical SaaS company in the portfolio."
 OUTPUT:
 {
+  "grounding": "TWiST Episode 2270 show notes [1] confirm portfolio membership; April 2026 portfolio update [2] names a different company as fastest-growing.",
   "verdict": "PARTIAL",
   "explanation": "The guest company is in the TWiST portfolio [1]; the fastest-growing designation belongs to a different company in the same cohort [2].",
   "citations": [{"title": "TWiST Episode 2270 Show Notes", "url": "https://twistartups.com/episodes/2270", "tier": 1}, {"title": "Portfolio Performance Update – April 2026", "url": "https://twistartups.com/portfolio", "tier": 1}]
@@ -260,6 +279,7 @@ Example 9 — UNVERIFIABLE
 CLAIM: "This feature set puts us in a category of one with no direct competitors on the horizon."
 OUTPUT:
 {
+  "grounding": "No retrieved source addresses the 'category of one' benchmark or competitor-horizon claim.",
   "verdict": "UNVERIFIABLE",
   "explanation": "No primary source located in show archive or live retrieval for \\"category of one\\" benchmark.",
   "citations": []
@@ -269,6 +289,7 @@ Example 10 — UNVERIFIABLE
 CLAIM: "Our AI model outperforms every other solution on the market by at least 15% on standard benchmarks."
 OUTPUT:
 {
+  "grounding": "No retrieved source addresses the 15% benchmark outperformance claim across competitor models.",
   "verdict": "UNVERIFIABLE",
   "explanation": "No primary source located in show archive or live retrieval for the 15% outperformance benchmark across all competitors.",
   "citations": []
@@ -278,6 +299,7 @@ Example 11 — PARTIAL (contextual citation, market stat)
 CLAIM: "Five US firms captured 73.1% of LP commits in 2024."
 OUTPUT:
 {
+  "grounding": "Reuters [1] and SEC ADV filings [2] confirm record LP concentration in mega-funds but neither cites the specific 73.1% figure.",
   "verdict": "PARTIAL",
   "explanation": "Sources confirm record LP concentration in mega-funds [1][2]; the specific 73.1% figure traces to PitchBook NVCA Venture Monitor, not in retrieval.",
   "citations": [{"title": "Reuters – LP Concentration in US Venture", "url": "https://www.reuters.com/business/finance/lp-concentration-venture-2024", "tier": 1}, {"title": "SEC – Top Fund Form ADV Filings", "url": "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany", "tier": 1}]
@@ -287,6 +309,7 @@ Example 12 — PARTIAL (LanceDB show archive hit)
 CLAIM: "This founder previously raised a $50M Series A from Andreessen Horowitz."
 OUTPUT:
 {
+  "grounding": "TWiST Ep 2215 [1] discusses the founder's Series A but does not confirm the $50M figure or Andreessen Horowitz as lead.",
   "verdict": "PARTIAL",
   "explanation": "TWiST Ep 2215 discussed this founder's Series A [1]; round size and lead investor not confirmed in available sources.",
   "citations": [{"title": "TWiST Ep 2215 (March 2026) – Founder Interview", "url": null, "tier": 1}]
@@ -296,6 +319,7 @@ Example 13 — PARTIAL (funding round, web + LanceDB)
 CLAIM: "We closed our Series B at a $280 million valuation led by Benchmark."
 OUTPUT:
 {
+  "grounding": "TechCrunch [1] confirms Benchmark as Series B lead; Crunchbase [2] reports the round but does not state the $280M valuation.",
   "verdict": "PARTIAL",
   "explanation": "TechCrunch confirms Series B close with Benchmark as lead [1]; the $280M valuation is not in the public reporting [2].",
   "citations": [{"title": "TechCrunch – Series B Announcement", "url": "https://techcrunch.com/2026/03/example-series-b", "tier": 1}, {"title": "Crunchbase – Company Funding History", "url": "https://www.crunchbase.com/organization/example-company", "tier": 2}]
@@ -305,6 +329,7 @@ Example 14 — PARTIAL (platform-statistic claim with company-page evidence)
 CLAIM: "Three million developers are already using AcmeCloud."
 OUTPUT:
 {
+  "grounding": "AcmeCloud's company page [1] confirms a multi-million developer base but does not state the specific 3M figure.",
   "verdict": "PARTIAL",
   "explanation": "AcmeCloud's company page confirms a multi-million developer base; the specific 3M figure is not stated in retrieved sources [1].",
   "citations": [{"title": "AcmeCloud – Company Page", "url": "https://acmecloud.example.com", "tier": 2}]
@@ -314,6 +339,7 @@ Example 15 — PARTIAL (product-availability claim with tech-press evidence)
 CLAIM: "Helio is available right now in the App Store and Google Play."
 OUTPUT:
 {
+  "grounding": "TechCrunch [1] covered Helio's launch and positioning but does not confirm specific App Store or Google Play availability.",
   "verdict": "PARTIAL",
   "explanation": "TechCrunch covered Helio's launch and product positioning [1]; specific App Store and Google Play listing status is not confirmed in retrieved sources.",
   "citations": [{"title": "TechCrunch – Helio Launch Coverage", "url": "https://techcrunch.com/2026/example-helio-launch", "tier": 1}]
@@ -323,6 +349,7 @@ Example 16 — PARTIAL (LanceDB archive only, no web sources)
 CLAIM: "There are a billion people using LinkedIn."
 OUTPUT:
 {
+  "grounding": "TWiST Ep 2194 [1] discussed LinkedIn's scale but does not independently confirm the one-billion-user figure.",
   "verdict": "PARTIAL",
   "explanation": "TWiST Ep 2194 discussed LinkedIn's scale and platform reach [1]; the specific one billion figure is not independently confirmed.",
   "citations": [{"title": "TWiST Ep 2194 – LinkedIn platform discussion", "url": null, "tier": 1}]
@@ -481,23 +508,34 @@ export function applyLanceDBInjection(
 }
 
 // Build a corrective instruction appended to the user message on retry attempt 2
-// when attempt 1 failed Zod validation due to explanation word overflow. Tells
-// Haiku to shorten while preserving citations and verdict.
+// when attempt 1 failed Zod validation due to explanation or grounding word
+// overflow. Tells Haiku to shorten while preserving citations and verdict.
 //
 // `input` is the failed attempt's tool_use payload (matches DocketOutput shape
 // pre-validation).
 export function buildCorrectiveInstruction(
-  input: { explanation?: unknown }
+  input: { explanation?: unknown; grounding?: unknown },
+  explFail: string | undefined,
+  groundingFail: string | undefined
 ): string {
   const parts: string[] = [];
 
-  if (typeof input.explanation === 'string') {
+  if (explFail && typeof input.explanation === 'string') {
     const n = input.explanation.split(/\s+/).filter(Boolean).length;
     parts.push(
       `Your previous explanation was ${n} words. The required maximum is 28 words. ` +
       `Shorten the previous explanation to 28 words or fewer while preserving all citation references in the form [1], [2], etc. ` +
       `Do not introduce new citations. Do not change the verdict. Do not change which sources are referenced — only the prose length.\n\n` +
       `Your previous explanation:\n"${input.explanation}"`
+    );
+  }
+
+  if (groundingFail && typeof input.grounding === 'string') {
+    const n = input.grounding.split(/\s+/).filter(Boolean).length;
+    parts.push(
+      `Your previous grounding was ${n} words. The required maximum is 40 words. ` +
+      `Shorten the previous grounding to 40 words or fewer while preserving the citation references.\n\n` +
+      `Your previous grounding:\n"${input.grounding}"`
     );
   }
 
@@ -540,7 +578,7 @@ export async function runDocket(
       raw = await callHaiku({
         systemPrompt: DOCKET_SYSTEM,
         userMessage: attemptUserMessage,
-        maxTokens: 400,
+        maxTokens: 500,
         temperature: 0,
         tools: [FACT_CHECK_TOOL],
         toolChoice: { type: 'tool', name: 'fact_check' },
@@ -566,21 +604,25 @@ export async function runDocket(
       // Only fires on attempt 1 — attempt 2 falls through to suppression if it fails again.
       if (attempt === 1) {
         const explFail = messages.find((m) => m.startsWith('Explanation exceeds'));
-        if (explFail) {
-          correctiveInstruction = buildCorrectiveInstruction(input);
+        const groundingFail = messages.find((m) => m.startsWith('Grounding exceeds'));
+        if (explFail || groundingFail) {
+          correctiveInstruction = buildCorrectiveInstruction(input, explFail, groundingFail);
         }
       }
       continue;
     }
     let candidate: DocketOutput = zParse.data;
 
-    // Anti-pattern scan on explanation. Retry once on hit.
+    // Anti-pattern scan on explanation + grounding. Retry once on hit.
     // Carve-out: under PARTIAL, "appears" and "suggests" are allowed because
     // the model needs them to describe what a source partially establishes.
     const activeList = candidate.verdict === 'PARTIAL'
       ? DOCKET_ANTI_PATTERNS.filter((p) => !DOCKET_PARTIAL_ALLOWED.has(p))
       : DOCKET_ANTI_PATTERNS;
-    const hits = scanBlocklist(candidate.explanation, activeList);
+    const hits = [
+      ...scanBlocklist(candidate.explanation, activeList),
+      ...scanBlocklist(candidate.grounding, activeList),
+    ];
     if (hits.length > 0) {
       console.log(`[DOCKET] Anti-pattern detected: ${hits.join(', ')} verdict=${candidate.verdict} (attempt ${attempt})`);
       continue;

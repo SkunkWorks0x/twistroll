@@ -201,6 +201,13 @@
   }
 
   /* Verdict + explanation */
+  .grounding {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #8B8F9A;
+    font-style: italic;
+    margin-bottom: 8px;
+  }
   .verdict-row {
     display: flex;
     align-items: center;
@@ -353,6 +360,7 @@
     white-space: nowrap;
     flex: 1;
   }
+  .card.collapsed:not(.expanded) .grounding,
   .card.collapsed:not(.expanded) .verdict-row,
   .card.collapsed:not(.expanded) .claim-text-quote,
   .card.collapsed:not(.expanded) .explanation,
@@ -714,6 +722,13 @@
 
     // 3) Verdict pill + explanation
     if (docket) {
+      if (docket.grounding) {
+        const g = document.createElement('div');
+        g.className = 'grounding';
+        g.innerHTML = formatExplanationWithRefs(docket.grounding);
+        el.appendChild(g);
+      }
+
       const vrow = document.createElement('div');
       vrow.className = 'verdict-row';
       vrow.innerHTML = `<span class="pill ${verdictClass(docket.verdict)}">${escape(docket.verdict)}</span>`;

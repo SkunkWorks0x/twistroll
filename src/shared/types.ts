@@ -102,6 +102,7 @@ export interface DocketCitationPayload {
   citationSource?: 'haiku' | 'post_processor';
 }
 export interface DocketPayload {
+  grounding: string;
   verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIAL' | 'UNVERIFIABLE';
   explanation: string;
   citations: DocketCitationPayload[];
