@@ -425,6 +425,12 @@ function extractToolUseInput(response: any): any | null {
   return null;
 }
 
+// Render-policy predicate. Exported so the unit test in
+// scripts/test-render-policy.ts can bind to the same logic the gate uses.
+export function isEmptyAbsence(candidate: DocketOutput | null): boolean {
+  return !!candidate && candidate.verdict === 'UNVERIFIABLE' && candidate.citations.length === 0;
+}
+
 function citationsRefInExplanation(text: string): number[] {
   const out = new Set<number>();
   const matches = text.matchAll(/\[(\d+)\]/g);
@@ -726,6 +732,17 @@ export async function runDocket(
     console.log(`[DOCKET] Citations: claimId=${claim.segmentId} count=${candidate.citations.length} urls=[${citePayload}]`);
 
     parsed = candidate;
+  }
+
+  // UNVERIFIABLE render policy: suppress empty-absence cards before broadcast.
+  // A UNVERIFIABLE verdict with zero citations carries no actionable signal
+  // for the host — we found nothing relevant. UNVERIFIABLE WITH citations is
+  // "useful absence" (we surfaced related context that doesn't confirm the
+  // specific claim) and renders normally. server/index.ts treats output=null
+  // as a suppressed card via the existing no-verdict gate.
+  if (isEmptyAbsence(parsed)) {
+    console.log(`[RENDER-POLICY] Suppressed empty-absence UNVERIFIABLE for entity="${claim.primaryEntity}"`);
+    parsed = null;
   }
 
   return { output: parsed, ms: Date.now() - start };
