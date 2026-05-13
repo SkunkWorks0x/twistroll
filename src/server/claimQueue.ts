@@ -1,13 +1,21 @@
-// Sentinel claim queue. Bridges classifier output to the retrieval layer (and,
-// in CC Prompt 5, to the synthesis layer).
+// Sentinel claim queue. Bridges classifier output to the retrieval layer and
+// then the synthesis layer.
 //
 // Concurrency cap: 2 in-flight retrievals. Bypasses cap → drop with a log so
 // the failure mode is visible.
 //
-// Entity-based dedup: incoming claim's lowercased tokens (from primaryEntity,
-// keyNumbers, searchableNoun) are compared against claims processed in the
-// last 10s. Overlap > 0.8 = skip. Prevents the same claim from re-firing
-// across overlapping windows the classifier didn't dedup.
+// Two dedup layers operate here:
+//   1. Entity + claim-fingerprint cooldown (90s). Keyed on the normalized
+//      entity; entries carry the normalized claim text, claimType, and
+//      keyNumbers so distinct claims about the same entity (different type,
+//      low text overlap) flow through. Registers on enqueue, not on
+//      broadcast — a failed Docket run shouldn't open the door for a
+//      restatement to burn another Docket call seconds later.
+//   2. In-flight token-overlap dedup (10s rolling window, 0.8 threshold) on
+//      primaryEntity / searchableNoun / keyNumbers — catches near-duplicate
+//      windows the classifier didn't dedup before they reach retrieval.
+//
+// Layer (1) is documented inline at shouldCooldown.
 
 import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 import { retrieve, RetrievalResult } from './retrieval.js';
@@ -36,16 +44,104 @@ const SPONSOR_NAMES = new Set(
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
 
-const lastBroadcastByEntity = new Map<string, number>();
-
 function normalizeEntity(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-export function recordBroadcast(entity: string): void {
-  if (!entity) return;
-  lastBroadcastByEntity.set(normalizeEntity(entity), Date.now());
+// ─── Entity + claim-fingerprint cooldown ───────────────────────────────
+
+type CooldownEntry = {
+  entity: string;
+  claimType: string | undefined;
+  normalizedClaim: string;
+  keyNumbers: string[];
+  expiresAt: number;
+};
+
+const cooldownsByEntity = new Map<string, CooldownEntry[]>();
+
+function normalizeClaimText(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s.$%-]/g, ' ')
+    .replace(/\b(the|a|an|is|are|was|were|has|have|had|said|says|that|this|it)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
+
+function tokenJaccard(a: string, b: string): number {
+  const setA = new Set(a.split(' ').filter((w) => w.length > 3));
+  const setB = new Set(b.split(' ').filter((w) => w.length > 3));
+  if (setA.size === 0 && setB.size === 0) return 1;
+  if (setA.size === 0 || setB.size === 0) return 0;
+  const intersection = [...setA].filter((w) => setB.has(w)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return intersection / union;
+}
+
+// Predicate buckets — synonym families that collapse opinion/assessment claims
+// into a small set of qualitative directions. Used by the empty-keyNumbers
+// fallback in shouldCooldown so "X is behind in Y" and "X is lagging in Y"
+// resolve to the same bucket (suppress as restatement), while "X is behind"
+// and "X has unbeatable distribution" don't (different buckets, allow).
+const PREDICATE_FAMILIES: Record<string, string[]> = {
+  lagging: ['behind', 'lagging', 'late', 'catching', 'furthest', 'losing'],
+  leading: ['leading', 'ahead', 'dominant', 'winning', 'best'],
+  weak: ['bad', 'weak', 'poor', 'worse', 'inferior', 'struggling'],
+  strong: ['good', 'strong', 'great', 'better', 'superior', 'impressive'],
+  risk: ['risky', 'mistake', 'misstep', 'unstable', 'chaos', 'exposed'],
+  advantage: ['advantage', 'moat', 'distribution', 'ecosystem', 'unbeatable'],
+  dependent: ['dependent', 'relies', 'needs', 'powered', 'built'],
+};
+
+function predicateBucket(normalizedText: string): string | null {
+  const words = normalizedText.split(' ');
+  for (const [bucket, keywords] of Object.entries(PREDICATE_FAMILIES)) {
+    if (keywords.some((kw) => words.includes(kw))) return bucket;
+  }
+  return null;
+}
+
+function shouldCooldown(claim: ClaimClassification, now = Date.now()): boolean {
+  const entity = normalizeEntity(claim.primaryEntity);
+  const entries = (cooldownsByEntity.get(entity) ?? []).filter((e) => e.expiresAt > now);
+
+  const normalized = normalizeClaimText(claim.claimText);
+
+  for (const entry of entries) {
+    const sameClaimType = entry.claimType === claim.claimType;
+    const overlap = tokenJaccard(normalized, entry.normalizedClaim);
+
+    // Same entity + same claim type + high text overlap = suppress (restatement)
+    if (sameClaimType && overlap >= 0.72) return true;
+
+    // Same entity + very high text overlap regardless of claim type = suppress
+    if (overlap >= 0.85) return true;
+
+    // Short opinion/assessment restatements with no numeric anchors —
+    // matched via predicate-family bucket (synonym collapse). Unknown
+    // predicates (null bucket) pass through and are not suppressed.
+    const bothNoNumbers = (entry.keyNumbers.length === 0) && ((claim.keyNumbers ?? []).length === 0);
+    if (sameClaimType && bothNoNumbers) {
+      const entryPred = predicateBucket(entry.normalizedClaim);
+      const claimPred = predicateBucket(normalizeClaimText(claim.claimText));
+      if (entryPred !== null && entryPred === claimPred) return true;
+    }
+  }
+
+  // Not suppressed — register this claim in cooldown.
+  entries.push({
+    entity,
+    claimType: claim.claimType,
+    normalizedClaim: normalized,
+    keyNumbers: claim.keyNumbers ?? [],
+    expiresAt: now + ENTITY_COOLDOWN_MS,
+  });
+  cooldownsByEntity.set(entity, entries);
+  return false;
+}
+
+// ─── In-flight token-overlap dedup (10s window) ────────────────────────
 
 interface ProcessedRecord {
   entities: Set<string>;
@@ -134,13 +230,9 @@ export function enqueueClaim(
     return { enqueued: false, reason: 'weak entity (generic term)' };
   }
 
-  const lastBroadcast = lastBroadcastByEntity.get(normEntity);
-  if (lastBroadcast !== undefined) {
-    const elapsed = Date.now() - lastBroadcast;
-    if (elapsed < ENTITY_COOLDOWN_MS) {
-      console.log(`[queue-dedup] entity-cooldown: ${claim.primaryEntity} (last card ${elapsed}ms ago)`);
-      return { enqueued: false, reason: `entity cooldown ${elapsed}ms` };
-    }
+  if (shouldCooldown(claim)) {
+    console.log(`[queue-dedup] cooldown-fingerprint: "${claim.primaryEntity}" claimType=${claim.claimType ?? 'unknown'}`);
+    return { enqueued: false, reason: 'entity+fingerprint cooldown' };
   }
 
   const incoming = extractEntities(claim);
