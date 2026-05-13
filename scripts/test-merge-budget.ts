@@ -47,6 +47,8 @@ function makeTavily(titleLen: number, contentLen: number, idx = 0, score = 0.5):
     url: `https://example-${idx}.com/article-${idx}`,
     content: 'T'.repeat(contentLen),
     score,
+    sourceKind: 'transcript',
+    evidenceRole: 'primary',
     metadata: {},
   };
 }
@@ -60,6 +62,8 @@ function makeLance(titleLen: number, contentLen: number, episodeNumber = 1, scor
     url: null,
     content: 'L'.repeat(contentLen),
     score,
+    sourceKind: 'transcript',
+    evidenceRole: 'primary',
     metadata: { episodeNumber, episodeDate: '2026-01-01', episodeTitle: 'Test' },
   };
 }
@@ -73,6 +77,8 @@ function makeGrok(titleLen: number, contentLen: number): RetrievedSource {
     url: null,
     content: 'G'.repeat(contentLen),
     score: 0.5,
+    sourceKind: 'transcript',
+    evidenceRole: 'primary',
     metadata: {},
   };
 }
@@ -118,6 +124,8 @@ console.log('\nTest 4 — Live production shape: 3 lancedb @ ~2800c + 3 tavily @
     // ~2800c with unique first-100 prefix per source.
     content: `Episode ${ep} content prefix: ` + 'L'.repeat(2770),
     score: [0.50, 0.45, 0.40][i],
+    sourceKind: 'transcript' as const,
+    evidenceRole: 'primary' as const,
     metadata: { episodeNumber: ep, episodeDate: '2026-01-01', episodeTitle: `Test ${ep}` },
   }));
   // 3 tavily: distinct URLs, tier 1, score 0.60-0.70.
@@ -129,6 +137,8 @@ console.log('\nTest 4 — Live production shape: 3 lancedb @ ~2800c + 3 tavily @
     url: `https://example-${idx}.com/article`,
     content: 'T'.repeat(1500),
     score: [0.70, 0.65, 0.60][i],
+    sourceKind: 'transcript' as const,
+    evidenceRole: 'primary' as const,
     metadata: {},
   }));
   const merged = mergeAndRank(lance, tavily, []);

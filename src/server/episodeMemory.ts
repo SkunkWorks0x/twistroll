@@ -30,6 +30,12 @@ if (EXCLUDE_EPISODE_ID !== null) {
   console.log(`[lancedb] Episode exclusion INACTIVE (env var present but invalid).`);
 }
 
+// Provenance: every chunk carries its origin so derived Sentinel conclusions
+// can't masquerade as primary transcript evidence. See queryMemorySplit and
+// the post-process downgrade in synthesis.ts.
+export type SourceKind = 'transcript' | 'derived_verdict';
+export type EvidenceRole = 'primary' | 'secondary';
+
 export interface EpisodeChunk {
   id: string;
   vector: number[];
@@ -43,6 +49,11 @@ export interface EpisodeChunk {
   chunkIndex: number;
   provisional: boolean;
   sessionFile: string | null;
+  sourceKind: SourceKind;
+  evidenceRole: EvidenceRole;
+  // Empty string is the null sentinel (LanceDB doesn't store typed nulls well).
+  // Populated as 'docket' when a future write-back path lands.
+  generatedBy: string;
 }
 
 export interface IngestMetadata {
@@ -64,10 +75,33 @@ export interface MemoryQueryResult {
   episodeTitle: string;
   guestName: string;
   score: number;
+  sourceKind: SourceKind;
+  evidenceRole: EvidenceRole;
 }
 
 let connection: lancedb.Connection | null = null;
 let table: lancedb.Table | null = null;
+
+/**
+ * Run the one-time provenance-column migration if the table predates the
+ * schema. Idempotent — checks schema first, only addColumns when missing.
+ * Backfills existing rows to sourceKind='transcript', evidenceRole='primary',
+ * generatedBy=''.
+ */
+async function migrateProvenanceColumns(tbl: lancedb.Table): Promise<void> {
+  const schema = await tbl.schema();
+  const names = new Set(schema.fields.map((f) => f.name));
+  if (names.has('sourceKind') && names.has('evidenceRole') && names.has('generatedBy')) {
+    return;
+  }
+  const toAdd: { name: string; valueSql: string }[] = [];
+  if (!names.has('sourceKind')) toAdd.push({ name: 'sourceKind', valueSql: "'transcript'" });
+  if (!names.has('evidenceRole')) toAdd.push({ name: 'evidenceRole', valueSql: "'primary'" });
+  if (!names.has('generatedBy')) toAdd.push({ name: 'generatedBy', valueSql: "''" });
+  console.log(`[migrate] Adding provenance columns: ${toAdd.map((c) => c.name).join(', ')}`);
+  await tbl.addColumns(toAdd);
+  console.log('[migrate] Provenance columns added — existing rows defaulted to transcript/primary.');
+}
 
 /**
  * Open or create the LanceDB connection and episodes table.
@@ -85,6 +119,7 @@ export async function initMemory(): Promise<lancedb.Table> {
   const tableNames = await connection.tableNames();
   if (tableNames.includes(TABLE_NAME)) {
     table = await connection.openTable(TABLE_NAME);
+    await migrateProvenanceColumns(table);
     return table;
   }
 
@@ -104,6 +139,9 @@ export async function initMemory(): Promise<lancedb.Table> {
     chunkIndex: 0,
     provisional: true,
     sessionFile: '' as any,
+    sourceKind: 'transcript',
+    evidenceRole: 'primary',
+    generatedBy: '',
   };
 
   table = await connection.createTable(TABLE_NAME, [seed] as unknown as Record<string, unknown>[], { mode: 'create' });
@@ -197,6 +235,9 @@ export async function ingestEpisode(metadata: IngestMetadata): Promise<number> {
       chunkIndex: i,
       provisional,
       sessionFile,
+      sourceKind: 'transcript',
+      evidenceRole: 'primary',
+      generatedBy: '',
     });
   }
 
@@ -204,8 +245,23 @@ export async function ingestEpisode(metadata: IngestMetadata): Promise<number> {
   return rows.length;
 }
 
+// TODO: derived-verdict write-back (planned, not yet implemented).
+// When a Docket fires PARTIAL/UNVERIFIABLE the system may write a derived
+// chunk back to LanceDB with sourceKind='derived_verdict',
+// evidenceRole='secondary', generatedBy='docket' so future retrievals can
+// surface prior Sentinel conclusions as SECONDARY SHOW MEMORY (never as
+// primary evidence). Recursion guard: do NOT write back if the only
+// retrieval context that informed this verdict came from
+// sourceKind='derived_verdict' chunks. Until this lands, query-time
+// separation alone enforces the provenance boundary.
+
+const DEFAULT_TRANSCRIPT_FILTER = "(sourceKind IS NULL OR sourceKind != 'derived_verdict')";
+
 /**
  * Embed a query and run a LanceDB similarity search with optional metadata filter.
+ * Returns transcript-only results by default — derived_verdict chunks are
+ * excluded so callers that haven't opted into split retrieval don't surface
+ * Sentinel's own prior conclusions.
  */
 export async function queryMemory(
   queryText: string,
@@ -220,7 +276,7 @@ export async function queryMemory(
   // gives us cosine similarity in a clean 0..1 range (higher = better).
   let q = (tbl.search(qVec) as lancedb.VectorQuery).distanceType('dot').limit(topK);
 
-  const clauses: string[] = ['provisional = false'];
+  const clauses: string[] = ['provisional = false', DEFAULT_TRANSCRIPT_FILTER];
   if (filter?.guestName) {
     clauses.push(`guestName = '${filter.guestName.replace(/'/g, "''")}'`);
   }
@@ -241,9 +297,66 @@ export async function queryMemory(
     episodeTitle: r.episodeTitle,
     guestName: r.guestName,
     score: typeof r._distance === 'number' ? 1 - r._distance : 0,
+    sourceKind: (r.sourceKind ?? 'transcript') as SourceKind,
+    evidenceRole: (r.evidenceRole ?? 'primary') as EvidenceRole,
   }));
 
   return findRelevantResults(scored);
+}
+
+/**
+ * Two-pass split query for the retrieval pipeline. Runs the embedding once
+ * (Ollama call), then two LanceDB searches against the same vector:
+ *   - primary: sourceKind != 'derived_verdict', limit 8
+ *   - secondary: sourceKind = 'derived_verdict', limit 3
+ * Each result set is gap-filtered independently. Provenance separation is
+ * enforced at query time so derived Sentinel conclusions can't dominate the
+ * primary evidence list.
+ */
+export async function queryMemorySplit(
+  queryText: string,
+  filter?: { guestName?: string; sinceDate?: string }
+): Promise<{ primary: MemoryQueryResult[]; secondary: MemoryQueryResult[] }> {
+  const tbl = await initMemory();
+  const qVec = await embedText(queryText);
+
+  function buildWhere(provenanceClause: string): string {
+    const clauses: string[] = ['provisional = false', provenanceClause];
+    if (filter?.guestName) clauses.push(`guestName = '${filter.guestName.replace(/'/g, "''")}'`);
+    if (filter?.sinceDate) clauses.push(`episodeDate >= '${filter.sinceDate.replace(/'/g, "''")}'`);
+    if (EXCLUDE_EPISODE_ID !== null) clauses.push(`episodeNumber != ${EXCLUDE_EPISODE_ID}`);
+    return clauses.join(' AND ');
+  }
+
+  const primaryRaw = await (tbl.search(qVec) as lancedb.VectorQuery)
+    .distanceType('dot')
+    .where(buildWhere(DEFAULT_TRANSCRIPT_FILTER))
+    .limit(8)
+    .toArray();
+
+  const secondaryRaw = await (tbl.search(qVec) as lancedb.VectorQuery)
+    .distanceType('dot')
+    .where(buildWhere("sourceKind = 'derived_verdict'"))
+    .limit(3)
+    .toArray();
+
+  function toMQR(r: any): MemoryQueryResult {
+    return {
+      text: r.text,
+      episodeNumber: r.episodeNumber,
+      episodeDate: r.episodeDate,
+      episodeTitle: r.episodeTitle,
+      guestName: r.guestName,
+      score: typeof r._distance === 'number' ? 1 - r._distance : 0,
+      sourceKind: (r.sourceKind ?? 'transcript') as SourceKind,
+      evidenceRole: (r.evidenceRole ?? 'primary') as EvidenceRole,
+    };
+  }
+
+  const primary = findRelevantResults(primaryRaw.map(toMQR));
+  const secondary = findRelevantResults(secondaryRaw.map(toMQR));
+  console.log(`[memory-split] primary=${primary.length} secondary=${secondary.length}`);
+  return { primary, secondary };
 }
 
 /**
@@ -316,6 +429,9 @@ export async function commitEpisode(sessionFile: string): Promise<number> {
     chunkIndex: r.chunkIndex,
     provisional: false,
     sessionFile: r.sessionFile,
+    sourceKind: (r.sourceKind ?? 'transcript') as SourceKind,
+    evidenceRole: (r.evidenceRole ?? 'primary') as EvidenceRole,
+    generatedBy: r.generatedBy ?? '',
   }));
   // Add new rows FIRST — if this fails, originals are still intact.
   await tbl.add(updated as unknown as Record<string, unknown>[]);

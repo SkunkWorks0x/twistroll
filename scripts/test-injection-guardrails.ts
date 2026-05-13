@@ -65,6 +65,8 @@ function makeLanceSource(score: number, content: string): RetrievedSource {
     url: null,
     content,
     score,
+    sourceKind: 'transcript',
+    evidenceRole: 'primary',
     metadata: {
       episodeNumber: 9999,
       episodeDate: '2026-05-01',

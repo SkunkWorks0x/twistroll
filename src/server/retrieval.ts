@@ -6,7 +6,7 @@
 // breakers + per-source timeouts so one slow source can't stall the whole pipeline.
 
 import { tavily } from '@tavily/core';
-import { queryMemory } from './episodeMemory.js';
+import { queryMemorySplit, type SourceKind, type EvidenceRole } from './episodeMemory.js';
 import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 
 export interface RetrievedSource {
@@ -17,6 +17,11 @@ export interface RetrievedSource {
   url: string | null;
   content: string;
   score: number;
+  // Provenance — derived from the LanceDB row's sourceKind/evidenceRole columns
+  // for type==='lancedb'; Tavily/Grokipedia always count as primary transcript-
+  // equivalent web sources (they were never written by Sentinel itself).
+  sourceKind: SourceKind;
+  evidenceRole: EvidenceRole;
   metadata: {
     episodeNumber?: number;
     episodeDate?: string;
@@ -226,39 +231,52 @@ export async function queryLanceDB(claim: ClaimClassification): Promise<Retrieve
   if (!queryText) return [];
 
   try {
-    const results = await queryMemory(queryText, 5);
+    const { primary, secondary } = await queryMemorySplit(queryText);
     recordSuccess('lancedb');
 
     // Post-filter relaxed 2026-05-07 to align with the Docket's LANCEDB
     // CITATION RULE — the prompt expects topical hits to flow through and
     // lets Haiku decide relevance. The gap-detection floor (0.35) inside
-    // queryMemory already screened for relevance; here we only confirm
+    // queryMemorySplit already screened for relevance; here we only confirm
     // topical overlap via any 4+ char primaryEntity token. Empty primaryEntity
     // (no tokens to match) falls through.
     const tokens = entityTokens(claim.primaryEntity || '');
-    const filtered = results
-      .filter((r) => {
-        if (tokens.length === 0) return true;
-        const textLc = r.text.toLowerCase();
-        return tokens.some((tok) => textLc.includes(tok));
-      })
-      .slice(0, 3);
+    const tokenMatch = (text: string): boolean => {
+      if (tokens.length === 0) return true;
+      const textLc = text.toLowerCase();
+      return tokens.some((tok) => textLc.includes(tok));
+    };
+    // Primary capped at 3 (matches prior behavior). Secondary capped at 2 —
+    // it's supplementary show-memory context, not primary evidence.
+    const filteredPrimary = primary.filter((r) => tokenMatch(r.text)).slice(0, 3);
+    const filteredSecondary = secondary.filter((r) => tokenMatch(r.text)).slice(0, 2);
 
-    return filtered.map((r, i) => ({
-      id: `lance_${r.episodeNumber}_${i}_${Date.now()}`,
+    const toSource = (
+      r: typeof filteredPrimary[number],
+      i: number,
+      bucket: 'p' | 's'
+    ): RetrievedSource => ({
+      id: `lance_${bucket}_${r.episodeNumber}_${i}_${Date.now()}`,
       type: 'lancedb' as const,
       tier: 1 as const,
       title: `TWiST Ep ${r.episodeNumber} (${r.episodeDate})${r.guestName ? ` — ${r.guestName}` : ''}`,
       url: null,
       content: r.text,
       score: r.score,
+      sourceKind: r.sourceKind,
+      evidenceRole: r.evidenceRole,
       metadata: {
         episodeNumber: r.episodeNumber,
         episodeDate: r.episodeDate,
         episodeTitle: r.episodeTitle,
         guestName: r.guestName,
       },
-    }));
+    });
+
+    return [
+      ...filteredPrimary.map((r, i) => toSource(r, i, 'p')),
+      ...filteredSecondary.map((r, i) => toSource(r, i, 's')),
+    ];
   } catch (err) {
     recordFailure('lancedb');
     const msg = err instanceof Error ? err.message : String(err);
@@ -478,6 +496,8 @@ export async function queryTavily(claim: ClaimClassification): Promise<Retrieved
         url: r.url,
         content: r.content || '',
         score: typeof r.score === 'number' ? r.score : 0,
+        sourceKind: 'transcript',
+        evidenceRole: 'primary',
         metadata: {
           domain,
           publishDate: r.publishedDate || undefined,
@@ -548,6 +568,8 @@ export async function queryGrokipedia(claim: ClaimClassification): Promise<Retri
         url: null,
         content: text,
         score: 0.5,
+        sourceKind: 'transcript',
+        evidenceRole: 'primary',
         metadata: {},
       },
     ];
@@ -735,20 +757,43 @@ export function formatForDocket(
   for (const seg of recentSegments.slice(-8)) {
     out += `[${seg.speakerLabel}] "${seg.text}"\n`;
   }
-  out += '\nSOURCES:\n';
-  if (sources.length === 0) {
-    out += '(no sources retrieved)\n';
+
+  // Citation indices run continuously across both sections so the Docket can
+  // reference any source as [1], [2], … regardless of provenance bucket.
+  const primary = sources.filter((s) => s.sourceKind !== 'derived_verdict');
+  const secondary = sources.filter((s) => s.sourceKind === 'derived_verdict');
+
+  function emitSource(s: RetrievedSource, idx: number): string {
+    const url = s.url ?? '(LanceDB)';
+    const limit = EXCERPT_LIMITS[s.type];
+    const excerpt = s.content.slice(0, limit);
+    return (
+      `[${idx}] ${s.title} | ${url} | Tier ${s.tier}\n` +
+      `Excerpt: "${excerpt}${s.content.length > limit ? '…' : ''}"\n\n`
+    );
+  }
+
+  if (primary.length === 0 && secondary.length === 0) {
+    out += '\nPRIMARY EVIDENCE (use to determine verdict):\n(no sources retrieved)\n';
+    return out;
+  }
+
+  out += '\nPRIMARY EVIDENCE (use to determine verdict):\n';
+  if (primary.length === 0) {
+    out += '(none)\n';
   } else {
-    sources.forEach((s, i) => {
-      const url = s.url ?? '(LanceDB)';
-      // LanceDB chunks need more excerpt for the topical anchor to surface —
-      // 200 chars often cut mid-transcript before any anchor word appeared.
-      const limit = EXCERPT_LIMITS[s.type];
-      out += `[${i + 1}] ${s.title} | ${url} | Tier ${s.tier}\n`;
-      const excerpt = s.content.slice(0, limit);
-      out += `Excerpt: "${excerpt}${s.content.length > limit ? '…' : ''}"\n\n`;
+    primary.forEach((s, i) => {
+      out += emitSource(s, i + 1);
     });
   }
+
+  if (secondary.length > 0) {
+    out += '\nSECONDARY SHOW MEMORY (prior Sentinel conclusions — context only, not primary evidence):\n';
+    secondary.forEach((s, i) => {
+      out += emitSource(s, primary.length + i + 1);
+    });
+  }
+
   return out;
 }
 

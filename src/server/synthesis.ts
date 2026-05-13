@@ -164,6 +164,14 @@ GROUNDING:
 
 Before assigning a verdict, populate the grounding field: state in one sentence what the retrieved evidence directly says about the specific assertion in the claim. Do not restate the claim. Do not summarize the topic. If the evidence does not directly address the assertion, say so explicitly and assign UNVERIFIABLE. The grounding must reference at least one citation by number.
 
+SOURCE SECTIONS:
+
+The retrieval context is split into two sections.
+
+PRIMARY EVIDENCE (use to determine verdict) — transcripts, SEC filings, news articles, prior TWiST archive episodes. These are load-bearing facts. Citations from this section can support any verdict.
+
+SECONDARY SHOW MEMORY (prior Sentinel conclusions — context only, not primary evidence) — derived verdicts emitted by Sentinel on past claims. Treat these as background context only. NEVER cite them as the sole basis for a TRUE, FALSE, or MISLEADING verdict. If the only sources that address the assertion live in SECONDARY SHOW MEMORY, the correct verdict is UNVERIFIABLE.
+
 VERDICT RULES:
 
 TRUE — A retrieved source directly confirms the specific claim (number, date, name, fact). Cite the source.
@@ -672,6 +680,30 @@ export async function runDocket(
     };
 
     candidate = applyLanceDBInjection(candidate, sources, claim);
+
+    // Provenance downgrade: if every citation references a derived_verdict
+    // source (Sentinel's own prior conclusions written back to LanceDB), the
+    // model is echoing itself rather than primary evidence. Downgrade to
+    // UNVERIFIABLE so secondary show memory never carries a confident verdict
+    // on its own. No-op today since the write-back path doesn't exist yet —
+    // exists for forward compatibility with the planned write-back feature.
+    if (candidate.citations.length > 0 && candidate.verdict !== 'UNVERIFIABLE') {
+      const allDerived = candidate.citations.every((c) => {
+        const matchSrc =
+          c.url !== null
+            ? sources.find((s) => s.url === c.url)
+            : sources.find((s) => s.url === null && s.title === c.title);
+        return matchSrc?.sourceKind === 'derived_verdict';
+      });
+      if (allDerived) {
+        console.log(`[DOCKET] Downgrade ${candidate.verdict} → UNVERIFIABLE: all citations reference derived_verdict sources`);
+        candidate = {
+          ...candidate,
+          verdict: 'UNVERIFIABLE',
+          explanation: 'No primary source located in show archive or live retrieval.',
+        };
+      }
+    }
 
     // UNVERIFIABLE: trust Haiku's judgment. If sources existed and Haiku still
     // returned UNVERIFIABLE with empty citations after injection guards
