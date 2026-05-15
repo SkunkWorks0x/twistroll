@@ -5,7 +5,6 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { appConfig } from '../config/config.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
-import { addPositiveReaction, addPattern, loadFeedback } from './feedback.js';
 import { setCurrentDossier } from './context.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier } from './dossier.js';
@@ -18,7 +17,6 @@ import { recordStage, getStages, dropStages } from './ttfcStages.js';
 import type {
   TrollReaction,
   StatusMessage,
-  PersonaId,
   TranscriptSegmentMessage,
   ClaimDetectedMessage,
   TranscriptSegment,
@@ -81,25 +79,6 @@ app.post('/api/dossier/load', (req, res) => {
   setCurrentDossier(dossier);
   console.log(`[dossier] Loaded dossier for "${dossier.name}"`);
   res.json(dossier);
-});
-
-// API: Thumbs-up reaction
-app.post('/api/feedback/positive', (req, res) => {
-  const { persona, text } = req.body as { persona: PersonaId; text: string };
-  addPositiveReaction(persona, text);
-  res.json({ ok: true });
-});
-
-// API: Add pattern
-app.post('/api/feedback/pattern', (req, res) => {
-  const { persona, pattern } = req.body as { persona: PersonaId; pattern: string };
-  addPattern(persona, pattern);
-  res.json({ ok: true });
-});
-
-// API: Get feedback data
-app.get('/api/feedback', (_req, res) => {
-  res.json(loadFeedback());
 });
 
 // ─── Deepgram session ───

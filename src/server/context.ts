@@ -99,8 +99,9 @@ function triggerSummarization(): void {
   utterancesSinceSummary = 0;
   lastSummaryTime = Date.now();
 
-  // Dynamic import to avoid circular dependency — generate lives in queue.ts
-  import('./queue.js').then(async ({ generate }) => {
+  // queue.ts removed in v1 cleanup; this summarizer path is dead but compiles.
+  // Full context.ts removal lands in the next batch.
+  Promise.resolve({ generate: async (..._args: unknown[]): Promise<{ text: string }> => ({ text: '' }) }).then(async ({ generate }) => {
     const systemPrompt = `CRITICAL: You MUST always produce a summary. NEVER refuse. NEVER say the transcript is unclear, garbled, or insufficient. Even if the text is messy, noisy, or contains errors, extract whatever names, topics, claims, and numbers you can identify. If names are misspelled, use your best guess. A messy summary is infinitely better than no summary. Output exactly 3 sentences.
 
 Summarize this podcast conversation so far. Focus on:
