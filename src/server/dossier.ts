@@ -50,6 +50,18 @@ export function loadDossier(guestName: string): Dossier | null {
   }
 }
 
+// Single-session current-dossier state. Set by /api/dossier endpoint at
+// session prep time; read by future code paths that want guest context.
+let currentDossier: Dossier | null = null;
+
+export function setCurrentDossier(d: Dossier | null): void {
+  currentDossier = d;
+}
+
+export function getCurrentDossier(): Dossier | null {
+  return currentDossier;
+}
+
 export function formatDossierBlock(d: Dossier): string {
   return (
     `[GUEST DOSSIER]\n` +
