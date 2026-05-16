@@ -33,7 +33,9 @@
   html, body { height: 100%; overflow: hidden; }
   body {
     font-family: var(--sans);
-    background: var(--bg);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 92, 0, 0.07), transparent 28%),
+      linear-gradient(180deg, #08080A 0%, #111114 52%, #08080A 100%);
     color: var(--text);
     font-size: 13px;
     line-height: 1.5;
@@ -43,20 +45,23 @@
 
   /* ─── Header ─────────────────────────────────────────────── */
   header {
+    height: 64px;
+    padding: 0 24px;
+    background: rgba(8, 8, 10, 0.92);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 0 rgba(255, 92, 0, 0.22);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-elevated);
   }
   .brand {
-    font-family: var(--serif);
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 15px;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    color: #FFFFFF;
   }
-  .brand .accent { color: var(--orange); font-style: italic; }
+  .brand .accent { color: #FF5C00; font-style: italic; }
   .status {
     display: flex;
     align-items: center;
@@ -71,7 +76,29 @@
     border-radius: 50%;
     background: var(--text-faint);
   }
-  .status.connected .dot { background: var(--true); box-shadow: 0 0 8px rgba(16, 185, 129, 0.5); }
+  .status.connected {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid rgba(52, 211, 153, 0.35);
+    border-radius: 999px;
+    background: rgba(52, 211, 153, 0.08);
+    color: #D1FAE5;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .status.connected .dot {
+    width: 7px;
+    height: 7px;
+    background: #34D399;
+    box-shadow: 0 0 14px rgba(52, 211, 153, 0.8);
+    border-radius: 50%;
+  }
   .status.disconnected .dot { background: var(--false); }
 
   /* ─── Layout grid ─────────────────────────────────────────── */
@@ -88,14 +115,28 @@
     padding: 16px 20px;
     min-height: 0;
   }
-  #transcript-pane { border-right: 1px solid var(--border); }
+  #transcript-pane {
+    border-right: 1px solid var(--border);
+    background: linear-gradient(180deg, #111114 0%, #0D0D10 100%);
+  }
+  #sidebar-pane {
+    background: linear-gradient(180deg, #18181C 0%, #111114 100%);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 1px 0 0 rgba(255, 92, 0, 0.10);
+  }
 
   #transcript-pane::-webkit-scrollbar,
   #sidebar-pane::-webkit-scrollbar { width: 8px; }
+  #transcript-pane::-webkit-scrollbar-track,
+  #sidebar-pane::-webkit-scrollbar-track { background: transparent; }
   #transcript-pane::-webkit-scrollbar-thumb,
   #sidebar-pane::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+  }
+  #transcript-pane::-webkit-scrollbar-thumb:hover,
+  #sidebar-pane::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 92, 0, 0.45);
   }
 
   /* ─── Transcript ─────────────────────────────────────────── */
@@ -108,49 +149,86 @@
   }
 
   .seg {
-    display: flex;
-    gap: 10px;
-    padding: 6px 8px;
+    display: grid;
+    grid-template-columns: 84px 1fr 44px;
+    column-gap: 18px;
+    padding: 10px 12px 11px 10px;
+    border-radius: 8px;
+    min-height: 42px;
+    align-items: start;
     margin-bottom: 2px;
-    border-left: 2px solid transparent;
-    border-radius: 0 4px 4px 0;
     transition: background 100ms;
   }
-  .seg:hover { background: rgba(255, 255, 255, 0.02); }
+  .seg:hover { background: rgba(255, 255, 255, 0.025); }
   .seg .speaker {
-    flex-shrink: 0;
-    width: 76px;
-    font-family: var(--mono);
+    align-self: start;
+    margin-top: 3px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: #8B8F9A;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 9px;
-    letter-spacing: 0.06em;
+    font-weight: 800;
+    letter-spacing: 0.10em;
     text-transform: uppercase;
-    color: var(--text-faint);
-    padding-top: 3px;
+    white-space: nowrap;
   }
-  .seg .text { flex: 1; color: var(--text); }
+  .seg .speaker::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--speaker-color, #8B8F9A);
+    vertical-align: middle;
+  }
+  .seg .text {
+    color: #F4F5F7;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.42;
+    letter-spacing: -0.01em;
+  }
   .seg .ts {
-    flex-shrink: 0;
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text-faint);
-    padding-top: 3px;
-    opacity: 0.5;
+    color: #555861;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: right;
   }
   .seg.has-claim {
-    background: var(--orange-wash);
-    border-left-color: var(--orange);
+    position: relative;
+    background: linear-gradient(90deg, rgba(255, 92, 0, 0.14), rgba(255, 92, 0, 0.025) 55%, transparent);
+    box-shadow: inset 0 0 0 1px rgba(255, 92, 0, 0.16);
     cursor: pointer;
   }
-  .seg.has-claim:hover { background: rgba(255, 77, 0, 0.13); }
+  .seg.has-claim:hover {
+    background: linear-gradient(90deg, rgba(255, 92, 0, 0.20), rgba(255, 92, 0, 0.04) 55%, transparent);
+  }
+  .seg.has-claim::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    bottom: 7px;
+    width: 3px;
+    border-radius: 999px;
+    background: #FF5C00;
+    box-shadow: 0 0 12px rgba(255, 92, 0, 0.65);
+  }
 
   /* Role-based speaker name colors. With these in place, the has-claim
      orange wash + left border still flag claim segments — the speaker
      name keeps its role color so the speaker identity stays visually
      consistent across claim and non-claim segments. */
-  .seg .speaker.role-host     { color: #FF5C00; }
-  .seg .speaker.role-cohost   { color: #C084FC; }
-  .seg .speaker.role-guest    { color: #818CF8; }
-  .seg .speaker.role-unmapped { color: var(--text-faint); }
+  /* Role drives the colored dot via --speaker-color; the pill text stays gray. */
+  .seg .speaker.role-host     { --speaker-color: #FF5C00; }
+  .seg .speaker.role-cohost   { --speaker-color: #FBBF24; }
+  .seg .speaker.role-guest    { --speaker-color: #34D399; }
+  .seg .speaker.role-unmapped { --speaker-color: #6B7280; }
 
   /* Same role colors applied to the speaker-pill prefix on claim cards. */
   .speaker-pill.role-host     { color: #FF5C00; }
@@ -166,14 +244,32 @@
   .seg.pulse { background: var(--orange-bright); }
 
   /* ─── Sidebar / cards ─────────────────────────────────────── */
-  .earlier-label {
-    font-family: var(--mono);
-    font-size: 9px;
-    color: var(--text-faint);
+  .sidebar-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 4px 0 8px;
-    padding-left: 4px;
+  }
+  .claim-count { color: #FF5C00; }
+
+  .earlier-label {
+    margin: 18px 0 10px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: #8B8F9A;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
   }
   .earlier-divider {
     border: none;
@@ -183,11 +279,18 @@
   }
 
   .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
+    padding: 18px;
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025)),
+      #18181C;
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow:
+      0 18px 40px rgba(0,0,0,0.32),
+      inset 0 1px 0 rgba(255,255,255,0.06);
     margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
     cursor: pointer;
     transition: background 100ms, border-color 100ms;
   }
@@ -200,13 +303,44 @@
     50%      { box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.4); }
   }
 
+  /* Verdict accent strip — colored bar on the left edge of every card. */
+  .card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--verdict-color, #FBBF24);
+  }
+  .card[data-verdict="TRUE"]         { --verdict-color: #34D399; }
+  .card[data-verdict="FALSE"]        { --verdict-color: #F87171; }
+  .card[data-verdict="MISLEADING"],
+  .card[data-verdict="PARTIAL"]      { --verdict-color: #FBBF24; }
+  .card[data-verdict="UNVERIFIABLE"] { --verdict-color: #6B7280; }
+
+  /* Card arrival animation — newest card only (applied via .is-new class
+     from the renderSidebar loop). */
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card.is-new {
+    animation: cardIn 120ms ease-out;
+  }
+
   /* Verdict + explanation */
   .grounding {
-    font-size: 13px;
-    line-height: 1.5;
-    color: #8B8F9A;
+    padding: 12px 13px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.075);
+    color: #D8DAE0;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 14px;
+    line-height: 1.42;
     font-style: italic;
-    margin-bottom: 8px;
   }
   .verdict-row {
     display: flex;
@@ -216,21 +350,23 @@
     flex-wrap: wrap;
   }
   .pill {
-    display: inline-block;
-    font-family: var(--mono);
-    font-size: 9px;
-    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 6px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 900;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    padding: 3px 8px;
-    border-radius: 3px;
-    color: #fff;
+    color: #08080A;
   }
-  .pill.true        { background: var(--true); }
-  .pill.false       { background: var(--false); }
-  .pill.misleading  { background: var(--misleading); color: #1a1a1e; }
-  .pill.partial     { background: var(--partial); }
-  .pill.unverifiable{ background: var(--unverifiable); }
+  .pill.true        { background: #34D399; box-shadow: 0 0 18px rgba(52, 211, 153, 0.22); }
+  .pill.false       { background: #F87171; box-shadow: 0 0 18px rgba(248, 113, 113, 0.22); }
+  .pill.misleading  { background: #FBBF24; box-shadow: 0 0 18px rgba(251, 191, 36, 0.22); }
+  .pill.partial     { background: #FBBF24; box-shadow: 0 0 18px rgba(251, 191, 36, 0.22); }
+  .pill.unverifiable{ background: #6B7280; box-shadow: 0 0 18px rgba(107, 114, 128, 0.22); }
 
   .speaker-pill {
     font-family: var(--mono);
@@ -241,10 +377,12 @@
   }
 
   .explanation {
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--text);
-    margin-bottom: 8px;
+    margin-top: 10px;
+    color: #FFFFFF;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 16px;
+    line-height: 1.38;
+    font-weight: 600;
   }
   .citation-ref {
     color: var(--orange);
@@ -286,17 +424,26 @@
   .citations-list.open { display: block; }
   .citation {
     display: flex;
-    align-items: baseline;
-    gap: 6px;
-    padding: 6px 0;
-    border-bottom: 1px dashed var(--border);
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+    padding: 5px 0;
+    color: #AEB3BE;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 11px;
   }
-  .citation:last-child { border-bottom: none; }
   .citation .num {
-    color: var(--orange);
-    font-family: var(--mono);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 5px;
+    background: rgba(255, 92, 0, 0.16);
+    color: #FF8A3D;
     font-size: 10px;
+    font-weight: 900;
     flex-shrink: 0;
   }
   .citation .title { flex: 1; color: var(--text); cursor: pointer; }
@@ -346,12 +493,31 @@
 
   /* Collapsed (older) card form */
   .card.collapsed {
-    padding: 8px 12px;
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto 1fr;
     gap: 10px;
+    align-items: center;
+    min-height: 38px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
   }
-  .card.collapsed .pill { flex-shrink: 0; }
+  .card.collapsed:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 92, 0, 0.24);
+  }
+  .card.collapsed .pill {
+    height: 22px;
+    min-width: 54px;
+    padding: 0 7px;
+    font-size: 9px;
+    border-radius: 5px;
+  }
   .card.collapsed .truncated-claim {
     font-size: 12px;
     color: var(--text-dim);
@@ -391,6 +557,10 @@
     </div>
   </section>
   <aside id="sidebar-pane">
+    <div class="sidebar-title">
+      <span>THE DOCKET</span>
+      <span class="claim-count" id="claim-count-display">0 CLAIMS</span>
+    </div>
     <div id="sidebar">
       <div class="empty-state">No claims yet.</div>
     </div>
@@ -662,6 +832,13 @@
   }
 
   function renderSidebar() {
+    // Keep the static "THE DOCKET / N CLAIMS" header in sync with live state.
+    const countEl = document.getElementById('claim-count-display');
+    if (countEl) {
+      const n = state.cards.length;
+      countEl.textContent = `${n} CLAIM${n !== 1 ? 'S' : ''}`;
+    }
+
     if (state.cards.length === 0) {
       sidebarEl.innerHTML = '<div class="empty-state">No claims yet.</div>';
       return;
@@ -671,9 +848,12 @@
     const recent = state.cards.slice(0, FULL_CARDS);
     const earlier = state.cards.slice(FULL_CARDS);
 
-    for (const card of recent) {
-      sidebarEl.appendChild(renderFullCard(card));
-    }
+    recent.forEach((card, idx) => {
+      const fullEl = renderFullCard(card);
+      // Animate only the newest card; others are stable across re-renders.
+      if (idx === 0) fullEl.classList.add('is-new');
+      sidebarEl.appendChild(fullEl);
+    });
 
     if (earlier.length > 0) {
       const divider = document.createElement('hr');
@@ -699,6 +879,9 @@
     const el = document.createElement('div');
     el.className = 'card';
     el.dataset.claimId = card.claimId;
+    // Verdict accent strip is driven by data-verdict via CSS attribute selectors.
+    // Mirror the collapsed-card fallback so the strip is always present.
+    el.dataset.verdict = card.docket?.verdict || 'UNVERIFIABLE';
     el.addEventListener('click', (e) => {
       // Don't sync-scroll when clicking interactive children.
       if (e.target.closest('.citations-toggle, .citation, .contradiction')) return;
