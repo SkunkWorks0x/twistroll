@@ -1,176 +1,190 @@
 # TWiST Sentinel
 
-**Real-time AI fact-checker + cynic for live podcasts.**
+Real-time AI fact-checking for live podcasts. Built for [This Week in Startups](https://www.youtube.com/@thisweekin).
 
-Two AI personas watch your show and surface verified facts, counterarguments, and follow-up questions — in real time, with citations from Reuters, Bloomberg, and TechCrunch.
+Sentinel listens to a live podcast stream, detects checkable claims, retrieves evidence from the TWiST archive and live web search, and renders structured fact-check cards in a browser dashboard. In recent smoke tests, cards appeared roughly 5–7 seconds after the claim was spoken.
 
-Built for the [TWiST bounty](https://x.com/twistartups) announced live on air by Jason Calacanis, April 27, 2026. Two personas, scrollable transcript, runs on any stream or Zoom. Jason's spec, built to Jason's spec.
+> *"A real time podcast fact checker."*
+> — Jason Calacanis describing what he wants built, TWiST, May 11, 2026
 
----
-
-## What it does
-
-Sentinel listens to a live podcast stream, detects verifiable claims in real time, and produces structured fact-check cards with:
-
-- **Verdicts** — TRUE, FALSE, MISLEADING, PARTIAL, or UNVERIFIABLE on every claim
-- **Citations** — sourced from Reuters, Bloomberg, TechCrunch, SEC filings, and 127 TWiST episodes in memory
-- **Counterpoints** — precedent-driven "the other side of it" on every card
-- **Follow-up questions** — the next question the host should ask
-- **Scrollable transcript** — the full conversation with highlighted claim segments
-
-The host scrolls up, sees what was said, sees the fact-check, sees the counterargument, sees the follow-up question. That's the product.
+<!-- TODO: Add hero screenshot -->
+<!-- ![TWiST Sentinel Dashboard](docs/assets/sentinel-dashboard-hero.png) -->
 
 ---
 
-## The two personas
-
-| Persona | Role | Voice |
-|---------|------|-------|
-| **The Docket** | Fact-checker | Clinical precision. Verdict + explanation + citations + follow-up question. "The record is the record." |
-| **The Pattern Recognizer** | Cynic | Calm senior partner. Precedent-driven counterarguments. "The precedent here is..." |
-
-No comedy. No sound effects. No entertainment framing. Jason said "you don't have to try to get the jokes — that's my job." These two personas do the work Jason described: real-time fact checking and real-time cynic.
+## 127 episodes · 3,956 chunks · 5–7s claim-to-card · single agent
 
 ---
 
-## What the demo shows
+## Silence Over Fabrication
 
-8 minutes uncut against TWiST E2281 (China Kills Meta/Manus Deal). No narration, no editing. What you see is what you get.
+Sentinel's core design principle: if the evidence doesn't support a verdict, say nothing. Every rendered card must include at least one validated citation URL. Cards without citations are suppressed. URLs not present in retrieval results are never rendered. The gate stack, post-processing pipeline, and UNVERIFIABLE render policy all enforce this — the system would rather show fewer cards than risk a single fabricated source.
 
-Cards that fired during the demo:
-
-- **FALSE** — "Google owns DeepSeek" → debunked with Reuters and TechCrunch, naming the actual owner
-- **MISLEADING** — "Apple and Microsoft are the two furthest behind in AI" → corrected with three sources
-- **TRUE** — "Manus founders relocated to Singapore in 2025" → confirmed with two Reuters sources
-- **PARTIAL** — Microsoft $900B revenue claim → fact-checked with Bloomberg and The Information
-- **TRUE** — "OpenAI models on Bedrock in coming weeks" → confirmed with Ars Technica
-
-80% citation rate. Zero hallucinated URLs. Zero crashes.
+This is not a design choice made for safety theater. It is the fundamental difference between a fact-checker that earns trust over a 90-minute episode and one that doesn't.
 
 ---
 
-## Cross-episode memory
+## What a Card Contains
 
-127 TWiST episodes (Ep 2007 through Ep 2285) indexed in LanceDB. When a guest makes a claim, Sentinel cross-references what was said on prior shows.
+Each fact-check card renders four fields:
 
-In the demo, a claim about Microsoft's OpenAI stake surfaced a TWiST archive citation from Ep 2201 (October 2025). The card rendered with "— show archive" label, distinguishing internal memory from external sources.
+**Grounding** — one sentence stating what the retrieved evidence says about the specific assertion, written before the verdict is assigned. Forces the model to confront what the evidence actually says rather than pattern-matching on topic similarity. 40-word max.
 
-This is the feature Jason described: "we can feed in our full docket and it can say, hey, this guest posted about this on X that we already have in the docket."
+**Verdict** — TRUE, FALSE, MISLEADING, PARTIAL, or UNVERIFIABLE. UNVERIFIABLE means retrieval found no source that confirms the specific assertion — it does not mean the claim is false.
 
----
+**Explanation** — the verdict rationale in 28 words or fewer, with inline citation references.
 
-## Architecture
-Audio source (YouTube via yt-dlp, or Zoom via BlackHole)
-→ Deepgram Nova-3 streaming (diarization, smart_format)
-→ Sliding 3-segment window
-→ Claim Classifier (Claude Haiku 4.5, structured extraction)
-→ Gate chain: empty-entity → sponsor → weak-entity → cooldown → dedup
-→ Parallel Retrieval: LanceDB + Tavily (relationship-first queries)
-→ Parallel Synthesis: Docket (tool_use JSON) + Pattern Recognizer (text)
-→ Post-processing: Zod validation, citation cross-check, word limits
-→ WebSocket → Browser dashboard
+**Citations** — validated source URLs only, organized by credibility tier. Tier 1: SEC filings, Bloomberg, Reuters, company IR, official government sources, and the TWiST archive. Tier 2: Wikipedia, Crunchbase, PitchBook, FT, The Information. Tier 3: everything else not blocked. Tier 4 (blocked, never rendered): Reddit, Quora, Medium blogs, SEO content farms.
 
-Typical claim-to-card latency: 5-7 seconds.
+<!-- TODO: Add card detail screenshot -->
+<!-- ![Fact-check card detail](docs/assets/sentinel-card-detail.png) -->
 
 ---
 
-## Dashboard
+## How a Claim Becomes a Card
 
-The browser dashboard at `localhost:3000` is the primary interface:
+A guest says *"OpenAI and Microsoft have altered their ongoing partnership."* Here's what happens in the next 6 seconds:
 
-- **Left (65%)** — Scrollable transcript with speaker labels and claim highlights
-- **Right (35%)** — Pinned sidebar with fact-check cards, auto-collapsing older cards
-- **Click-to-expand** — Collapsed cards expand to show full verdict, citations, and counterpoint
-- **Bidirectional sync** — Click a card to highlight the transcript segment, click a segment to scroll to the card
-
-Design language: Bloomberg terminal meets teleprompter. JetBrains Mono for system chrome, Source Serif 4 for human content. Engineered for 2-3 second glance reads under studio lighting.
+1. **Deepgram Nova-3** transcribes the audio stream in real time with speaker diarization.
+2. **The claim classifier** (Haiku 4.5) examines a sliding 3-segment window, resolves pronouns, and extracts the checkable assertion with a primary entity and claim type. Confidence must exceed 0.7 to proceed.
+3. **The 7-layer gate stack** checks: is this entity on the sponsor blocklist? Has this entity been checked in the last 90 seconds with a similar claim fingerprint? Is this a duplicate already in the queue? If any gate fires, the claim is silently dropped.
+4. **Parallel retrieval** fans out to LanceDB (127 TWiST episodes, 3,956 searchable chunks) and Tavily (live web search). Results are merged, deduplicated, and filtered by credibility tier. Capped at 6 sources, roughly 1,400 tokens.
+5. **The Docket** (Haiku 4.5 via tool_use) receives the claim, the transcript context, and the retrieved evidence. It writes the grounding field first — stating what the evidence says about this specific assertion — then commits to a verdict, writes the explanation, and attaches citations by reference number.
+6. **Post-processing** validates the output against a Zod schema, cross-checks that every cited reference number maps to a real retrieval result, enforces word limits, scans for anti-pattern language, and suppresses UNVERIFIABLE cards with zero citations.
+7. **The card appears** on the dashboard via WebSocket.
 
 ---
 
-## Quick start
+## Cross-Episode Memory
+
+LanceDB stores 127 TWiST episodes (Ep 2007 through Ep 2285) as 3,956 searchable chunks embedded with EmbeddingGemma 308M. When a guest references something Jason discussed three months ago, Sentinel can surface it.
+
+Provenance-separated: primary transcript evidence and derived verdict summaries are queried independently and labeled in the Docket's context window. Derived verdicts can appear as secondary show memory but are never treated as primary evidence for TRUE, FALSE, or MISLEADING verdicts.
+
+---
+
+## Design Choices
+
+**Structured verdicts, not free-text opinions.** Every card commits to one of five verdict types. This makes the output auditable and consistent across a 90-minute episode.
+
+**Grounding-first architecture.** The Docket must state what the evidence says before assigning a verdict. This attacks the dominant failure mode in retrieval-augmented fact-checking: retrieving a topically related source that doesn't actually support the specific claim.
+
+**Tiered citation pipeline.** Not all sources are equal. SEC filings outrank Wikipedia. Wikipedia outranks blog posts. Blog posts from SEO farms are blocked entirely. The tier is visible on every citation.
+
+**Claim fingerprint cooldown.** Entity-only cooldown suppresses distinct claims about the same company. Sentinel uses token-level Jaccard similarity plus predicate-bucket matching to distinguish "Microsoft is behind in AI" from "Microsoft has unbeatable enterprise distribution" even when both mention Microsoft within 90 seconds.
+
+**Conservative by default.** The gate stack, post-processing pipeline, and render policy are all tuned to suppress rather than fabricate. A quiet sidebar is better than a wrong one.
+
+---
+
+## Latest Smoke Test
+
+Fresh run against TWiST E2281 ("China Kills Meta/Manus Deal"), May 2026:
+
+- 6 cards rendered (3 TRUE, 1 PARTIAL, 1 MISLEADING, 1 UNVERIFIABLE with citations)
+- 13 cited URLs — all validated against tier-1/2 sources (Reuters, Ars Technica, TechCrunch, FT, Bloomberg) plus 2 LanceDB archive citations
+- 0 hallucinated URLs
+- 0 crashes
+- 1 Zod schema overshoot recovered via corrective retry
+
+This is a smoke test, not a benchmark. A proper eval set with gold-labeled claims is on the roadmap.
+
+---
+
+## Quick Start
 
 ```bash
 git clone https://github.com/SkunkWorks0x/twistroll.git
 cd twistroll
-npm install
-cp .env.example .env
-# Add your Anthropic API key and Tavily API key
-
-# Pull the embedding model
-ollama pull embeddinggemma
-
-# Start
-npm run dev
-# Open http://localhost:3000
+cp .env.example .env   # Add your API keys (see below)
+./start.sh             # Pre-flight checks + launch
 ```
 
-Start a session:
+`start.sh` verifies every dependency before booting: Node.js, ffmpeg, yt-dlp, Ollama (daemon + models), and API keys. If anything is missing, it tells you exactly what and exits cleanly.
+
+> **Note:** The repo is named `twistroll` for historical reasons — TWiSTroll v1 was the predecessor project. The current product is TWiST Sentinel.
+
+### Requirements
+
+**CLI tools** (must be on PATH):
+- Node.js >= 18
+- ffmpeg
+- yt-dlp
+- Ollama (`ollama serve`)
+
+**Ollama models** (pull before first run):
+```bash
+ollama pull embeddinggemma
+ollama pull qwen2.5:7b
+```
+
+**API keys** (in `.env`):
+
+| Key | Required | Purpose |
+|-----|----------|---------|
+| `ANTHROPIC_API_KEY` | Yes | Claim classifier + Docket verdicts (Haiku 4.5) |
+| `DEEPGRAM_API_KEY` | Yes | Live audio transcription (Nova-3) |
+| `TAVILY_API_KEY` | Recommended | Live web retrieval. Without it, Sentinel checks the TWiST archive only — most claims about current events will go UNVERIFIABLE. |
+| `GROQ_API_KEY` | No | Classifier fallback chain — skipped without it |
+
+### Start a Session
+
+With the server running at http://localhost:3000:
+
 ```bash
 curl -X POST http://localhost:3000/api/session/start \
   -H "Content-Type: application/json" \
-  -d '{"source": "https://youtube.com/watch?v=YOUR_VIDEO_ID"}'
+  -d '{"source": "YOUTUBE_URL_HERE", "mode": "stream"}'
 ```
 
-No configuration screen, no guest names to type in, no setup wizard. URL in, facts out.
+### Estimated Cost
+
+Roughly $2–4 per 90-minute episode at current Haiku 4.5 and Deepgram pricing. Dominated by Deepgram streaming and Haiku API calls. Tavily adds approximately $0.50–1.00 depending on claim density. Ollama embeddings are free (local).
 
 ---
 
-## LLM stack
+## Current Limitations
 
-| Component | Model | Role |
-|-----------|-------|------|
-| Claim Classifier | Claude Haiku 4.5 | Structured claim extraction from transcript |
-| The Docket | Claude Haiku 4.5 | Fact-check verdict + citations via tool_use |
-| The Pattern Recognizer | Claude Haiku 4.5 | Precedent-driven counterargument |
-| Fallback classifier | Groq llama-3.3-70b | Cloud fallback |
-| Last-resort classifier | Ollama qwen2.5:7b | Local fallback — pipeline never dies |
-| Embeddings | EmbeddingGemma 308M | LanceDB vector search |
+- **YouTube stream input only.** Zoom/system-audio adapter (via BlackHole) is planned but not yet packaged.
+- **Localhost only.** No hosted deployment, no authentication layer. See Security below.
+- **Archive coverage is partial.** 127 of ~279 episodes ingested. 152 gaps in the Ep 2007–2285 range.
+- **Speaker diarization resolves to SPEAKER 0 / SPEAKER 1**, not names. Functional but not polished.
+- **UNVERIFIABLE does not mean false.** It means no retrieved source confirms the specific assertion.
+- **Latency varies.** 5–7 seconds observed in smoke tests; actual latency depends on Deepgram, Tavily, and Haiku response times.
 
 ---
 
-## Source credibility
+## Failure Behavior
 
-Citations are tier-filtered before rendering:
+Sentinel is conservative by design:
 
-| Tier | Sources | Treatment |
-|------|---------|-----------|
-| 1 (Primary) | SEC, BLS, FRED, company IR, Reuters, Bloomberg, NYT, WSJ, TechCrunch, AP | Full confidence |
-| 2 (Credible) | Wikipedia, Crunchbase, PitchBook, SaaStr, FT, Economist, Ars Technica | Normal confidence |
-| 3 (Secondary) | Everything else not blocked | "Unverified source" flag |
-| 4 (Blocked) | Reddit, Quora, Medium blogs, SEO farms | Never rendered |
-
-Hard rule: no URL = no citation card. Silence over fabrication.
+- If classifier JSON is malformed, the claim is retried once or suppressed.
+- If citations cannot be validated against retrieval results, the card is suppressed.
+- If Tavily is unavailable, Sentinel falls back to archive-only retrieval.
+- If Ollama is down, LanceDB queries fail gracefully and the classifier falls through to cloud-only mode.
+- If no source verifies the exact assertion, the card is marked UNVERIFIABLE. If that UNVERIFIABLE card also has zero citations, it is suppressed entirely.
 
 ---
 
-## System requirements
+## Security
 
-- macOS with Apple Silicon (M1/M2/M3/M4/M5), 32GB RAM recommended
-- Node.js 20+
-- Ollama (for embeddings and local fallback)
-- Anthropic API key
-- Tavily API key
+Sentinel is designed for local operation. The `/api/session/start` endpoint accepts a URL and has no authentication. Do not expose it to the public internet without adding auth and URL allowlisting.
 
 ---
 
-## What's next
+## Roadmap
 
-Built and shipping now. If this earns the bounty, here's where it goes:
-
-- **Zoom mode** — BlackHole audio capture for private calls
-- **Per-guest social context** — pull guest's recent X posts and prior interviews into memory
-- **Host contradiction card** — surface when the host contradicts their own prior statements
-- **Laughter detection** — audio-aware feature for the broadcast experience
-
----
-
-## License
-
-MIT — do whatever you want with it.
+- [ ] Zoom/BlackHole audio adapter
+- [ ] LanceDB backfill (152 remaining episodes)
+- [ ] Hosted replay page (closes the "must clone to see it" gap)
+- [ ] Eval set with gold-labeled claims
+- [ ] Speaker name resolution from dossier
+- [ ] Session-start authentication
 
 ---
 
-Built by [@SkunkWorks0x](https://x.com/SkunkWorks0x)
+## Built By
 
-*Built for the show. Ready for air.*
+[@SkunkWorks0x](https://x.com/SkunkWorks0x) — solo founder building AI agent infrastructure. TWiST Sentinel was built against Jason's May 11 spec change to single-agent fact-checking and shipped as a solo effort on a MacBook.
 
+MIT License
