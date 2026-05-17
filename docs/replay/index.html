@@ -779,16 +779,27 @@
     return (v || 'unverifiable').toLowerCase();
   }
 
-  // Speaker label → role classification. The captured JSON stores speakerLabel
-  // as a string ("Speaker 0", "Host", "Guest", etc.). Map to the same role
-  // classes the live dashboard uses so the colored dot lines up.
+  // The captured E2281 JSON predates server-side effectiveSpeakerMap, so its
+  // segments still carry literal "Speaker 0" / "Speaker 1" labels. Map those
+  // to the same HOST/GUEST roles the live dashboard now serves, so the replay
+  // matches the production dashboard visually (orange dot for HOST, green for
+  // GUEST). Future captures will arrive pre-mapped and pass through.
+  function displaySpeaker(label) {
+    if (label === 'Speaker 0') return 'HOST';
+    if (label === 'Speaker 1') return 'GUEST';
+    return String(label || '').toUpperCase();
+  }
+
+  // Speaker label → role classification. The display layer (displaySpeaker)
+  // has already normalized the raw captured label, so we map the normalized
+  // form to a role class. Mirrors the live dashboard's role-class behavior.
   function resolveSpeakerLabel(raw) {
     const s = String(raw || '').trim();
     const lower = s.toLowerCase();
     if (lower.startsWith('host')) return { name: s, roleClass: 'role-host' };
     if (lower.startsWith('cohost') || lower.startsWith('co-host')) return { name: s, roleClass: 'role-cohost' };
     if (lower.startsWith('guest')) return { name: s, roleClass: 'role-guest' };
-    return { name: s || 'Speaker', roleClass: 'role-unmapped' };
+    return { name: s || 'SPEAKER', roleClass: 'role-unmapped' };
   }
 
   function pulse(el) {
@@ -810,7 +821,7 @@
     const el = document.createElement('div');
     el.className = 'seg';
     el.dataset.segmentId = seg.id;
-    const { name, roleClass } = resolveSpeakerLabel(seg.speaker);
+    const { name, roleClass } = resolveSpeakerLabel(displaySpeaker(seg.speaker));
     el.innerHTML = `
       <span class="speaker ${roleClass}">${escape(name)}</span>
       <span class="text">${escape(seg.text)}</span>
