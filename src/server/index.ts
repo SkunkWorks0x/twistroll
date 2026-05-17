@@ -362,12 +362,22 @@ app.get('/api/session/status', (_req, res) => {
   if (!deepgram) {
     return res.json({ active: false, mode: null, uptime: null, configured: false });
   }
+  // effectiveSpeakerMap: what consumers should actually use. Operator-provided
+  // map wins; absent that, fall back to the classifier's legacy default
+  // (speaker 0 = host, speaker 1 = guest) so the dashboard renders HOST/GUEST
+  // even for sessions started without an explicit map. The raw `speakerMap`
+  // is preserved for backward compat; `speakerMapSource` lets callers tell
+  // the two apart.
+  const mapIsExplicit = Object.keys(currentSpeakerMap).length > 0;
+  const effectiveSpeakerMap = mapIsExplicit ? currentSpeakerMap : { 0: 'host', 1: 'guest' };
   res.json({
     active: deepgram.isActive(),
     mode: deepgram.getMode(),
     uptime: deepgram.getUptime(),
     configured: true,
     speakerMap: currentSpeakerMap,
+    effectiveSpeakerMap,
+    speakerMapSource: mapIsExplicit ? 'explicit' : 'default',
   });
 });
 

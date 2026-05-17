@@ -590,8 +590,10 @@
     // Session metadata cached from /api/session/status — drives the
     // speaker name/role rendering on each transcript segment.
     session: {
-      speakerMap: {},          // { [speakerId]: 'host' | 'guest' }
-      sessionContext: {},      // { hostName, guestName, … }
+      speakerMap: {},            // raw operator-provided map (may be empty)
+      effectiveSpeakerMap: {},   // what we actually render against — server picks default if no explicit map
+      speakerMapSource: 'default', // 'explicit' | 'default'
+      sessionContext: {},        // { speakerNames: {[id]: name}, … } — only `speakerNames` is consulted; names other than per-id explicit operator overrides are ignored.
     },
   };
 
@@ -634,44 +636,56 @@
     return text.slice(0, n).trim() + '…';
   }
 
-  // Resolve a Deepgram speaker id to a display name + role class. Lookup
-  // priority:
-  //   1. sessionContext.speakerNames[id] — per-id override (handles roundtable
-  //      formats where multiple speaker IDs share the 'guest' role)
-  //   2. role-based fallback from sessionContext.{hostName,cohostName,guestName}
-  //   3. literal "Speaker N" for unmapped (gray)
+  // Resolve a Deepgram speaker id to a display name + role class.
+  //
+  // Render policy (post-effectiveSpeakerMap):
+  //   - Read from state.session.effectiveSpeakerMap first (server already
+  //     applied the legacy 0=host/else=guest default when no explicit map
+  //     was provided).
+  //   - Safety net: if effectiveSpeakerMap is somehow empty (status hasn't
+  //     polled yet, or server returned an empty object), apply the same
+  //     legacy fallback inline so we never render the literal "SPEAKER N"
+  //     for ids 0 and 1.
+  //   - Names: only an explicit operator-provided per-id override
+  //     (sessionContext.speakerNames[id]) is rendered. Otherwise the label
+  //     is the role itself: HOST / COHOST / GUEST. We do NOT pull from
+  //     ctx.hostName / cohostName / guestName — those auto-filled paths
+  //     produced "JASON" / "LON" without explicit consent.
   // Speaker keys round-trip through JSON as strings, so look up by both forms.
-  // CSS upper-cases the rendered text — we leave capitalization alone here.
   function resolveSpeaker(speakerId) {
-    const map = state.session.speakerMap || {};
+    const map = state.session.effectiveSpeakerMap
+      && Object.keys(state.session.effectiveSpeakerMap).length > 0
+        ? state.session.effectiveSpeakerMap
+        : (state.session.speakerMap || {});
     const ctx = state.session.sessionContext || {};
-    const role = map[speakerId] ?? map[String(speakerId)];
+    let role = map[speakerId] ?? map[String(speakerId)];
+
+    // Final safety net — if no role yet AND the map is empty, mirror the
+    // classifier's legacy default so id 0/1 always resolve.
+    if (!role && Object.keys(map).length === 0) {
+      role = speakerId === 0 ? 'host' : 'guest';
+    }
+
     const namesMap = ctx.speakerNames || {};
     const perId = namesMap[speakerId] ?? namesMap[String(speakerId)];
-    if (role === 'host') {
-      return { role, name: perId || ctx.hostName || 'Host', roleClass: 'role-host' };
-    }
-    if (role === 'cohost') {
-      return { role, name: perId || ctx.cohostName || 'Cohost', roleClass: 'role-cohost' };
-    }
-    if (role === 'guest') {
-      return { role, name: perId || ctx.guestName || 'Guest', roleClass: 'role-guest' };
-    }
-    return { role: null, name: `Speaker ${speakerId}`, roleClass: 'role-unmapped' };
+
+    if (role === 'host')   return { role, name: perId || 'HOST',   roleClass: 'role-host' };
+    if (role === 'cohost') return { role, name: perId || 'COHOST', roleClass: 'role-cohost' };
+    if (role === 'guest')  return { role, name: perId || 'GUEST',  roleClass: 'role-guest' };
+    return { role: null, name: `SPEAKER ${speakerId}`, roleClass: 'role-unmapped' };
   }
 
-  // Resolve a card's speaker for the claim-quote pill. Format:
-  //   "ROLE (Name)" when card.speakerNumber resolves to a known role
-  //   "GUEST" generic for unmapped ids (per spec Phase 3 — fall back to
-  //          generic GUEST attribution rather than reuse a specific guestName)
+  // Resolve a card's speaker for the claim-quote pill. Returns r.name as-is
+  // (HOST/COHOST/GUEST, or an explicit operator-supplied name). Unmapped ids
+  // fall back to generic GUEST attribution (per spec — never reuse a specific
+  // name for an unknown speaker).
   function resolveCardSpeaker(card) {
     const id = typeof card.speakerNumber === 'number' ? card.speakerNumber : -1;
     const r = resolveSpeaker(id);
     if (r.role === null) {
       return { label: 'GUEST', roleClass: 'role-guest' };
     }
-    const tag = r.role === 'host' ? 'HOST' : r.role === 'cohost' ? 'COHOST' : 'GUEST';
-    return { label: `${tag} (${r.name})`, roleClass: r.roleClass };
+    return { label: r.name, roleClass: r.roleClass };
   }
 
   // Re-paint speaker labels on every existing segment. Called when session
@@ -698,6 +712,14 @@
       if (d.speakerMap && JSON.stringify(d.speakerMap) !== JSON.stringify(state.session.speakerMap)) {
         state.session.speakerMap = d.speakerMap;
         changed = true;
+      }
+      if (d.effectiveSpeakerMap && JSON.stringify(d.effectiveSpeakerMap) !== JSON.stringify(state.session.effectiveSpeakerMap)) {
+        state.session.effectiveSpeakerMap = d.effectiveSpeakerMap;
+        changed = true;
+      }
+      if (d.speakerMapSource && d.speakerMapSource !== state.session.speakerMapSource) {
+        state.session.speakerMapSource = d.speakerMapSource;
+        // No re-paint needed — provenance is metadata only.
       }
       if (d.sessionContext && JSON.stringify(d.sessionContext) !== JSON.stringify(state.session.sessionContext)) {
         state.session.sessionContext = d.sessionContext;
