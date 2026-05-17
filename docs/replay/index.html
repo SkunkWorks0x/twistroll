@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TWiST Sentinel — Replay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@500;700;800;900&family=Inter:wght@400;500;600&display=swap" />
+<style>
+  /* ════════════════════════════════════════════════════════════
+     CSS copied verbatim from public/index.html (single source of
+     truth for the dashboard look). Replay-specific additions are
+     at the bottom of this block under "REPLAY ADDITIONS".
+     ════════════════════════════════════════════════════════════ */
+
+  :root {
+    --bg: #1a1a1e;
+    --bg-elevated: #232328;
+    --surface: rgba(255, 255, 255, 0.04);
+    --surface-hover: rgba(255, 255, 255, 0.07);
+    --text: #e8e8e8;
+    --text-dim: #94a3b8;
+    --text-faint: #6b7280;
+    --orange: #ff4d00;
+    --orange-wash: rgba(255, 77, 0, 0.08);
+    --orange-bright: rgba(255, 77, 0, 0.22);
+    --border: rgba(255, 255, 255, 0.06);
+    --true: #10b981;
+    --false: #ef4444;
+    --misleading: #f59e0b;
+    --partial: #3b82f6;
+    --unverifiable: #6b7280;
+    --serif: "Source Serif 4", Georgia, serif;
+    --sans: "Inter", system-ui, -apple-system, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: var(--sans);
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255, 92, 0, 0.07), transparent 28%),
+      linear-gradient(180deg, #08080A 0%, #111114 52%, #08080A 100%);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* ─── Header ─────────────────────────────────────────────── */
+  header {
+    height: 64px;
+    padding: 0 24px;
+    background: rgba(8, 8, 10, 0.92);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 0 rgba(255, 92, 0, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .brand {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 15px;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    color: #FFFFFF;
+  }
+  .brand .accent { color: #FF5C00; font-style: italic; }
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .status .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  /* Replay page has no WebSocket — connection-state CSS (.status.connected /
+     .status.disconnected) from the live dashboard is intentionally omitted. */
+
+  /* ─── Layout grid ─────────────────────────────────────────── */
+  main {
+    display: grid;
+    grid-template-columns: 65fr 35fr;
+    overflow: hidden;
+    min-height: 0;
+  }
+  #transcript-pane,
+  #sidebar-pane {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 16px 20px;
+    min-height: 0;
+  }
+  #transcript-pane {
+    border-right: 1px solid var(--border);
+    background: linear-gradient(180deg, #111114 0%, #0D0D10 100%);
+  }
+  #sidebar-pane {
+    background: linear-gradient(180deg, #18181C 0%, #111114 100%);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 1px 0 0 rgba(255, 92, 0, 0.10);
+  }
+
+  #transcript-pane::-webkit-scrollbar,
+  #sidebar-pane::-webkit-scrollbar { width: 8px; }
+  #transcript-pane::-webkit-scrollbar-track,
+  #sidebar-pane::-webkit-scrollbar-track { background: transparent; }
+  #transcript-pane::-webkit-scrollbar-thumb,
+  #sidebar-pane::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+  }
+  #transcript-pane::-webkit-scrollbar-thumb:hover,
+  #sidebar-pane::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 92, 0, 0.45);
+  }
+
+  /* ─── Transcript ─────────────────────────────────────────── */
+  .empty-state {
+    color: var(--text-faint);
+    font-style: italic;
+    text-align: center;
+    padding: 80px 20px;
+    font-size: 12px;
+  }
+
+  .seg {
+    display: grid;
+    grid-template-columns: 84px 1fr 44px;
+    column-gap: 18px;
+    padding: 10px 12px 11px 10px;
+    border-radius: 8px;
+    min-height: 42px;
+    align-items: start;
+    margin-bottom: 2px;
+    transition: background 100ms;
+  }
+  .seg:hover { background: rgba(255, 255, 255, 0.025); }
+  .seg .speaker {
+    align-self: start;
+    margin-top: 3px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: #8B8F9A;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .seg .speaker::before {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--speaker-color, #8B8F9A);
+    vertical-align: middle;
+  }
+  .seg .text {
+    color: #F4F5F7;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 17px;
+    line-height: 1.42;
+    letter-spacing: -0.01em;
+  }
+  .seg .ts {
+    color: #555861;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-align: right;
+  }
+  .seg.has-claim {
+    position: relative;
+    background: linear-gradient(90deg, rgba(255, 92, 0, 0.14), rgba(255, 92, 0, 0.025) 55%, transparent);
+    box-shadow: inset 0 0 0 1px rgba(255, 92, 0, 0.16);
+    cursor: pointer;
+  }
+  .seg.has-claim:hover {
+    background: linear-gradient(90deg, rgba(255, 92, 0, 0.20), rgba(255, 92, 0, 0.04) 55%, transparent);
+  }
+  .seg.has-claim::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 7px;
+    bottom: 7px;
+    width: 3px;
+    border-radius: 999px;
+    background: #FF5C00;
+    box-shadow: 0 0 12px rgba(255, 92, 0, 0.65);
+  }
+
+  .seg .speaker.role-host     { --speaker-color: #FF5C00; }
+  .seg .speaker.role-cohost   { --speaker-color: #FBBF24; }
+  .seg .speaker.role-guest    { --speaker-color: #34D399; }
+  .seg .speaker.role-unmapped { --speaker-color: #6B7280; }
+
+  .speaker-pill.role-host     { color: #FF5C00; }
+  .speaker-pill.role-cohost   { color: #C084FC; }
+  .speaker-pill.role-guest    { color: #818CF8; }
+  .speaker-pill.role-unmapped { color: var(--text-faint); }
+
+  @keyframes pulse-bg {
+    0%, 100% { background-color: var(--orange-wash); }
+    50%      { background-color: var(--orange-bright); }
+  }
+  .pulse { animation: pulse-bg 120ms ease-in-out; }
+  .seg.pulse { background: var(--orange-bright); }
+
+  /* ─── Sidebar / cards ─────────────────────────────────────── */
+  .sidebar-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #FFFFFF;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .claim-count { color: #FF5C00; }
+
+  .earlier-label {
+    margin: 18px 0 10px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: #8B8F9A;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .earlier-divider {
+    border: none;
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  .card {
+    padding: 18px;
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.055), rgba(255,255,255,0.025)),
+      #18181C;
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow:
+      0 18px 40px rgba(0,0,0,0.32),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: background 100ms, border-color 100ms;
+  }
+  .card:hover { background: var(--surface-hover); border-color: rgba(255, 255, 255, 0.1); }
+  .card.pulse { animation: card-pulse 120ms ease-in-out; }
+  @keyframes card-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 0, 0); }
+    50%      { box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.4); }
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--verdict-color, #FBBF24);
+  }
+  .card[data-verdict="TRUE"]         { --verdict-color: #34D399; }
+  .card[data-verdict="FALSE"]        { --verdict-color: #F87171; }
+  .card[data-verdict="MISLEADING"],
+  .card[data-verdict="PARTIAL"]      { --verdict-color: #FBBF24; }
+  .card[data-verdict="UNVERIFIABLE"] { --verdict-color: #6B7280; }
+
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card.is-new { animation: cardIn 120ms ease-out; }
+
+  .grounding {
+    padding: 12px 13px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.075);
+    color: #D8DAE0;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 14px;
+    line-height: 1.42;
+    font-style: italic;
+  }
+  .verdict-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 6px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #08080A;
+  }
+  .pill.true        { background: #34D399; box-shadow: 0 0 18px rgba(52, 211, 153, 0.22); }
+  .pill.false       { background: #F87171; box-shadow: 0 0 18px rgba(248, 113, 113, 0.22); }
+  .pill.misleading  { background: #FBBF24; box-shadow: 0 0 18px rgba(251, 191, 36, 0.22); }
+  .pill.partial     { background: #FBBF24; box-shadow: 0 0 18px rgba(251, 191, 36, 0.22); }
+  .pill.unverifiable{ background: #6B7280; box-shadow: 0 0 18px rgba(107, 114, 128, 0.22); }
+
+  .explanation {
+    margin-top: 10px;
+    color: #FFFFFF;
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 16px;
+    line-height: 1.38;
+    font-weight: 600;
+  }
+  .citation-ref {
+    color: var(--orange);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .citations-toggle {
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+    font-family: var(--mono);
+    letter-spacing: 0.04em;
+  }
+  .citations-toggle:hover { color: var(--orange); }
+  .citations-toggle .caret { display: inline-block; transition: transform 120ms; }
+  .citations-toggle.open .caret { transform: rotate(90deg); }
+
+  .citations-list {
+    display: none;
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.18);
+    border-radius: 6px;
+  }
+  .citations-list.open { display: block; }
+  .citation {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+    padding: 5px 0;
+    color: #AEB3BE;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+  }
+  .citation .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 5px;
+    background: rgba(255, 92, 0, 0.16);
+    color: #FF8A3D;
+    font-size: 10px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+  .citation .title { flex: 1; color: var(--text); cursor: pointer; }
+  .citation .title:hover { color: var(--orange); }
+  .citation.archive .title { cursor: default; }
+  .citation.archive .title:hover { color: var(--text); }
+  .citation .archive-label {
+    color: #8B8F9A;
+    font-style: italic;
+    font-size: 11px;
+    margin-left: 4px;
+  }
+  .citation .tier {
+    font-family: var(--mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .citation.copied .title::after {
+    content: "  copied!";
+    color: var(--true);
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+
+  .card.collapsed {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: center;
+    min-height: 38px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.075);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .card.collapsed:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 92, 0, 0.24);
+  }
+  .card.collapsed .pill {
+    height: 22px;
+    min-width: 54px;
+    padding: 0 7px;
+    font-size: 9px;
+    border-radius: 5px;
+  }
+  .card.collapsed .truncated-claim {
+    font-size: 12px;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .card.collapsed:not(.expanded) .grounding,
+  .card.collapsed:not(.expanded) .verdict-row,
+  .card.collapsed:not(.expanded) .explanation,
+  .card.collapsed:not(.expanded) .citations-toggle,
+  .card.collapsed:not(.expanded) .citations-list { display: none; }
+  .card.collapsed.expanded {
+    display: block;
+    padding: 14px;
+  }
+  .card.collapsed.expanded > .pill,
+  .card.collapsed.expanded > .truncated-claim { display: none; }
+
+  /* ════════════════════════════════════════════════════════════
+     REPLAY ADDITIONS — gray REPLAY pill, episode label, timeline
+     bar, hero click-to-start overlay, dim-on-overlay state.
+     ════════════════════════════════════════════════════════════ */
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .episode-label {
+    color: #6B7280;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .status.replay {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 12px;
+    border: 1px solid rgba(107, 114, 128, 0.45);
+    border-radius: 999px;
+    background: rgba(107, 114, 128, 0.10);
+    color: #D1D5DB;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .status.replay .dot {
+    width: 7px;
+    height: 7px;
+    background: #6B7280;
+    box-shadow: 0 0 8px rgba(107, 114, 128, 0.45);
+    border-radius: 50%;
+  }
+
+  /* Bottom-fixed timeline bar */
+  .timeline-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    padding: 0 24px;
+    background: #18181C;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -1px 0 rgba(255, 92, 0, 0.10);
+  }
+  .timeline-play {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 92, 0, 0.5);
+    background: rgba(255, 92, 0, 0.10);
+    color: #FF5C00;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    font-weight: 900;
+    transition: background 100ms;
+  }
+  .timeline-play:hover { background: rgba(255, 92, 0, 0.22); }
+  .timeline-track {
+    flex: 1;
+    height: 6px;
+    background: #18181C;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .timeline-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, #FF5C00, #FF8A3D);
+    border-radius: 999px;
+    width: 0%;
+    transition: width 80ms linear;
+  }
+  .timeline-clock {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: #8B8F9A;
+    min-width: 84px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .timeline-speed {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .timeline-speed button {
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    color: #8B8F9A;
+    cursor: pointer;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    transition: all 100ms;
+  }
+  .timeline-speed button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #D8DAE0;
+  }
+  .timeline-speed button.active {
+    border-color: rgba(255, 92, 0, 0.5);
+    background: rgba(255, 92, 0, 0.10);
+    color: #FF5C00;
+  }
+
+  /* Hero click-to-start overlay */
+  .hero-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    cursor: pointer;
+    transition: opacity 120ms ease-out;
+  }
+  .hero-overlay.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .hero-title {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #FFFFFF;
+    text-transform: none;
+  }
+  .hero-title .accent { color: #FF5C00; font-style: italic; }
+  .hero-subtitle {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: #E2E4E9;
+    letter-spacing: -0.01em;
+  }
+  .hero-play {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    border: 2px solid #FF5C00;
+    background: rgba(255, 92, 0, 0.10);
+    box-shadow:
+      0 0 40px rgba(255, 92, 0, 0.40),
+      inset 0 0 16px rgba(255, 92, 0, 0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 120ms;
+  }
+  .hero-overlay:hover .hero-play { transform: scale(1.05); }
+  .hero-play::before {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 20px solid #FFFFFF;
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    margin-left: 7px;
+  }
+  .hero-footer {
+    margin-top: 6px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: #555861;
+    text-transform: uppercase;
+  }
+
+  /* Dimmed dashboard while overlay is showing */
+  body.has-overlay header,
+  body.has-overlay main,
+  body.has-overlay .timeline-bar {
+    opacity: 0.40;
+    transition: opacity 160ms ease-out;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body class="has-overlay">
+
+<header>
+  <div class="brand">TWiST <span class="accent">Sentinel</span></div>
+  <div class="header-right">
+    <span class="episode-label" id="episode-label">E2281 · CHINA KILLS META / MANUS DEAL</span>
+    <div class="status replay">
+      <span class="dot"></span><span>REPLAY</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="transcript-pane">
+    <div id="transcript">
+      <div class="empty-state">Press play to start the replay.</div>
+    </div>
+  </section>
+  <aside id="sidebar-pane">
+    <div class="sidebar-title">
+      <span>THE DOCKET</span>
+      <span class="claim-count" id="claim-count-display">0 CLAIMS</span>
+    </div>
+    <div id="sidebar">
+      <div class="empty-state">No claims yet.</div>
+    </div>
+  </aside>
+</main>
+
+<aside class="timeline-bar">
+  <button class="timeline-play" id="play-toggle" aria-label="Play / pause">▶</button>
+  <div class="timeline-track" id="timeline-track">
+    <div class="timeline-fill" id="timeline-fill"></div>
+  </div>
+  <span class="timeline-clock" id="timeline-clock">0:00 / 0:00</span>
+  <div class="timeline-speed">
+    <button data-speed="1">1×</button>
+    <button data-speed="2" class="active">2×</button>
+    <button data-speed="4">4×</button>
+  </div>
+</aside>
+
+<div class="hero-overlay" id="hero-overlay">
+  <div class="hero-title">TWiST <span class="accent">Sentinel</span></div>
+  <div class="hero-subtitle">Live Fact-Check Replay</div>
+  <div class="hero-play" aria-hidden="true"></div>
+  <div class="hero-footer" id="hero-footer">Loading…</div>
+</div>
+
+<script>
+(() => {
+  // ─── State ──────────────────────────────────────────────────
+  let data = null;
+  let timeline = [];        // [{timeOffset, kind: 'segment'|'card', payload}, ...] sorted ascending
+  let cursorMs = 0;
+  let durationMs = 0;
+  let playing = false;
+  let speed = 2;
+  let nextIdx = 0;          // next timeline entry to render
+  let lastTickPerf = 0;
+
+  // Replay renders EVERY card from the captured session — no count cap.
+  // (The live dashboard caps at 10 for DOM weight; for a finite replay we
+  // want the full set so the claim counter reaches the captured total.)
+  const MAX_CARDS = Infinity;
+  const FULL_CARDS = 2;
+  let renderedCards = [];   // newest-first
+  const segmentsWithClaims = new Set();
+
+  const transcriptEl   = document.getElementById('transcript');
+  const sidebarEl      = document.getElementById('sidebar');
+  const claimCountEl   = document.getElementById('claim-count-display');
+  const playBtn        = document.getElementById('play-toggle');
+  const trackEl        = document.getElementById('timeline-track');
+  const fillEl         = document.getElementById('timeline-fill');
+  const clockEl        = document.getElementById('timeline-clock');
+  const heroOverlay    = document.getElementById('hero-overlay');
+  const heroFooter     = document.getElementById('hero-footer');
+  const episodeLabelEl = document.getElementById('episode-label');
+
+  // ─── Utilities ──────────────────────────────────────────────
+  const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+
+  function formatExplanationWithRefs(text) {
+    return escape(text).replace(/\[(\d+)\]/g, '<span class="citation-ref">[$1]</span>');
+  }
+
+  function fmtClock(ms) {
+    if (!isFinite(ms) || ms < 0) ms = 0;
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    return `${m}:${(s % 60).toString().padStart(2, '0')}`;
+  }
+
+  function truncate(text, n) {
+    if (!text) return '';
+    if (text.length <= n) return text;
+    return text.slice(0, n).trim() + '…';
+  }
+
+  function verdictClass(v) {
+    return (v || 'unverifiable').toLowerCase();
+  }
+
+  // Speaker label → role classification. The captured JSON stores speakerLabel
+  // as a string ("Speaker 0", "Host", "Guest", etc.). Map to the same role
+  // classes the live dashboard uses so the colored dot lines up.
+  function resolveSpeakerLabel(raw) {
+    const s = String(raw || '').trim();
+    const lower = s.toLowerCase();
+    if (lower.startsWith('host')) return { name: s, roleClass: 'role-host' };
+    if (lower.startsWith('cohost') || lower.startsWith('co-host')) return { name: s, roleClass: 'role-cohost' };
+    if (lower.startsWith('guest')) return { name: s, roleClass: 'role-guest' };
+    return { name: s || 'Speaker', roleClass: 'role-unmapped' };
+  }
+
+  function pulse(el) {
+    if (!el) return;
+    el.classList.remove('pulse');
+    void el.offsetWidth;
+    el.classList.add('pulse');
+    setTimeout(() => el.classList.remove('pulse'), 240);
+  }
+
+  // ─── Transcript rendering ──────────────────────────────────
+  function addSegment(seg) {
+    // Clear the "Press play to start the replay." prompt on the first
+    // segment. querySelector skips text-node siblings (whitespace from
+    // pretty-printed HTML) that broke the old firstChild check.
+    const emptyState = transcriptEl.querySelector('.empty-state');
+    if (emptyState) emptyState.remove();
+
+    const el = document.createElement('div');
+    el.className = 'seg';
+    el.dataset.segmentId = seg.id;
+    const { name, roleClass } = resolveSpeakerLabel(seg.speaker);
+    el.innerHTML = `
+      <span class="speaker ${roleClass}">${escape(name)}</span>
+      <span class="text">${escape(seg.text)}</span>
+      <span class="ts">${escape(seg.timestamp || '')}</span>
+    `;
+    el.addEventListener('click', () => {
+      if (!el.classList.contains('has-claim')) return;
+      const card = sidebarEl.querySelector(`[data-claim-id="${CSS.escape(seg.id)}"]`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pulse(card);
+      }
+    });
+    transcriptEl.appendChild(el);
+
+    if (seg.claimId || segmentsWithClaims.has(seg.id)) {
+      el.classList.add('has-claim');
+    }
+
+    // Auto-scroll to bottom if the viewer is already near the bottom.
+    const pane = document.getElementById('transcript-pane');
+    const atBottom = pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 80;
+    if (atBottom) pane.scrollTop = pane.scrollHeight;
+  }
+
+  function markSegmentAsClaim(segmentId) {
+    segmentsWithClaims.add(segmentId);
+    const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(segmentId)}"]`);
+    if (segEl) segEl.classList.add('has-claim');
+  }
+
+  // ─── Card rendering (mirrors public/index.html renderFullCard) ──
+  function renderFullCard(card) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.claimId = card.id;
+    el.dataset.verdict = card.verdict || 'UNVERIFIABLE';
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.citations-toggle, .citation')) return;
+      const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(card.segmentId || card.id)}"]`);
+      if (segEl) {
+        segEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pulse(segEl);
+      }
+    });
+
+    if (card.grounding) {
+      const g = document.createElement('div');
+      g.className = 'grounding';
+      g.innerHTML = formatExplanationWithRefs(card.grounding);
+      el.appendChild(g);
+    }
+
+    const vrow = document.createElement('div');
+    vrow.className = 'verdict-row';
+    vrow.innerHTML = `<span class="pill ${verdictClass(card.verdict)}">${escape(card.verdict)}</span>`;
+    el.appendChild(vrow);
+
+    if (card.explanation) {
+      const exp = document.createElement('div');
+      exp.className = 'explanation';
+      exp.innerHTML = formatExplanationWithRefs(card.explanation);
+      el.appendChild(exp);
+    }
+
+    if (card.citations && card.citations.length > 0) {
+      const toggle = document.createElement('div');
+      toggle.className = 'citations-toggle';
+      const n = card.citations.length;
+      toggle.innerHTML = `<span class="caret">▸</span> ${n} ${n === 1 ? 'source' : 'sources'}`;
+
+      const list = document.createElement('div');
+      list.className = 'citations-list';
+      card.citations.forEach((c, i) => {
+        const row = document.createElement('div');
+        row.className = 'citation';
+        if (c.url) {
+          row.innerHTML = `
+            <span class="num">[${i + 1}]</span>
+            <span class="title" title="Click to copy URL">${escape(c.title)}</span>
+            <span class="tier">T${c.tier}</span>
+          `;
+          row.querySelector('.title').addEventListener('click', (e) => {
+            e.stopPropagation();
+            copyToClipboard(c.url, row);
+          });
+        } else {
+          row.classList.add('archive');
+          row.innerHTML = `
+            <span class="num">[${i + 1}]</span>
+            <span class="title">${escape(c.title)}</span>
+            <span class="archive-label">— show archive</span>
+            <span class="tier">T${c.tier}</span>
+          `;
+        }
+        list.appendChild(row);
+      });
+
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggle.classList.toggle('open');
+        list.classList.toggle('open');
+      });
+
+      el.appendChild(toggle);
+      el.appendChild(list);
+    }
+
+    return el;
+  }
+
+  function renderCollapsedCard(card) {
+    const el = renderFullCard(card);
+    el.classList.add('collapsed');
+    const verdict = card.verdict || 'UNVERIFIABLE';
+    const pill = document.createElement('span');
+    pill.className = `pill ${verdictClass(verdict)}`;
+    pill.textContent = verdict;
+    const truncatedClaim = document.createElement('span');
+    truncatedClaim.className = 'truncated-claim';
+    truncatedClaim.textContent = truncate(card.explanation || card.grounding || '', 60);
+    el.insertBefore(truncatedClaim, el.firstChild);
+    el.insertBefore(pill, el.firstChild);
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.citations-toggle, .citation')) return;
+      el.classList.toggle('expanded');
+    });
+    return el;
+  }
+
+  function renderSidebar() {
+    const n = renderedCards.length;
+    claimCountEl.textContent = `${n} CLAIM${n !== 1 ? 'S' : ''}`;
+
+    if (n === 0) {
+      sidebarEl.innerHTML = '<div class="empty-state">No claims yet.</div>';
+      return;
+    }
+    sidebarEl.innerHTML = '';
+
+    const recent = renderedCards.slice(0, FULL_CARDS);
+    const earlier = renderedCards.slice(FULL_CARDS);
+
+    recent.forEach((card, idx) => {
+      const fullEl = renderFullCard(card);
+      if (idx === 0) fullEl.classList.add('is-new');
+      sidebarEl.appendChild(fullEl);
+    });
+
+    if (earlier.length > 0) {
+      const divider = document.createElement('hr');
+      divider.className = 'earlier-divider';
+      sidebarEl.appendChild(divider);
+
+      const label = document.createElement('div');
+      label.className = 'earlier-label';
+      label.textContent = `Earlier (${earlier.length})`;
+      sidebarEl.appendChild(label);
+
+      for (const card of earlier) {
+        sidebarEl.appendChild(renderCollapsedCard(card));
+      }
+    }
+  }
+
+  function addCard(card) {
+    renderedCards.unshift(card);
+    while (renderedCards.length > MAX_CARDS) renderedCards.pop();
+    markSegmentAsClaim(card.segmentId || card.id);
+    renderSidebar();
+  }
+
+  // ─── Clipboard ──────────────────────────────────────────────
+  async function copyToClipboard(text, rowEl) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      ta.remove();
+    }
+    rowEl.classList.add('copied');
+    setTimeout(() => rowEl.classList.remove('copied'), 1500);
+  }
+
+  // ─── Playback engine ────────────────────────────────────────
+  function tick() {
+    const now = performance.now();
+    if (!playing) {
+      lastTickPerf = now;
+      return;
+    }
+    const dt = now - lastTickPerf;
+    lastTickPerf = now;
+    cursorMs += dt * speed;
+
+    if (cursorMs >= durationMs) {
+      cursorMs = durationMs;
+      playing = false;
+      playBtn.textContent = '▶';
+    }
+
+    // Render every event the cursor has passed.
+    while (nextIdx < timeline.length && timeline[nextIdx].timeOffset <= cursorMs) {
+      const ev = timeline[nextIdx];
+      if (ev.kind === 'segment') addSegment(ev.payload);
+      else if (ev.kind === 'card') addCard(ev.payload);
+      nextIdx++;
+    }
+
+    // Update timeline UI.
+    const pct = durationMs > 0 ? (cursorMs / durationMs) * 100 : 0;
+    fillEl.style.width = `${pct}%`;
+    clockEl.textContent = `${fmtClock(cursorMs)} / ${fmtClock(durationMs)}`;
+  }
+
+  function play() {
+    if (playing) return;
+    playing = true;
+    lastTickPerf = performance.now();
+    playBtn.textContent = '⏸';
+  }
+
+  function pause() {
+    playing = false;
+    playBtn.textContent = '▶';
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (playing) pause(); else play();
+  });
+
+  document.querySelectorAll('.timeline-speed button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.timeline-speed button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      speed = parseFloat(btn.dataset.speed) || 1;
+    });
+  });
+
+  // Timeline scrubbing — click anywhere on the track to seek.
+  trackEl.addEventListener('click', (e) => {
+    const rect = trackEl.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const target = ratio * durationMs;
+    seekTo(target);
+  });
+
+  function seekTo(targetMs) {
+    cursorMs = Math.max(0, Math.min(durationMs, targetMs));
+    nextIdx = 0;
+    renderedCards = [];
+    segmentsWithClaims.clear();
+    transcriptEl.innerHTML = '<div class="empty-state">Press play to start the replay.</div>';
+    sidebarEl.innerHTML = '<div class="empty-state">No claims yet.</div>';
+    claimCountEl.textContent = '0 CLAIMS';
+    while (nextIdx < timeline.length && timeline[nextIdx].timeOffset <= cursorMs) {
+      const ev = timeline[nextIdx];
+      if (ev.kind === 'segment') addSegment(ev.payload);
+      else if (ev.kind === 'card') addCard(ev.payload);
+      nextIdx++;
+    }
+    const pct = durationMs > 0 ? (cursorMs / durationMs) * 100 : 0;
+    fillEl.style.width = `${pct}%`;
+    clockEl.textContent = `${fmtClock(cursorMs)} / ${fmtClock(durationMs)}`;
+  }
+
+  // Hero click-to-start
+  heroOverlay.addEventListener('click', () => {
+    heroOverlay.classList.add('fade-out');
+    document.body.classList.remove('has-overlay');
+    play();
+    setTimeout(() => { heroOverlay.style.display = 'none'; }, 200);
+  });
+
+  // ─── Boot ───────────────────────────────────────────────────
+  async function boot() {
+    let resp;
+    try {
+      resp = await fetch('data/e2281-session.json');
+    } catch (err) {
+      heroFooter.textContent = 'Replay data unavailable';
+      console.error('Replay data fetch failed:', err);
+      return;
+    }
+    if (!resp.ok) {
+      heroFooter.textContent = `Replay data unavailable (HTTP ${resp.status})`;
+      return;
+    }
+    data = await resp.json();
+
+    // Build a unified timeline sorted by timeOffset. Segments at the same
+    // offset render before cards (so the segment exists in the DOM by the
+    // time the card click-handler tries to scroll to it).
+    for (const seg of data.segments || []) {
+      timeline.push({ timeOffset: seg.timeOffset, kind: 'segment', payload: seg });
+    }
+    for (const card of data.cards || []) {
+      timeline.push({ timeOffset: card.timeOffset, kind: 'card', payload: card });
+    }
+    timeline.sort((a, b) => {
+      if (a.timeOffset !== b.timeOffset) return a.timeOffset - b.timeOffset;
+      return a.kind === 'segment' ? -1 : 1;
+    });
+
+    durationMs = timeline.length > 0 ? timeline[timeline.length - 1].timeOffset + 5000 : 0;
+
+    const durMin = Math.max(1, Math.round(durationMs / 60000));
+    heroFooter.textContent = `${durMin}-minute session • No audio • Best at desktop`;
+    clockEl.textContent = `0:00 / ${fmtClock(durationMs)}`;
+
+    // Tick the engine every 50ms regardless of playing state (cheap, lets
+    // pause/resume use the same code path).
+    setInterval(tick, 50);
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

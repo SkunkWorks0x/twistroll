@@ -1,0 +1,1283 @@
+{
+  "meta": {
+    "sessionStartMs": 1778912428111,
+    "url": "https://www.youtube.com/watch?v=pjnOykD3tzA",
+    "commit": "bdf948b290f2bc6ee7301526b69e5701c9e606c2",
+    "capturedAt": "2026-05-16T06:20:28.118Z"
+  },
+  "segments": [
+    {
+      "id": "1834f7c3-0aa7-4359-b1ef-9104969b9b50",
+      "speaker": "Speaker 0",
+      "text": "Of the Manus founders if they don't return. This to me feels like the story of the year.",
+      "timestamp": "0:00",
+      "timeOffset": 0,
+      "claimId": null
+    },
+    {
+      "id": "27f77d07-9b73-4f9a-b923-8864d76a773c",
+      "speaker": "Speaker 0",
+      "text": "This is huge. Should we talk about some news? There's lots of news.",
+      "timestamp": "0:04",
+      "timeOffset": 4910,
+      "claimId": null
+    },
+    {
+      "id": "6ff4cc7c-d562-4f9f-bcee-fb3bfb5469ae",
+      "speaker": "Speaker 0",
+      "text": "People want me to talk about the news, so let's do it. Which is there a story people want you to particular",
+      "timestamp": "0:08",
+      "timeOffset": 8500,
+      "claimId": null
+    },
+    {
+      "id": "017ef68c-3aa1-4d11-a3d2-e82889fdbe71",
+      "speaker": "Speaker 0",
+      "text": "talk about? Is it the opening? Why don't you tell me your top two or three here, we'll just go through them?",
+      "timestamp": "0:12",
+      "timeOffset": 12930,
+      "claimId": null
+    },
+    {
+      "id": "eaca5e46-4de5-4ee6-b4f4-6f2ef6da66ed",
+      "speaker": "Speaker 0",
+      "text": "So OpenAI and Microsoft, this is probably the biggest traditional tech story of the day.",
+      "timestamp": "0:16",
+      "timeOffset": 16550,
+      "claimId": null
+    },
+    {
+      "id": "6af35624-4b30-435d-96f3-f8a27f19a8e1",
+      "speaker": "Speaker 0",
+      "text": "They have altered their ongoing partnership, Jason, as you recall.",
+      "timestamp": "0:20",
+      "timeOffset": 20620,
+      "claimId": "6af35624-4b30-435d-96f3-f8a27f19a8e1"
+    },
+    {
+      "id": "e7a72a14-446f-415b-bf49-ff8ed073b838",
+      "speaker": "Speaker 0",
+      "text": "They they they've been working together yet again. They've been working together.",
+      "timestamp": "0:24",
+      "timeOffset": 24270,
+      "claimId": null
+    },
+    {
+      "id": "e093dbe4-f8e0-4f27-8792-40bbb083ee41",
+      "speaker": "Speaker 0",
+      "text": "It's very complicated. There are all these different rules. They've sort of",
+      "timestamp": "0:28",
+      "timeOffset": 28670,
+      "claimId": null
+    },
+    {
+      "id": "fff53106-d841-449d-93ad-bf82fceb140d",
+      "speaker": "Speaker 0",
+      "text": "smooth things out and simplified them. So,",
+      "timestamp": "0:32",
+      "timeOffset": 32110,
+      "claimId": null
+    },
+    {
+      "id": "b9d7926d-6909-4d1e-a5b5-c63036577012",
+      "speaker": "Speaker 0",
+      "text": "the companies have agreed to drop Microsoft's exclusive rights",
+      "timestamp": "0:35",
+      "timeOffset": 35130,
+      "claimId": "b9d7926d-6909-4d1e-a5b5-c63036577012"
+    },
+    {
+      "id": "6e6a258a-a50d-4b8a-84af-591708a6792b",
+      "speaker": "Speaker 0",
+      "text": "to sell OpenAI models. So OpenAI is now free to pursue",
+      "timestamp": "0:38",
+      "timeOffset": 38780,
+      "claimId": null
+    },
+    {
+      "id": "83261566-d598-4e67-8420-129b44b6779d",
+      "speaker": "Speaker 0",
+      "text": "deals with especially Amazon, they're already working on a joint deal to develop products",
+      "timestamp": "0:43",
+      "timeOffset": 43180,
+      "claimId": null
+    },
+    {
+      "id": "871c78ae-2e2d-4344-9f49-ef4f7e95732e",
+      "speaker": "Speaker 0",
+      "text": "for Amazon Web. They're gonna continue doing that, and then they can open up",
+      "timestamp": "0:48",
+      "timeOffset": 48150,
+      "claimId": "871c78ae-2e2d-4344-9f49-ef4f7e95732e"
+    },
+    {
+      "id": "b4fd0c71-b496-4d49-82f9-a676963792da",
+      "speaker": "Speaker 0",
+      "text": "to even more, OpenAI. Microsoft has",
+      "timestamp": "0:51",
+      "timeOffset": 51950,
+      "claimId": null
+    },
+    {
+      "id": "e3d44df5-e51c-490f-9aaf-45c50e4f6b2c",
+      "speaker": "Speaker 0",
+      "text": "was sort of weighing legal action over the AWS deal, but now",
+      "timestamp": "0:55",
+      "timeOffset": 55510,
+      "claimId": null
+    },
+    {
+      "id": "e98ef5ef-066a-44d9-a8ea-b3f26db2d03f",
+      "speaker": "Speaker 0",
+      "text": "now that is off. However, Microsoft will remain OpenAI's, quote, unquote,",
+      "timestamp": "0:58",
+      "timeOffset": 58560,
+      "claimId": null
+    },
+    {
+      "id": "f7e03d2d-da57-4da8-81e2-74bfd49b72d1",
+      "speaker": "Speaker 0",
+      "text": "primary cloud provider, and new OpenAI products are gonna debut",
+      "timestamp": "1:03",
+      "timeOffset": 63500,
+      "claimId": "f7e03d2d-da57-4da8-81e2-74bfd49b72d1"
+    },
+    {
+      "id": "0b0925ce-565d-4900-9573-729eafd93b7d",
+      "speaker": "Speaker 0",
+      "text": "first on Azure before they're available across other",
+      "timestamp": "1:08",
+      "timeOffset": 68470,
+      "claimId": "0b0925ce-565d-4900-9573-729eafd93b7d"
+    },
+    {
+      "id": "4080e6ee-379d-4bfa-ac73-0eff04d83a5b",
+      "speaker": "Speaker 0",
+      "text": "cloud services. Now in exchange for all of this, Microsoft no longer has",
+      "timestamp": "1:12",
+      "timeOffset": 72090,
+      "claimId": "4080e6ee-379d-4bfa-ac73-0eff04d83a5b"
+    },
+    {
+      "id": "40549428-038c-45e1-bbb4-640d49489eef",
+      "speaker": "Speaker 0",
+      "text": "to pay OpenAI a revenue share on the products it resells",
+      "timestamp": "1:16",
+      "timeOffset": 76250,
+      "claimId": null
+    },
+    {
+      "id": "54b0fff6-ab64-43e3-b1d2-9ef72305521c",
+      "speaker": "Speaker 0",
+      "text": "in Azure, and the revenue share paid by OpenAI is going to be capped",
+      "timestamp": "1:20",
+      "timeOffset": 80830,
+      "claimId": "54b0fff6-ab64-43e3-b1d2-9ef72305521c"
+    },
+    {
+      "id": "eb0a3f0b-fcda-401b-81b6-7b8e54850e56",
+      "speaker": "Speaker 0",
+      "text": "though we don't know at what level. They didn't specify exactly",
+      "timestamp": "1:25",
+      "timeOffset": 85470,
+      "claimId": null
+    },
+    {
+      "id": "a20a6283-ed6d-4542-ac76-34ea5c2798f8",
+      "speaker": "Speaker 0",
+      "text": "where that cap will be. Microsoft now receives rev share through 2030 regardless of the AGI. Remember, it was always like, it's contingent on OpenAI",
+      "timestamp": "1:29",
+      "timeOffset": 89000,
+      "claimId": "a20a6283-ed6d-4542-ac76-34ea5c2798f8"
+    },
+    {
+      "id": "efaae93a-3e7b-4950-af85-dfd026ef3dad",
+      "speaker": "Speaker 0",
+      "text": "maybe reaching AGI. So that now they've just locked it in through 2030.",
+      "timestamp": "1:38",
+      "timeOffset": 98700,
+      "claimId": null
+    },
+    {
+      "id": "5489a86e-a36f-410d-b6f5-311ffb6376f7",
+      "speaker": "Speaker 0",
+      "text": "And they're sort of kicking that can the AGI can down the road.",
+      "timestamp": "1:43",
+      "timeOffset": 103670,
+      "claimId": null
+    },
+    {
+      "id": "9c69c6ea-d37a-4bb9-b3f9-949068e4b89c",
+      "speaker": "Speaker 0",
+      "text": "What's important here is how much equity",
+      "timestamp": "1:46",
+      "timeOffset": 106810,
+      "claimId": null
+    },
+    {
+      "id": "d40e8d44-371f-412c-bffd-085d01342fdc",
+      "speaker": "Speaker 0",
+      "text": "Microsoft has in OpenAI. Microsoft owns about",
+      "timestamp": "1:50",
+      "timeOffset": 110190,
+      "claimId": null
+    },
+    {
+      "id": "7dc41458-6ffb-470d-be50-d52bc05d1cc8",
+      "speaker": "Speaker 0",
+      "text": "27% of OpenAI Group, to now, according to Bloomberg.",
+      "timestamp": "1:53",
+      "timeOffset": 113210,
+      "claimId": "7dc41458-6ffb-470d-be50-d52bc05d1cc8"
+    },
+    {
+      "id": "9ac66cf6-5bf1-4a93-a7dd-10b68d48fe0a",
+      "speaker": "Speaker 0",
+      "text": "So why would Microsoft agree to give up the exclusive",
+      "timestamp": "1:57",
+      "timeOffset": 117880,
+      "claimId": null
+    },
+    {
+      "id": "f51f2140-9b02-4a21-a19f-4707883fe83a",
+      "speaker": "Speaker 0",
+      "text": "to OpenAI's models?",
+      "timestamp": "2:02",
+      "timeOffset": 122700,
+      "claimId": null
+    },
+    {
+      "id": "0a25b6e1-0105-480a-b54a-6cc953aa366e",
+      "speaker": "Speaker 0",
+      "text": "Right. This wasn't a two way exclusive, so it wasn't like Microsoft couldn't do Claude or Grock. They're they're hosting",
+      "timestamp": "2:05",
+      "timeOffset": 125460,
+      "claimId": null
+    },
+    {
+      "id": "af4b4b48-bebf-4ca6-944d-f3bd9a768cf4",
+      "speaker": "Speaker 1",
+      "text": "things like that, I believe, on Azure.",
+      "timestamp": "2:13",
+      "timeOffset": 133150,
+      "claimId": null
+    },
+    {
+      "id": "2556bdb0-22d7-4e4d-aa36-4202fe9cce62",
+      "speaker": "Speaker 1",
+      "text": "So why would Microsoft why would",
+      "timestamp": "2:15",
+      "timeOffset": 135650,
+      "claimId": null
+    },
+    {
+      "id": "967cd66c-54d4-4cb5-a103-23b6a78e2617",
+      "speaker": "Speaker 1",
+      "text": "Satya Nadella do this?",
+      "timestamp": "2:19",
+      "timeOffset": 139510,
+      "claimId": null
+    },
+    {
+      "id": "7426c54c-2658-421f-9233-abc9c9fd18dd",
+      "speaker": "Speaker 1",
+      "text": "The answer",
+      "timestamp": "2:21",
+      "timeOffset": 141790,
+      "claimId": null
+    },
+    {
+      "id": "604f0e47-bdb1-47d5-8f60-e57bf1bfb80d",
+      "speaker": "Speaker 1",
+      "text": "is that if this becomes a $10,000,000,000 company,",
+      "timestamp": "2:23",
+      "timeOffset": 143600,
+      "claimId": null
+    },
+    {
+      "id": "43970459-0431-4980-ba3e-0045bd60fc2c",
+      "speaker": "Speaker 1",
+      "text": "a $10,000,000,000,000 company, and they own 27% of it,",
+      "timestamp": "2:27",
+      "timeOffset": 147670,
+      "claimId": "43970459-0431-4980-ba3e-0045bd60fc2c"
+    },
+    {
+      "id": "8385253d-8b6f-4cc9-9e97-2f91783335d3",
+      "speaker": "Speaker 1",
+      "text": "The 27% of a $2,000,000,000,000 open AI or a $3,000,000,000,000 open AI is",
+      "timestamp": "2:32",
+      "timeOffset": 152310,
+      "claimId": null
+    },
+    {
+      "id": "e64b5593-2c1e-4292-91b8-b0248d1f3c0f",
+      "speaker": "Speaker 1",
+      "text": "500, 600. It's an incremental",
+      "timestamp": "2:39",
+      "timeOffset": 159640,
+      "claimId": null
+    },
+    {
+      "id": "645d7812-7e52-4069-911d-510e05b637d1",
+      "speaker": "Speaker 1",
+      "text": "$600,000,000,000. Yeah.",
+      "timestamp": "2:43",
+      "timeOffset": 163620,
+      "claimId": null
+    },
+    {
+      "id": "51df4886-3f92-4165-99ac-6ea670aee009",
+      "speaker": "Speaker 1",
+      "text": "In their equity stake. So let that sink in. What could Microsoft do",
+      "timestamp": "2:47",
+      "timeOffset": 167180,
+      "claimId": null
+    },
+    {
+      "id": "53db633b-4418-4f3b-ad61-def139b9b2b7",
+      "speaker": "Speaker 1",
+      "text": "with 900,000,000,000 with a b dollars. Yeah.",
+      "timestamp": "2:52",
+      "timeOffset": 172000,
+      "claimId": null
+    },
+    {
+      "id": "055d8127-9a5d-48f7-ba3a-9e7d36fa7569",
+      "speaker": "Speaker 0",
+      "text": "Most of the time. Revenue than Microsoft will make in the next ten years. So they made this",
+      "timestamp": "2:58",
+      "timeOffset": 178670,
+      "claimId": null
+    },
+    {
+      "id": "d4f01451-9694-4342-897b-8b2f6d0c2b85",
+      "speaker": "Speaker 1",
+      "text": "extraordinary bet",
+      "timestamp": "3:03",
+      "timeOffset": 183580,
+      "claimId": null
+    },
+    {
+      "id": "d000e4d2-8f4c-4082-8cc9-3b40bb28167f",
+      "speaker": "Speaker 1",
+      "text": "perhaps the greatest investment of all time.",
+      "timestamp": "3:05",
+      "timeOffset": 185010,
+      "claimId": null
+    },
+    {
+      "id": "149202cc-c842-479d-8d24-2bc75ab9046d",
+      "speaker": "Speaker 1",
+      "text": "Up there. In OpenAI. This might be Yeah. If if OpenAI becomes",
+      "timestamp": "3:08",
+      "timeOffset": 188750,
+      "claimId": null
+    },
+    {
+      "id": "c8c55ded-2eae-4168-b037-5ff5d6eda9c8",
+      "speaker": "Speaker 1",
+      "text": "a $3,000,000,000,000 company, it's a 1,000,000,000,000 or just under 1,000,000,000,000, let's",
+      "timestamp": "3:12",
+      "timeOffset": 192610,
+      "claimId": null
+    },
+    {
+      "id": "c7ad6d00-6ef2-4f16-ab48-b61f82f4e860",
+      "speaker": "Speaker 1",
+      "text": "call it 600,000,000,000 Yeah. To eight 100,000,000,000. But we'll round it up, the",
+      "timestamp": "3:17",
+      "timeOffset": 197580,
+      "claimId": "c7ad6d00-6ef2-4f16-ab48-b61f82f4e860"
+    },
+    {
+      "id": "6519d842-91a3-42b6-a827-8dd3890b3b43",
+      "speaker": "Speaker 1",
+      "text": "markets, it'll become worth a trillion. It'll get run up. Now they own 270,000,000,000.",
+      "timestamp": "3:21",
+      "timeOffset": 201530,
+      "claimId": null
+    },
+    {
+      "id": "1c0f5e26-badb-4934-8082-92eb567be2d1",
+      "speaker": "Speaker 1",
+      "text": "Now triple that. Okay. Now you're at 800,000,000,000. Yeah.",
+      "timestamp": "3:25",
+      "timeOffset": 205720,
+      "claimId": "1c0f5e26-badb-4934-8082-92eb567be2d1"
+    },
+    {
+      "id": "b0c68519-6b62-4e5e-bcc1-603c6ca7ea1a",
+      "speaker": "Speaker 1",
+      "text": "Then what if it goes to 10,000,000,000,000?",
+      "timestamp": "3:30",
+      "timeOffset": 210180,
+      "claimId": null
+    },
+    {
+      "id": "5e805c9a-c413-46c9-ae4f-78270a52584d",
+      "speaker": "Speaker 0",
+      "text": "That's what most of the companies trying in cash",
+      "timestamp": "3:33",
+      "timeOffset": 213280,
+      "claimId": null
+    },
+    {
+      "id": "1b083f57-878f-45bb-86df-6e2037727adc",
+      "speaker": "Speaker 1",
+      "text": "money. Yeah. This is what analysts were saying today is that the",
+      "timestamp": "3:37",
+      "timeOffset": 217830,
+      "claimId": null
+    },
+    {
+      "id": "fb482a39-19a8-41ae-a1bf-a46cf0af9b7a",
+      "speaker": "Speaker 0",
+      "text": "OpenAI wanted this greater flexibility. Microsoft just wanted to lock",
+      "timestamp": "3:40",
+      "timeOffset": 220940,
+      "claimId": null
+    },
+    {
+      "id": "debf8c14-9540-4223-8c29-fa8c1ba955b0",
+      "speaker": "Speaker 0",
+      "text": "in their part ownership and make sure they were gonna benefit down the road, but",
+      "timestamp": "3:45",
+      "timeOffset": 225100,
+      "claimId": null
+    },
+    {
+      "id": "65fcd15a-83aa-420e-9373-e3d4d264f536",
+      "speaker": "Speaker 0",
+      "text": "it seems to be all about just, like, the the the widest",
+      "timestamp": "3:49",
+      "timeOffset": 229410,
+      "claimId": null
+    },
+    {
+      "id": "fcfe5b90-2983-4356-99ac-9630b54b3b76",
+      "speaker": "Speaker 0",
+      "text": "possible avenue for OpenAI to sort of get as big as",
+      "timestamp": "3:52",
+      "timeOffset": 232670,
+      "claimId": null
+    },
+    {
+      "id": "6aa63fbe-a97a-40aa-a8d4-415263f7d0f6",
+      "speaker": "Speaker 1",
+      "text": "can. Also, there was probably something about",
+      "timestamp": "3:55",
+      "timeOffset": 235690,
+      "claimId": null
+    },
+    {
+      "id": "07a3f00f-1a55-416f-9124-a377891cdfcd",
+      "speaker": "Speaker 1",
+      "text": "this AGI, you know, that it reaches AGI.",
+      "timestamp": "3:58",
+      "timeOffset": 238740,
+      "claimId": null
+    },
+    {
+      "id": "41602419-5a0b-4ef7-a53c-7aa5b57c1613",
+      "speaker": "Speaker 1",
+      "text": "They probably put the gun to their head and said, we're gonna",
+      "timestamp": "4:01",
+      "timeOffset": 241790,
+      "claimId": null
+    },
+    {
+      "id": "cfd9a8c3-4a93-41df-a857-adb3ebb87563",
+      "speaker": "Speaker 1",
+      "text": "claim we're at AGI, and we're gonna be in a huge lawsuit. AGI progress is now going to be",
+      "timestamp": "4:04",
+      "timeOffset": 244810,
+      "claimId": null
+    },
+    {
+      "id": "f53b3a50-24eb-4dfb-87b0-7e631529bf15",
+      "speaker": "Speaker 0",
+      "text": "independently verified. That's the change now. So it's not up",
+      "timestamp": "4:09",
+      "timeOffset": 249780,
+      "claimId": null
+    },
+    {
+      "id": "f1fdd91c-73e1-44fa-848b-0de9b3b2ea2b",
+      "speaker": "Speaker 0",
+      "text": "to OpenAI to say AGI has been reached. We're gonna have to bring in some",
+      "timestamp": "4:12",
+      "timeOffset": 252800,
+      "claimId": null
+    },
+    {
+      "id": "d3ad0db6-9fe1-4071-bf7a-44eee4b45d34",
+      "speaker": "Speaker 0",
+      "text": "expert third party to make the official judgment. I'm gonna press the button on my plot pin.",
+      "timestamp": "4:17",
+      "timeOffset": 257050,
+      "claimId": null
+    },
+    {
+      "id": "4399c902-4b49-448d-a12f-c564e3bd3238",
+      "speaker": "Speaker 1",
+      "text": "Boom. It gives me a haptic. It shakes. I've got this on my suit.",
+      "timestamp": "4:22",
+      "timeOffset": 262020,
+      "claimId": null
+    },
+    {
+      "id": "e4003f96-7d52-4a30-8062-63c716985636",
+      "speaker": "Speaker 1",
+      "text": "I didn't pin it like lawn on a nice",
+      "timestamp": "4:25",
+      "timeOffset": 265370,
+      "claimId": null
+    },
+    {
+      "id": "bd4bf523-9b18-4db1-8901-14f5cd1b5423",
+      "speaker": "Speaker 1",
+      "text": "Lon. You don't pin a suit like that. You use the magnet",
+      "timestamp": "4:28",
+      "timeOffset": 268030,
+      "claimId": null
+    },
+    {
+      "id": "f2bed536-c527-4c65-83b2-afeb8227adae",
+      "speaker": "Speaker 1",
+      "text": "so you don't damage the suit, Lan. This isn't gonna hurt it. This is",
+      "timestamp": "4:32",
+      "timeOffset": 272310,
+      "claimId": null
+    },
+    {
+      "id": "4cfeb900-542d-4537-81b8-6b994487c5d8",
+      "speaker": "Speaker 0",
+      "text": "fine. This is the problem. You need to this is another lesson here from your your big brother.",
+      "timestamp": "4:35",
+      "timeOffset": 275930,
+      "claimId": null
+    },
+    {
+      "id": "e1ed50d6-079a-4035-81fc-49cef7864f0b",
+      "speaker": "Speaker 1",
+      "text": "Here's the thing. You use the magnet",
+      "timestamp": "4:40",
+      "timeOffset": 280900,
+      "claimId": null
+    },
+    {
+      "id": "5e8030a7-010e-450a-b890-5aad4fa03648",
+      "speaker": "Speaker 1",
+      "text": "like this. This is the magnet goes behind your plot. I have it. You if you take care of your",
+      "timestamp": "4:43",
+      "timeOffset": 283920,
+      "claimId": null
+    },
+    {
+      "id": "16c70510-c789-4fea-b456-d19e3ae9d86d",
+      "speaker": "Speaker 1",
+      "text": "suit, your suit's gonna take care of you long. K? That's what you need to learn here. I appreciate it. And",
+      "timestamp": "4:48",
+      "timeOffset": 288680,
+      "claimId": null
+    },
+    {
+      "id": "086d8394-9f7b-40e3-9c47-8e8d7176768b",
+      "speaker": "Speaker 1",
+      "text": "I'm constantly learning. I have my plug pin on. I give it action items.",
+      "timestamp": "4:53",
+      "timeOffset": 293440,
+      "claimId": null
+    },
+    {
+      "id": "f5255190-94ae-4fab-a2ec-bde4a66a8c2d",
+      "speaker": "Speaker 1",
+      "text": "One of the action items is I have to get engaged with the new community manager. I need to explain",
+      "timestamp": "4:58",
+      "timeOffset": 298200,
+      "claimId": null
+    },
+    {
+      "id": "1cbfaa60-ebe8-4452-9ed6-42a61ab3a393",
+      "speaker": "Speaker 1",
+      "text": "who we're trying to connect within each community, what our standard is,",
+      "timestamp": "5:03",
+      "timeOffset": 303110,
+      "claimId": null
+    },
+    {
+      "id": "6dbaf4d7-50dc-4029-9504-b77b6721911e",
+      "speaker": "Speaker 1",
+      "text": "and what our goals are. Okay. J Cal, make a note. Action item.",
+      "timestamp": "5:07",
+      "timeOffset": 307240,
+      "claimId": null
+    },
+    {
+      "id": "90fb1ffa-2a4f-46c1-93fb-a5f7b41f2436",
+      "speaker": "Speaker 1",
+      "text": "Let's define what we're trying to accomplish with the community before the community person",
+      "timestamp": "5:11",
+      "timeOffset": 311250,
+      "claimId": null
+    },
+    {
+      "id": "ff21671a-96dc-4bdf-aa0b-ef4f5f8953d9",
+      "speaker": "Speaker 1",
+      "text": "here and get that on the ground running. You know what? It's all now in my notes.",
+      "timestamp": "5:15",
+      "timeOffset": 315140,
+      "claimId": null
+    },
+    {
+      "id": "c525138e-2248-4867-84f6-7508826658d2",
+      "speaker": "Speaker 1",
+      "text": "I take this off. I put it into the cradle. It connects to Wi Fi. It syncs.",
+      "timestamp": "5:18",
+      "timeOffset": 318370,
+      "claimId": null
+    },
+    {
+      "id": "d21a3195-fbb4-4e5a-a9b3-640f581c928f",
+      "speaker": "Speaker 1",
+      "text": "Then I'm on my desktop. It's translated. It's put into bullet points. There's up to",
+      "timestamp": "5:23",
+      "timeOffset": 323010,
+      "claimId": null
+    },
+    {
+      "id": "0f3b219e-daee-4283-8c8a-b1c3103c16f2",
+      "speaker": "Speaker 1",
+      "text": "thousand templates. You can do all kinds of different things, a mind map, this, that, the other.",
+      "timestamp": "5:26",
+      "timeOffset": 326960,
+      "claimId": null
+    },
+    {
+      "id": "71db761c-f9c2-4401-a4b6-285891e213eb",
+      "speaker": "Speaker 1",
+      "text": "People are constantly making new templates for",
+      "timestamp": "5:31",
+      "timeOffset": 331360,
+      "claimId": null
+    },
+    {
+      "id": "5a914731-fd83-445f-9c6b-1edc9a753eb8",
+      "speaker": "Speaker 1",
+      "text": "what to do with this audio file. It's absolutely fantastic.",
+      "timestamp": "5:34",
+      "timeOffset": 334470,
+      "claimId": null
+    },
+    {
+      "id": "95f15da9-630d-4616-baeb-27009a556f00",
+      "speaker": "Speaker 1",
+      "text": "Over time, it learns about you. It learns about who you're talking to. Yeah. So it knows Lon Lon's",
+      "timestamp": "5:37",
+      "timeOffset": 337490,
+      "claimId": null
+    },
+    {
+      "id": "2ad488c0-66ee-4369-a514-d774d8acf501",
+      "speaker": "Speaker 1",
+      "text": "plot knows me. I applaud plot. It is",
+      "timestamp": "5:41",
+      "timeOffset": 341890,
+      "claimId": null
+    },
+    {
+      "id": "f746116b-951f-40a3-99d0-b43c7ee36927",
+      "speaker": "Speaker 1",
+      "text": "one of my breakout products for 2026.",
+      "timestamp": "5:45",
+      "timeOffset": 345450,
+      "claimId": null
+    },
+    {
+      "id": "aac34a22-8516-4db9-b01e-88a49b9f1aa9",
+      "speaker": "Speaker 0",
+      "text": "For sure. And if your work relies on conversations, you need a Plaid notepin or notepin as",
+      "timestamp": "5:48",
+      "timeOffset": 348770,
+      "claimId": null
+    },
+    {
+      "id": "d0bb8f10-537e-4397-a582-256adddcd5a9",
+      "speaker": "Speaker 0",
+      "text": "Check it out at plaud.ai/twist, and use the code Twist",
+      "timestamp": "5:53",
+      "timeOffset": 353740,
+      "claimId": null
+    },
+    {
+      "id": "f1656bfc-5371-4bf0-8b41-9526e0dd89a7",
+      "speaker": "Speaker 0",
+      "text": "to get 10% off.",
+      "timestamp": "5:57",
+      "timeOffset": 357510,
+      "claimId": null
+    },
+    {
+      "id": "295aaff2-0113-4620-9b77-662bbe48e4db",
+      "speaker": "Speaker 1",
+      "text": "Here's the problem. I'm so enthusiastic about plot. I I give them, like,",
+      "timestamp": "5:59",
+      "timeOffset": 359390,
+      "claimId": null
+    },
+    {
+      "id": "6a268161-8eba-4da9-9e80-a8a03c9b05e2",
+      "speaker": "Speaker 1",
+      "text": "triple the amount of airtime they they're paying for. We always end up talking a lot about",
+      "timestamp": "6:03",
+      "timeOffset": 363790,
+      "claimId": null
+    },
+    {
+      "id": "59f91e5e-cc21-4ea5-a641-0f4047b0902d",
+      "speaker": "Speaker 0",
+      "text": "power. Somebody's like, well, can you do triple for me? I'm like, I'm sorry. I",
+      "timestamp": "6:07",
+      "timeOffset": 367740,
+      "claimId": null
+    },
+    {
+      "id": "9ff993ae-cf26-476b-bfaf-fed55f7b89de",
+      "speaker": "Speaker 1",
+      "text": "I'll try my best. Anyway, thanks for supporting the show. That's how I pay Lon's ridiculous salary.",
+      "timestamp": "6:12",
+      "timeOffset": 372470,
+      "claimId": null
+    },
+    {
+      "id": "ae393eec-a72c-41ef-a23d-21e7f0b7606c",
+      "speaker": "Speaker 0",
+      "text": "I appreciate it. One month trip to Italy. Three weeks. Three weeks.",
+      "timestamp": "6:17",
+      "timeOffset": 377440,
+      "claimId": null
+    },
+    {
+      "id": "c53d29c6-d414-45f5-b549-5d39a5cccee6",
+      "speaker": "Speaker 0",
+      "text": "Three weeks. And I'm rounding up. Alright. Let's get to it. And, it's always interesting.",
+      "timestamp": "6:21",
+      "timeOffset": 381930,
+      "claimId": null
+    },
+    {
+      "id": "061e032b-f5f3-41bc-b081-c5aba865fa8b",
+      "speaker": "Speaker 1",
+      "text": "When people use the term interesting.",
+      "timestamp": "6:26",
+      "timeOffset": 386900,
+      "claimId": null
+    },
+    {
+      "id": "698ca217-dff1-43a3-8aec-5122d8150583",
+      "speaker": "Speaker 1",
+      "text": "Does anybody this is a good tweet by Jessica Lesson.",
+      "timestamp": "6:30",
+      "timeOffset": 390190,
+      "claimId": null
+    },
+    {
+      "id": "f7107651-140f-48d8-9592-b0985690d277",
+      "speaker": "Speaker 1",
+      "text": "Jessica Lesson's like, who thinks this is interesting? And then I open up my Twitter,",
+      "timestamp": "6:33",
+      "timeOffset": 393540,
+      "claimId": null
+    },
+    {
+      "id": "167eeda5-7f20-4b46-84a3-1c9b889c9912",
+      "speaker": "Speaker 1",
+      "text": "and what comes up? Peek. A very interesting announcement from OpenAI this morning. We're excited to make OpenAI's models available directly",
+      "timestamp": "6:37",
+      "timeOffset": 397760,
+      "claimId": null
+    },
+    {
+      "id": "7f38653a-cdbf-48c6-b61e-5321eca5cbf0",
+      "speaker": "Speaker 0",
+      "text": "to consumers on Bedrock in the coming weeks. That's from Andy Jassy, of course.",
+      "timestamp": "6:45",
+      "timeOffset": 405510,
+      "claimId": "7f38653a-cdbf-48c6-b61e-5321eca5cbf0"
+    },
+    {
+      "id": "b9938011-8fc2-44ab-b6d7-5385a81a0c7e",
+      "speaker": "Speaker 1",
+      "text": "From Amazon. Amazon CEO, Andy Jassy. So this is",
+      "timestamp": "6:50",
+      "timeOffset": 410480,
+      "claimId": null
+    },
+    {
+      "id": "37c86b73-70be-4b5f-8cb8-edb4ea9746fc",
+      "speaker": "Speaker 1",
+      "text": "super interesting development here.",
+      "timestamp": "6:54",
+      "timeOffset": 414610,
+      "claimId": null
+    },
+    {
+      "id": "1bf5e5fc-4a62-44c0-9562-62c122d5e36b",
+      "speaker": "Speaker 1",
+      "text": "And wow. I mean,",
+      "timestamp": "6:57",
+      "timeOffset": 417630,
+      "claimId": null
+    },
+    {
+      "id": "9c3a7d30-ed9c-43c8-92d3-1cf42d87a593",
+      "speaker": "Speaker 1",
+      "text": "yeah. I think it's a big deal. And this is",
+      "timestamp": "7:01",
+      "timeOffset": 421250,
+      "claimId": null
+    },
+    {
+      "id": "cdad1be0-2237-4b6d-93a2-720809979f88",
+      "speaker": "Speaker 1",
+      "text": "gonna be very interesting as well for",
+      "timestamp": "7:04",
+      "timeOffset": 424420,
+      "claimId": null
+    },
+    {
+      "id": "28693546-6b41-4ca6-8a2c-ef6610681b56",
+      "speaker": "Speaker 1",
+      "text": "the race between, them and Claude, OpenAI and Claude.",
+      "timestamp": "7:07",
+      "timeOffset": 427590,
+      "claimId": null
+    },
+    {
+      "id": "ce44a33f-2f10-47da-ab52-098c4bcae443",
+      "speaker": "Speaker 1",
+      "text": "But this is, great for Microsoft.",
+      "timestamp": "7:12",
+      "timeOffset": 432170,
+      "claimId": null
+    },
+    {
+      "id": "45aa1706-96c9-49e7-9e8f-7066af6ba607",
+      "speaker": "Speaker 1",
+      "text": "I mean, the Azure revenue, the equity value, this just unlocks a lot.",
+      "timestamp": "7:15",
+      "timeOffset": 435310,
+      "claimId": null
+    },
+    {
+      "id": "8ab2a53e-492b-4f0c-8e99-754e05f108d0",
+      "speaker": "Speaker 0",
+      "text": "So is this a win win, you think? Like, everybody benefits",
+      "timestamp": "7:20",
+      "timeOffset": 440280,
+      "claimId": null
+    },
+    {
+      "id": "327bf195-480e-4401-80bf-0681ad6281da",
+      "speaker": "Speaker 0",
+      "text": "from this new agreement? I'll tell you what this is. This is OpenAI and Microsoft agreeing to go polyamorous.",
+      "timestamp": "7:24",
+      "timeOffset": 444470,
+      "claimId": null
+    },
+    {
+      "id": "321117ea-644e-40df-a8af-28f579f81235",
+      "speaker": "Speaker 1",
+      "text": "This is a polyamorous agreement. The first one in the history of tech companies",
+      "timestamp": "7:31",
+      "timeOffset": 451920,
+      "claimId": null
+    },
+    {
+      "id": "bc6838b5-c588-48da-98a6-8f4d1ccd244e",
+      "speaker": "Speaker 1",
+      "text": "Well, I mean, I think this is like they're going to a polycube here.",
+      "timestamp": "7:35",
+      "timeOffset": 455720,
+      "claimId": null
+    },
+    {
+      "id": "540bb2c8-b24f-440b-93a0-b7823a2d2342",
+      "speaker": "Speaker 1",
+      "text": "Yeah. Anything's possible. You can see other people. We can see other",
+      "timestamp": "7:39",
+      "timeOffset": 459130,
+      "claimId": null
+    },
+    {
+      "id": "00c2f6fe-7b56-43bb-9e85-fa3236058738",
+      "speaker": "Speaker 1",
+      "text": "people. We're opening this relationship up.",
+      "timestamp": "7:42",
+      "timeOffset": 462930,
+      "claimId": null
+    },
+    {
+      "id": "b79df327-7c47-4449-adce-78272357d480",
+      "speaker": "Speaker 1",
+      "text": "Anybody can do anything, which means there's gonna be a lot of bad feelings.",
+      "timestamp": "7:45",
+      "timeOffset": 465950,
+      "claimId": null
+    },
+    {
+      "id": "1a4151de-d5f5-40ff-84c1-66acc1aca1fb",
+      "speaker": "Speaker 1",
+      "text": "And it's gonna be dicey. Anybody who tells you, like, they're in",
+      "timestamp": "7:50",
+      "timeOffset": 470290,
+      "claimId": null
+    },
+    {
+      "id": "a59f1b69-8894-46c0-8241-2e3ea79d3228",
+      "speaker": "Speaker 1",
+      "text": "a polycube or whatever, their translation for that is chaos.",
+      "timestamp": "7:53",
+      "timeOffset": 473490,
+      "claimId": null
+    },
+    {
+      "id": "04e23e01-c1ca-43cf-b51b-5f5666cf84e3",
+      "speaker": "Speaker 0",
+      "text": "It's the old arrested development bit. Like, well, no. This never works out,",
+      "timestamp": "7:56",
+      "timeOffset": 476900,
+      "claimId": null
+    },
+    {
+      "id": "9ff072ba-9878-44df-ac73-4b453d38da21",
+      "speaker": "Speaker 0",
+      "text": "for people, but it might work for us. We",
+      "timestamp": "8:00",
+      "timeOffset": 480430,
+      "claimId": null
+    },
+    {
+      "id": "38f5cd9d-61c4-40df-8e93-f75c810faaa6",
+      "speaker": "Speaker 0",
+      "text": "Yes. Exactly. This is a must. Worked out in the history of relationships.",
+      "timestamp": "8:03",
+      "timeOffset": 483600,
+      "claimId": null
+    },
+    {
+      "id": "df601fe0-16a5-4818-8745-6a3880482222",
+      "speaker": "Speaker 1",
+      "text": "Maybe for us, it failed. Yeah. It's not gonna work out. This is gonna be chaotic. There'll be a",
+      "timestamp": "8:08",
+      "timeOffset": 488210,
+      "claimId": null
+    },
+    {
+      "id": "f640cf8a-5f1f-445f-9fd6-be1fff48edb6",
+      "speaker": "Speaker 1",
+      "text": "second or third lawsuit perhaps. But I do think it cleans things up",
+      "timestamp": "8:13",
+      "timeOffset": 493150,
+      "claimId": null
+    },
+    {
+      "id": "68a13aa0-7b25-4dde-bb81-cb2bc3274023",
+      "speaker": "Speaker 1",
+      "text": "If I was Satya Nadella, would've just said, I'll do all this.",
+      "timestamp": "8:18",
+      "timeOffset": 498120,
+      "claimId": null
+    },
+    {
+      "id": "75ddf404-c048-411d-a535-bd40aa005e94",
+      "speaker": "Speaker 1",
+      "text": "Just give me another three points. Round me up to 30%. Yeah. And I'm good.",
+      "timestamp": "8:22",
+      "timeOffset": 502010,
+      "claimId": null
+    },
+    {
+      "id": "fbefc4af-1fc8-4caa-95d4-b61992c9b7a7",
+      "speaker": "Speaker 1",
+      "text": "Because I think Microsoft is going to be able",
+      "timestamp": "8:26",
+      "timeOffset": 506980,
+      "claimId": null
+    },
+    {
+      "id": "b3b77d26-6c9f-4396-84e9-b9b0ef9f3831",
+      "speaker": "Speaker 1",
+      "text": "to, with their resources, build enough compute, and",
+      "timestamp": "8:30",
+      "timeOffset": 510210,
+      "claimId": null
+    },
+    {
+      "id": "3a81986b-0ae8-456e-a58c-106f6778542d",
+      "speaker": "Speaker 1",
+      "text": "build a competitor to OpenAI.",
+      "timestamp": "8:35",
+      "timeOffset": 515000,
+      "claimId": null
+    }
+  ],
+  "cards": [
+    {
+      "id": "6af35624-4b30-435d-96f3-f8a27f19a8e1",
+      "segmentId": "6af35624-4b30-435d-96f3-f8a27f19a8e1",
+      "timeOffset": 20620,
+      "grounding": "Multiple sources confirm OpenAI and Microsoft have altered their partnership: TechCrunch [2][3] reports negotiations and a new memorandum of understanding; Reuters [4] describes rewriting partnership terms; Ars Technica [6] documents an amended agreement ending exclusivity.",
+      "verdict": "TRUE",
+      "explanation": "OpenAI and Microsoft have altered their partnership through negotiations, a new MOU, and an amended agreement ending exclusivity [2][3][4][6].",
+      "citations": [
+        {
+          "title": "TechCrunch – Microsoft and OpenAI may be renegotiating their partnership",
+          "url": "https://techcrunch.com/2025/05/11/microsoft-and-openai-may-be-renegotiating-their-partnership/",
+          "tier": 1
+        },
+        {
+          "title": "TechCrunch – OpenAI secures Microsoft's blessing to transition its for-profit arm",
+          "url": "https://techcrunch.com/2025/09/11/openai-secures-microsofts-blessing-to-transition-its-for-profit-arm/",
+          "tier": 1
+        },
+        {
+          "title": "Reuters – OpenAI negotiates with Microsoft for new funding and future IPO",
+          "url": "https://www.reuters.com/business/openai-negotiates-with-microsoft-unlock-new-funding-future-ipo-ft-reports-2025-05-11/",
+          "tier": 1
+        },
+        {
+          "title": "Ars Technica – OpenAI ends its exclusive partnership with Microsoft",
+          "url": "https://arstechnica.com/ai/2026/04/no-longer-exclusive-microsoft-agrees-to-let-openai-see-other-cloud-providers/",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "b9d7926d-6909-4d1e-a5b5-c63036577012",
+      "segmentId": "b9d7926d-6909-4d1e-a5b5-c63036577012",
+      "timeOffset": 35130,
+      "grounding": "Ars Technica [2] reports that OpenAI and Microsoft jointly announced an amended agreement allowing OpenAI models to run on Amazon Bedrock, ending the exclusive partnership.",
+      "verdict": "TRUE",
+      "explanation": "Ars Technica confirms OpenAI and Microsoft ended their exclusive partnership through an amended agreement [2].",
+      "citations": [
+        {
+          "title": "OpenAI ends its exclusive partnership with Microsoft - Ars Technica",
+          "url": "https://arstechnica.com/ai/2026/04/no-longer-exclusive-microsoft-agrees-to-let-openai-see-other-cloud-providers/",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "871c78ae-2e2d-4344-9f49-ef4f7e95732e",
+      "segmentId": "871c78ae-2e2d-4344-9f49-ef4f7e95732e",
+      "timeOffset": 48150,
+      "grounding": "TechCrunch [3][4] and Ars Technica [6] confirm OpenAI and Microsoft amended their agreement, dropping Microsoft's exclusive rights. TechCrunch [2][4] confirm OpenAI is already working with AWS on products.",
+      "verdict": "TRUE",
+      "explanation": "OpenAI and Microsoft amended their agreement, dropping exclusivity [3][6]. OpenAI is already working with AWS on products for government and commercial use [2][4].",
+      "citations": [
+        {
+          "title": "OpenAI ends Microsoft legal peril over its $50B Amazon deal",
+          "url": "https://techcrunch.com/2026/04/27/openai-ends-microsoft-legal-peril-over-its-50b-amazon-deal/",
+          "tier": 1
+        },
+        {
+          "title": "OpenAI expands government footprint with AWS deal, report says",
+          "url": "https://techcrunch.com/2026/03/17/openai-expands-government-footprint-with-aws-deal/",
+          "tier": 1
+        },
+        {
+          "title": "Amazon is already offering new OpenAI products on AWS",
+          "url": "https://techcrunch.com/2026/04/28/amazon-is-already-offering-new-openai-products-on-aws/",
+          "tier": 1
+        },
+        {
+          "title": "OpenAI ends its exclusive partnership with Microsoft - Ars Technica",
+          "url": "https://arstechnica.com/ai/2026/04/no-longer-exclusive-microsoft-agrees-to-let-openai-see-other-cloud-providers/",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "f7e03d2d-da57-4da8-81e2-74bfd49b72d1",
+      "segmentId": "f7e03d2d-da57-4da8-81e2-74bfd49b72d1",
+      "timeOffset": 63500,
+      "grounding": "Ars Technica [5] reports that an amended agreement allows OpenAI to run models on Amazon Bedrock and pursue deals beyond Microsoft; the agreement does not state Microsoft will remain the \"primary\" cloud provider.",
+      "verdict": "UNVERIFIABLE",
+      "explanation": "The amended agreement permits OpenAI to work with other cloud providers [5]; no retrieved source confirms Microsoft's \"primary\" provider status going forward.",
+      "citations": [
+        {
+          "title": "OpenAI ends its exclusive partnership with Microsoft - Ars Technica",
+          "url": "https://arstechnica.com/ai/2026/04/no-longer-exclusive-microsoft-agrees-to-let-openai-see-other-cloud-providers/",
+          "tier": 2
+        },
+        {
+          "title": "TWiST Ep 2281 (2026-04-28) – China Kills Meta / Manus Deal (Story Of The Year) | E2281",
+          "url": null,
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "0b0925ce-565d-4900-9573-729eafd93b7d",
+      "segmentId": "0b0925ce-565d-4900-9573-729eafd93b7d",
+      "timeOffset": 68470,
+      "grounding": "Bloomberg [3] and Ars Technica [6] confirm Microsoft's exclusive right to sell OpenAI models has been dropped. No retrieved source confirms Microsoft remains \"primary cloud provider\" or that new products debut first on Azure.",
+      "verdict": "UNVERIFIABLE",
+      "explanation": "The exclusive partnership has ended per Bloomberg and Ars Technica [3][6]. The \"primary cloud provider\" and product-debut-first claims are not addressed in retrieved sources.",
+      "citations": [
+        {
+          "title": "OpenAI Breaks Free From Exclusive AI Pact With Microsoft",
+          "url": "https://www.bloomberg.com/news/articles/2026-04-27/microsoft-to-stop-sharing-revenue-with-main-ai-partner-openai",
+          "tier": 1
+        },
+        {
+          "title": "OpenAI ends its exclusive partnership with Microsoft - Ars Technica",
+          "url": "https://arstechnica.com/ai/2026/04/no-longer-exclusive-microsoft-agrees-to-let-openai-see-other-cloud-providers/",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "4080e6ee-379d-4bfa-ac73-0eff04d83a5b",
+      "segmentId": "4080e6ee-379d-4bfa-ac73-0eff04d83a5b",
+      "timeOffset": 72090,
+      "grounding": "The host's own statement in the recent conversation [1] directly asserts that \"new OpenAI products are gonna debut first on Azure before they're available across other cloud services.\"",
+      "verdict": "PARTIAL",
+      "explanation": "The host stated this claim in the recent segment [1]. Bloomberg [2] and Ars Technica [3] confirm Microsoft remains primary cloud provider; neither confirms the specific debut-first-on-Azure sequencing.",
+      "citations": [
+        {
+          "title": "Host statement – recent conversation segment",
+          "url": null,
+          "tier": 1
+        },
+        {
+          "title": "OpenAI Breaks Free From Exclusive AI Pact With Microsoft – Bloomberg",
+          "url": "https://www.bloomberg.com/news/articles/2026-04-27/microsoft-to-stop-sharing-revenue-with-main-ai-partner-openai",
+          "tier": 1
+        },
+        {
+          "title": "OpenAI ends its exclusive partnership with Microsoft – Ars Technica",
+          "url": "https://arstechnica.com/ai/2026/04/no-longer-exclusive-microsoft-agrees-to-let-openai-see-other-cloud-providers/",
+          "tier": 2
+        }
+      ]
+    },
+    {
+      "id": "54b0fff6-ab64-43e3-b1d2-9ef72305521c",
+      "segmentId": "54b0fff6-ab64-43e3-b1d2-9ef72305521c",
+      "timeOffset": 80830,
+      "grounding": "No retrieved source directly addresses the specific terms of the Microsoft-OpenAI revenue share arrangement, including whether Microsoft no longer pays a revenue share on resold products or whether OpenAI's revenue share is capped.",
+      "verdict": "UNVERIFIABLE",
+      "explanation": "Retrieved sources discuss Microsoft-OpenAI partnership and investment but do not confirm the specific revenue share terms stated in the claim. TWiST Ep 2281 (2026-04-28) covered this topic [1].",
+      "citations": [
+        {
+          "title": "TWiST Ep 2281 (2026-04-28) – China Kills Meta / Manus Deal (Story Of The Year) | E2281",
+          "url": null,
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "a20a6283-ed6d-4542-ac76-34ea5c2798f8",
+      "segmentId": "a20a6283-ed6d-4542-ac76-34ea5c2798f8",
+      "timeOffset": 89000,
+      "grounding": "Reuters [3] states that OpenAI sends about 20% of its revenue to Microsoft, and \"that essentially goes away if AGI occurs,\" directly contradicting the claim that Microsoft receives revenue share through 2030 regardless of AGI.",
+      "verdict": "FALSE",
+      "explanation": "Reuters reports the revenue share \"essentially goes away if AGI occurs\" [3], contradicting the claim of unconditional revenue share through 2030.",
+      "citations": [
+        {
+          "title": "OpenAI's AGI chase is tricky concept and contract - Reuters",
+          "url": "https://www.reuters.com/commentary/breakingviews/openais-agi-chase-is-tricky-concept-contract-2026-03-16/",
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "7dc41458-6ffb-470d-be50-d52bc05d1cc8",
+      "segmentId": "7dc41458-6ffb-470d-be50-d52bc05d1cc8",
+      "timeOffset": 113210,
+      "grounding": "Bloomberg [4][5] confirms OpenAI gave Microsoft a 27% ownership stake as part of a restructuring plan.",
+      "verdict": "TRUE",
+      "explanation": "Bloomberg reporting [4][5] directly confirms Microsoft received a 27% ownership stake in OpenAI Group.",
+      "citations": [
+        {
+          "title": "OpenAI Gives Long-Time Backer Microsoft 27% Stake - Bloomberg",
+          "url": "https://www.bloomberg.com/news/newsletters/2025-10-28/openai-gives-long-time-backer-microsoft-27-stake",
+          "tier": 1
+        },
+        {
+          "title": "Watch OpenAI Gives Microsoft 27% Stake, Clears Path to For-Profit",
+          "url": "https://www.bloomberg.com/news/videos/2025-10-28/openai-gives-microsoft-stake-clears-path-to-for-profit-video",
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "43970459-0431-4980-ba3e-0045bd60fc2c",
+      "segmentId": "43970459-0431-4980-ba3e-0045bd60fc2c",
+      "timeOffset": 147670,
+      "grounding": "TWiST Ep 2281 [1] states \"Microsoft owns about 27% of Open AAI Group\" and discusses scenarios where OpenAI becomes a trillion-dollar and 10-trillion-dollar company. The guest's claim mirrors this framing.",
+      "verdict": "TRUE",
+      "explanation": "Microsoft's 27% ownership of OpenAI and the hypothetical scenarios of $10B, $1T, and $10T valuations are confirmed in TWiST Ep 2281 [1].",
+      "citations": [
+        {
+          "title": "TWiST Ep 2281 (2026-04-28) – Microsoft OpenAI Investment Discussion",
+          "url": null,
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "c7ad6d00-6ef2-4f16-ab48-b61f82f4e860",
+      "segmentId": "c7ad6d00-6ef2-4f16-ab48-b61f82f4e860",
+      "timeOffset": 197580,
+      "grounding": "No retrieved source discloses Microsoft's equity stake percentage in OpenAI or calculates investment returns at a $3 trillion valuation.",
+      "verdict": "UNVERIFIABLE",
+      "explanation": "No primary source located in show archive or live retrieval for Microsoft's equity stake or return calculations at $3 trillion valuation.",
+      "citations": [
+        {
+          "title": "TWiST Ep 2206 (2025-11-10) – IPO Mania hits the TWiST 500! Three companies are ready to go public | E2206",
+          "url": null,
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "1c0f5e26-badb-4934-8082-92eb567be2d1",
+      "segmentId": "1c0f5e26-badb-4934-8082-92eb567be2d1",
+      "timeOffset": 205720,
+      "grounding": "TWiST Ep 2201 [5] states that if Microsoft owns 27% of OpenAI and the company reaches the trillion-dollar valuation range, Microsoft would make $270 billion from selling all shares. The claim conflates this hypothetical future value with current ownership value.",
+      "verdict": "MISLEADING",
+      "explanation": "Microsoft owns 27% of OpenAI [5]; $270B represents a hypothetical future value if OpenAI reaches ~$1 trillion valuation, not current investment value [5].",
+      "citations": [
+        {
+          "title": "TWiST Ep 2201 (2025-10-30) – Microsoft OpenAI ownership and valuation scenarios",
+          "url": null,
+          "tier": 1
+        }
+      ]
+    },
+    {
+      "id": "7f38653a-cdbf-48c6-b61e-5321eca5cbf0",
+      "segmentId": "7f38653a-cdbf-48c6-b61e-5321eca5cbf0",
+      "timeOffset": 405510,
+      "grounding": "TechCrunch [4] reports that Amazon CEO Andy Jassy announced OpenAI products are \"already offering\" on AWS, and The Information [6] confirms OpenAI models are now available in AWS Bedrock, not in coming weeks.",
+      "verdict": "MISLEADING",
+      "explanation": "OpenAI models are already available on Bedrock per TechCrunch and The Information [4][6], not coming in coming weeks as the claim states.",
+      "citations": [
+        {
+          "title": "Amazon is already offering new OpenAI products on AWS",
+          "url": "https://techcrunch.com/2026/04/28/amazon-is-already-offering-new-openai-products-on-aws/",
+          "tier": 1
+        },
+        {
+          "title": "OpenAI Models, Codex Now Available in AWS Bedrock",
+          "url": "https://www.theinformation.com/briefings/openai-models-codex-now-available-aws-bedrock",
+          "tier": 2
+        }
+      ]
+    }
+  ]
+}
