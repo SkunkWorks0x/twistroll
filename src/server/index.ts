@@ -45,9 +45,6 @@ app.get('/config', (_req, res) => {
 app.get('/api/status', (_req, res) => {
   res.json({
     ollama: isOllamaAvailable(),
-    config: {
-      cooldownMs: appConfig.cooldownMs,
-    },
   });
 });
 

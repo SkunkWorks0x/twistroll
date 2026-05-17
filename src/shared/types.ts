@@ -158,15 +158,9 @@ export type LlmEngine = 'cloud' | 'groq' | 'ollama' | 'haiku' | 'grok';
 export type LlmProvider = 'haiku' | 'grok' | 'groq' | 'ollama';
 
 export interface AppConfig {
-  transcriptDir: string;
   ollamaBaseUrl: string;
-  ollamaModelFactchecker: string;
+  // Historical name — actually the classifier-fallback Ollama model.
   ollamaModelTrolls: string;
   wsPort: number;
   overlayPort: number;
-  cooldownMs: number;
-  contextBufferSize: number;
-  llmMode: LlmMode;
-  cloudModel: string;
-  groqModel: string;
 }
