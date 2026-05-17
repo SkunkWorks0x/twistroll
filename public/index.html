@@ -258,7 +258,20 @@
     letter-spacing: 0.12em;
     text-transform: uppercase;
   }
-  .claim-count { color: #FF5C00; }
+  .claim-count {
+    color: #FF5C00;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 100ms;
+  }
+  .claim-count:hover { opacity: 0.8; }
+  /* Docket-mode-active: subtle orange underline signals "review mode on" */
+  .claim-count.docket-mode-active {
+    text-decoration: underline;
+    text-decoration-color: #FF5C00;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
 
   .earlier-label {
     margin: 18px 0 10px;
@@ -589,6 +602,19 @@
   const transcriptEl = document.getElementById('transcript');
   const sidebarEl = document.getElementById('sidebar');
   const statusEl = document.getElementById('status');
+  const claimCountEl = document.getElementById('claim-count-display');
+
+  // Docket-mode toggle: when true, sidebar collapses every card to a compact
+  // accent-strip row (any row click-expandable). Default false = Live mode
+  // (top 2 cards expanded, rest collapsed).
+  let docketMode = false;
+  if (claimCountEl) {
+    claimCountEl.addEventListener('click', () => {
+      docketMode = !docketMode;
+      claimCountEl.classList.toggle('docket-mode-active', docketMode);
+      renderSidebar();
+    });
+  }
   const statusLabelEl = statusEl.querySelector('.label');
 
   // ─── Utilities ──────────────────────────────────────────────
@@ -844,6 +870,14 @@
       return;
     }
     sidebarEl.innerHTML = '';
+
+    // Docket mode: every card renders as a compact collapsed accent-strip row.
+    if (docketMode) {
+      for (const card of state.cards) {
+        sidebarEl.appendChild(renderCollapsedCard(card));
+      }
+      return;
+    }
 
     const recent = state.cards.slice(0, FULL_CARDS);
     const earlier = state.cards.slice(FULL_CARDS);
