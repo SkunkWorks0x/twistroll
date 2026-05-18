@@ -165,8 +165,10 @@ const DG_QUERY_PARAMS = {
 };
 
 const KEEPALIVE_INTERVAL_MS = 8000;
-const RECONNECT_DELAY_MS = 2000;
-const MAX_RECONNECTS_PER_60S = 3;
+// Exponential backoff schedule, capped at 30s.
+const RECONNECT_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000];
+const MAX_RECONNECT_ATTEMPTS = RECONNECT_BACKOFF_MS.length;
+const RECONNECT_JITTER_PCT = 0.2;
 const CONNECT_TIMEOUT_MS = 5000;
 // Bounded audio buffer — at 16kHz mono s16le, ffmpeg emits ~2KB chunks every
 // ~30-60ms. 200 chunks ≈ 6-12s of audio. If WS is down longer than this, we
@@ -181,7 +183,7 @@ export class DeepgramClient extends EventEmitter {
   private ytdlpStderr = '';
   private ffmpegStderr = '';
   private keepAliveTimer: NodeJS.Timeout | null = null;
-  private reconnectTimes: number[] = [];
+  private reconnectAttempt = 0;
   private reconnecting = false;
   private active = false;
   private sessionConfig: SessionConfig | null = null;
@@ -216,28 +218,14 @@ export class DeepgramClient extends EventEmitter {
     this.sessionStart = Date.now();
     this.active = true;
     this.intentionalStop = false;
-    this.reconnectTimes = [];
+    this.reconnectAttempt = 0;
     this.audioBuffer = [];
 
     try {
       await this.connectDeepgram();
       this.startAudioPipeline();
     } catch (err) {
-      // connectDeepgram or startAudioPipeline threw before the session was
-      // fully established. Without this rollback, `this.active` stays true
-      // forever — every subsequent startSession hits the guard above and
-      // throws "Session already active," leaving the client wedged until
-      // stopSession() is called (or the process restarts).
-      this.active = false;
-      this.intentionalStop = true;
-      this.stopKeepAlive();
-      this.killAudioPipeline();
-      if (this.ws) {
-        try { this.ws.close(); } catch { /* ignore */ }
-        this.ws = null;
-      }
-      this.audioBuffer = [];
-      this.sessionConfig = null;
+      this.rollbackActive();
       throw err;
     }
     const offsetSuffix = config.startOffsetSeconds !== undefined ? `, startOffsetSeconds=${config.startOffsetSeconds}` : '';
@@ -265,6 +253,20 @@ export class DeepgramClient extends EventEmitter {
     this.audioBuffer = [];
     this.sessionConfig = null;
     console.log('[deepgram] session stopped');
+  }
+
+  // Without this, an async failure wedges active=true and retries 409.
+  private rollbackActive(): void {
+    this.active = false;
+    this.intentionalStop = true;
+    this.stopKeepAlive();
+    this.killAudioPipeline();
+    if (this.ws) {
+      try { this.ws.close(); } catch { /* ignore */ }
+      this.ws = null;
+    }
+    this.audioBuffer = [];
+    this.sessionConfig = null;
   }
 
   // ─── Deepgram WebSocket ────────────────────────────────────────────────
@@ -305,6 +307,12 @@ export class DeepgramClient extends EventEmitter {
         opened = true;
         console.log('[deepgram] WS connected');
         this.startKeepAlive();
+        // Per-incident reset so a future blip starts from attempt=1.
+        if (this.reconnectAttempt > 0) {
+          console.log(`[deepgram] reconnected after ${this.reconnectAttempt} attempt(s)`);
+          this.reconnectAttempt = 0;
+          this.emit('reconnected');
+        }
         this.emit('connected');
         settle(() => resolve());
       });
@@ -406,38 +414,35 @@ export class DeepgramClient extends EventEmitter {
     if (this.reconnecting) return;
     this.reconnecting = true;
 
-    const cutoff = Date.now() - 60000;
-    this.reconnectTimes = this.reconnectTimes.filter((t) => t > cutoff);
-
-    if (this.reconnectTimes.length >= MAX_RECONNECTS_PER_60S) {
-      const detail = `Deepgram WS reconnect failed: ${MAX_RECONNECTS_PER_60S} retries within 60s — giving up`;
+    if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      const detail = `Deepgram WS reconnect failed after ${MAX_RECONNECT_ATTEMPTS} attempts — giving up`;
       console.error(`[deepgram] CRITICAL: ${detail}`);
       this.emit('error', new SessionPipelineError(deepgramDisconnectError(detail)));
       this.reconnecting = false;
-      this.active = false;
-      this.killAudioPipeline();
+      this.rollbackActive();
       return;
     }
 
-    const attempt = this.reconnectTimes.length + 1;
-    this.reconnectTimes.push(Date.now());
-    console.warn(`[deepgram] reconnect attempt ${attempt}/${MAX_RECONNECTS_PER_60S} in ${RECONNECT_DELAY_MS}ms`);
+    this.reconnectAttempt++;
+    const attempt = this.reconnectAttempt;
+    const baseDelay = RECONNECT_BACKOFF_MS[attempt - 1];
+    // ±RECONNECT_JITTER_PCT — desynchronizes simultaneous reconnects when
+    // multiple clients drop on the same upstream blip.
+    const jitter = 1 + (Math.random() * 2 - 1) * RECONNECT_JITTER_PCT;
+    const delay = Math.round(baseDelay * jitter);
+    console.warn(`[deepgram] reconnect attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
     this.emit('reconnecting', { attempt });
 
     setTimeout(async () => {
       try {
         await this.connectDeepgram();
         this.reconnecting = false;
-        // Audio pipeline keeps running through the gap; buffered chunks drain
-        // on the next ffmpeg stdout 'data' event.
       } catch (err) {
         this.reconnecting = false;
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[deepgram] reconnect attempt ${attempt} failed: ${msg}`);
-        // The 'close' handler on the failed-to-open WS will trigger another
-        // attemptReconnect() if active && !intentionalStop.
       }
-    }, RECONNECT_DELAY_MS);
+    }, delay);
   }
 
   // ─── Audio Pipeline ────────────────────────────────────────────────────
@@ -479,12 +484,14 @@ export class DeepgramClient extends EventEmitter {
       if (code !== 0) {
         const se = classifyYtdlpError(code ?? -1, this.ytdlpStderr);
         console.error(`[deepgram] yt-dlp failed: code=${se.code} message="${se.message}"`);
+        this.rollbackActive();
         this.emit('error', new SessionPipelineError(se));
         return;
       }
       const cleanUrl = directUrl.trim().split('\n')[0];
       if (!cleanUrl) {
         const safe = redactUrls(this.ytdlpStderr);
+        this.rollbackActive();
         this.emit('error', new SessionPipelineError({
           code: 'YTDLP_EXIT_NONZERO',
           source: 'yt-dlp',
@@ -536,22 +543,11 @@ export class DeepgramClient extends EventEmitter {
         this.attachFfmpegStreams(ffmpeg);
       })
       .catch((err) => {
-        // Device resolution failed (probe couldn't list devices, or the
-        // named device wasn't in the audio section). Roll back the active
-        // flag — otherwise the next start sees active=true and 409s.
         const se = err instanceof SessionPipelineError
           ? err.sessionError
           : { code: 'FFMPEG_EXIT_NONZERO', source: 'ffmpeg', message: err.message, retryable: true } as SessionError;
         console.error(`[deepgram] system-audio start failed: code=${se.code}`);
-        this.active = false;
-        this.intentionalStop = true;
-        this.stopKeepAlive();
-        if (this.ws) {
-          try { this.ws.close(); } catch { /* ignore */ }
-          this.ws = null;
-        }
-        this.audioBuffer = [];
-        this.sessionConfig = null;
+        this.rollbackActive();
         this.emit('error', new SessionPipelineError(se));
       });
   }
@@ -616,6 +612,7 @@ export class DeepgramClient extends EventEmitter {
 
   private attachFfmpegStreams(ffmpeg: ChildProcess): void {
     if (!ffmpeg.stdout) {
+      this.rollbackActive();
       this.emit('error', new SessionPipelineError({
         code: 'FFMPEG_EXIT_NONZERO',
         source: 'ffmpeg',
@@ -662,6 +659,7 @@ export class DeepgramClient extends EventEmitter {
       if (this.active && !this.intentionalStop && code !== 0) {
         const se = classifyFfmpegError(code, this.ffmpegStderr);
         console.error(`[deepgram] ffmpeg failed: code=${se.code}`);
+        this.rollbackActive();
         this.emit('error', new SessionPipelineError(se));
       }
     });
