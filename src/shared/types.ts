@@ -137,6 +137,26 @@ export type WSMessage =
   | ClaimDetectedMessage
   | CardBroadcast;
 
+// Structured pipeline failure surfaced from the server to the dashboard.
+// Lets the operator see WHY a stream failed instead of a generic "Session
+// failed" — without leaking secrets (no URLs with tokens, no env vars).
+export interface SessionError {
+  code:
+    | 'YOUTUBE_BOT_CHECK'
+    | 'YOUTUBE_NOT_LIVE_OR_BLOCKED'
+    | 'YOUTUBE_UNAVAILABLE_OR_BLOCKED'
+    | 'YOUTUBE_HLS_FORBIDDEN'
+    | 'YTDLP_EXIT_NONZERO'
+    | 'FFMPEG_EXIT_NONZERO'
+    | 'DEEPGRAM_DISCONNECTED'
+    | 'UNKNOWN_SESSION_ERROR';
+  message: string;
+  detail?: string;
+  hint?: string;
+  retryable: boolean;
+  source: 'yt-dlp' | 'ffmpeg' | 'deepgram' | 'server';
+}
+
 export interface PersonaConfig {
   id: PersonaId;
   name: string;

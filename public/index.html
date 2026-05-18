@@ -712,6 +712,21 @@
     white-space: nowrap;
     min-width: 0;
   }
+  .session-error-hint {
+    color: var(--text-faint);
+    font-size: 10px;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .session-action.secondary {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: var(--text-dim);
+  }
+  .session-action.secondary:hover { background: rgba(255, 255, 255, 0.08); }
 </style>
 </head>
 <body>
@@ -794,7 +809,7 @@
   // Uses `escape` defined later in this IIFE under Utilities — hoisted by
   // closure scope, available by the time renderSessionBar is invoked.
   const sessionBar = document.getElementById('session-bar');
-  const session = { state: 'idle', url: null };
+  const session = { state: 'idle', url: null, error: null };
 
   function renderSessionBar(transientError) {
     sessionBar.className = `session-bar ${session.state}`;
@@ -836,17 +851,52 @@
       `;
       document.getElementById('session-stop').addEventListener('click', stopSession);
     } else { // error
+      const err = session.error || {};
+      const msg = err.message || 'Session failed';
+      const hint = err.hint || '';
+      const showRetry = err.retryable !== false;
       sessionBar.innerHTML = `
         <span class="session-dot"></span>
         <span class="session-label">Error</span>
-        <span class="session-error-msg">Session failed</span>
-        <button class="session-action primary" id="session-retry">Retry</button>
+        <span class="session-error-msg" title="${escape(err.detail || msg)}">${escape(msg)}</span>
+        ${hint ? `<span class="session-error-hint" title="${escape(hint)}">${escape(hint)}</span>` : ''}
+        <button class="session-action secondary" id="session-copy">Copy diagnostic</button>
+        ${showRetry ? '<button class="session-action primary" id="session-retry">Retry</button>' : ''}
       `;
-      document.getElementById('session-retry').addEventListener('click', () => {
+      document.getElementById('session-copy').addEventListener('click', () => copyDiagnostic());
+      const retryBtn = document.getElementById('session-retry');
+      if (retryBtn) retryBtn.addEventListener('click', () => {
         session.state = 'idle';
         session.url = null;
+        session.error = null;
         renderSessionBar();
       });
+    }
+  }
+
+  function copyDiagnostic() {
+    const e = session.error || {};
+    const text = [
+      `code: ${e.code || 'UNKNOWN'}`,
+      `source: ${e.source || 'unknown'}`,
+      `message: ${e.message || ''}`,
+      e.detail ? `detail: ${e.detail}` : '',
+      e.hint ? `hint: ${e.hint}` : '',
+      e.retryable !== undefined ? `retryable: ${e.retryable}` : '',
+    ].filter(Boolean).join('\n');
+    (navigator.clipboard?.writeText(text) || Promise.reject()).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch {}
+      ta.remove();
+    });
+    const btn = document.getElementById('session-copy');
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = prev; }, 1200);
     }
   }
 
@@ -1100,7 +1150,9 @@
       case 'session_state':
         session.state = msg.state;
         if (msg.url !== undefined) session.url = msg.url || null;
-        if (msg.state === 'idle') session.url = null;
+        if (msg.state === 'idle') { session.url = null; session.error = null; }
+        if (msg.state === 'connecting') session.error = null;
+        if (msg.state === 'error' && msg.error) session.error = msg.error;
         renderSessionBar();
         break;
       // claim_detected is informational; we wait for the synthesized card.
@@ -1393,6 +1445,7 @@
         if (d && typeof d.state === 'string') {
           session.state = d.state;
           session.url = d.url || null;
+          session.error = d.error || null;
         }
       }
     } catch {}

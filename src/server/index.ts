@@ -21,7 +21,9 @@ import type {
   TranscriptSegment,
   ClaimClassification,
   CardBroadcast,
+  SessionError,
 } from '../shared/types.js';
+import { SessionPipelineError } from './deepgram.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = resolve(__dirname, '..', '..', 'public');
@@ -121,29 +123,47 @@ interface SessionStateMessage {
   type: 'session_state';
   state: SessionUiState;
   url?: string;
+  error?: SessionError;
 }
 let sessionState: SessionUiState = 'idle';
 let sessionUrl: string | null = null;
 let sessionStartedAt: string | null = null;
+let lastSessionError: SessionError | null = null;
 // Tracks an in-flight startSession() so /api/session/stop can wait for it
 // before deciding the session is gone. Without this, a Stop click during
 // 'connecting' can race past a half-spawned ffmpeg and orphan it.
 let pendingStart: Promise<void> | null = null;
 
-function setSessionState(next: SessionUiState, url?: string): void {
-  if (sessionState === next) return;
+function setSessionState(next: SessionUiState, url?: string, error?: SessionError): void {
+  if (sessionState === next && (next !== 'error' || !error)) return;
   sessionState = next;
   if (next === 'connecting' && url) {
     sessionUrl = url;
     sessionStartedAt = new Date().toISOString();
+    lastSessionError = null;
   } else if (next === 'idle') {
     sessionUrl = null;
     sessionStartedAt = null;
+    lastSessionError = null;
+  } else if (next === 'error' && error) {
+    lastSessionError = error;
   }
-  console.log(`[session] state=${next}${sessionUrl ? ` url=${sessionUrl}` : ''}`);
+  console.log(`[session] state=${next}${sessionUrl ? ` url=${sessionUrl}` : ''}${error ? ` code=${error.code}` : ''}`);
   const msg: SessionStateMessage = { type: 'session_state', state: next };
   if (sessionUrl) msg.url = sessionUrl;
+  if (next === 'error' && lastSessionError) msg.error = lastSessionError;
   broadcast(msg);
+}
+
+function toSessionError(err: unknown, source: SessionError['source'] = 'server'): SessionError {
+  if (err instanceof SessionPipelineError) return err.sessionError;
+  const message = err instanceof Error ? err.message : String(err);
+  return {
+    code: 'UNKNOWN_SESSION_ERROR',
+    source,
+    message: message || 'Session failed.',
+    retryable: true,
+  };
 }
 
 // ─── Classifier state ───
@@ -284,7 +304,7 @@ if (deepgram) {
     // fire 'error' after we've already reset to 'idle'. Without this guard
     // the state ends in 'error' instead of 'idle'.
     if (sessionState === 'idle') return;
-    setSessionState('error');
+    setSessionState('error', undefined, toSessionError(err));
   });
   deepgram.on('reconnecting', ({ attempt }: { attempt: number }) => {
     console.warn(`[deepgram] reconnecting (attempt ${attempt})`);
@@ -431,12 +451,13 @@ app.post('/api/session/start', async (req, res) => {
     await startPromise;
     res.json({ status: 'connecting', sessionId });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[session/start] ${msg}`);
-    // startSession threw before the deepgram socket opened — roll back the
-    // connecting state so the dashboard doesn't get stuck.
-    setSessionState('idle');
-    res.status(500).json({ error: msg });
+    const se = toSessionError(err);
+    console.error(`[session/start] code=${se.code} message="${se.message}"`);
+    // startSession threw before the deepgram socket opened — transition to
+    // 'error' with the structured cause so the dashboard renders something
+    // actionable instead of bouncing back to idle with no explanation.
+    setSessionState('error', undefined, se);
+    res.status(500).json({ error: se.message, code: se.code });
   }
 });
 
@@ -471,6 +492,7 @@ app.get('/api/session/status', (_req, res) => {
       state: 'idle' as SessionUiState,
       url: null,
       startedAt: null,
+      error: null,
       active: false,
       mode: null,
       uptime: null,
@@ -489,6 +511,7 @@ app.get('/api/session/status', (_req, res) => {
     state: sessionState,
     url: sessionUrl,
     startedAt: sessionStartedAt,
+    error: lastSessionError,
     active: deepgram.isActive(),
     mode: deepgram.getMode(),
     uptime: deepgram.getUptime(),

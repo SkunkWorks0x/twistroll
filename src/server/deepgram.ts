@@ -9,7 +9,110 @@ import { EventEmitter } from 'events';
 import { spawn, ChildProcess } from 'child_process';
 import WebSocket, { RawData } from 'ws';
 import { randomUUID } from 'crypto';
-import type { TranscriptSegment } from '../shared/types.js';
+import type { SessionError, TranscriptSegment } from '../shared/types.js';
+
+// Error subclass carrying a structured SessionError. emit('error', ...) sites
+// in this file construct one of these so index.ts can surface a specific
+// cause to the dashboard instead of a generic 'Session failed'.
+export class SessionPipelineError extends Error {
+  readonly sessionError: SessionError;
+  constructor(se: SessionError) {
+    super(se.message);
+    this.name = 'SessionPipelineError';
+    this.sessionError = se;
+  }
+}
+
+const STDERR_TAIL_MAX = 4096; // bytes — bounded buffer for child-process stderr
+function appendBounded(buf: string, chunk: string): string {
+  const next = buf + chunk;
+  return next.length > STDERR_TAIL_MAX ? next.slice(-STDERR_TAIL_MAX) : next;
+}
+
+// yt-dlp stderr can echo the input URL, which may contain query params / auth.
+// Redact before any stderr substring lands in a dashboard-bound `detail`.
+function redactUrls(s: string): string {
+  return s.replace(/https?:\/\/\S+/g, '<url>');
+}
+
+// Classify yt-dlp's stderr tail into a SessionError. Patterns match the
+// soft-block signatures YouTube serves to flagged data-center IPs (cf.
+// yt-dlp issues #16072, #15865, #15751 — same code, only the flagged host
+// sees the failure). Order matters: bot-check first, then the lying-not-live
+// fallback, then the generic unavailable, then catch-all. Do NOT alphabetize.
+function classifyYtdlpError(exitCode: number, stderr: string): SessionError {
+  const safe = redactUrls(stderr);
+  if (/sign in to confirm/i.test(safe)) {
+    return {
+      code: 'YOUTUBE_BOT_CHECK',
+      source: 'yt-dlp',
+      message: 'YouTube blocked the hosted server.',
+      detail: 'yt-dlp returned: "Sign in to confirm you are not a bot."',
+      hint: 'Use a local source relay or run Sentinel from a residential network. Railway/Fly/AWS IPs are often blocked by YouTube.',
+      retryable: false,
+    };
+  }
+  if (/not currently live/i.test(safe)) {
+    return {
+      code: 'YOUTUBE_NOT_LIVE_OR_BLOCKED',
+      source: 'yt-dlp',
+      message: 'YouTube says this channel is not currently live (or this is a soft-block).',
+      detail: 'yt-dlp returned: "The channel is not currently live."',
+      hint: 'YouTube serves this same message to flagged data-center IPs even when the stream IS live. Try from a residential network to confirm.',
+      retryable: false,
+    };
+  }
+  if (/video unavailable/i.test(safe)) {
+    return {
+      code: 'YOUTUBE_UNAVAILABLE_OR_BLOCKED',
+      source: 'yt-dlp',
+      message: 'YouTube reported the video as unavailable.',
+      detail: 'yt-dlp returned: "Video unavailable."',
+      hint: 'May be a real takedown, geo-block, or a data-center IP soft-block. Verify the URL in a browser first.',
+      retryable: false,
+    };
+  }
+  return {
+    code: 'YTDLP_EXIT_NONZERO',
+    source: 'yt-dlp',
+    message: `yt-dlp exited with code ${exitCode}.`,
+    detail: safe ? `Last stderr: ${safe.slice(-500).trim()}` : undefined,
+    retryable: true,
+  };
+}
+
+// HLS 403s surface here, not in yt-dlp's --get-url call. Manifest may parse
+// at resolve time but segment fetches hit YouTube's per-segment IP check.
+function classifyFfmpegError(exitCode: number | null, stderr: string): SessionError {
+  const safe = redactUrls(stderr);
+  if (/HTTP Error 403|HTTP_403|HTTP error 403|403 Forbidden/i.test(safe)) {
+    return {
+      code: 'YOUTUBE_HLS_FORBIDDEN',
+      source: 'ffmpeg',
+      message: 'YouTube refused the HLS segment fetch.',
+      detail: 'ffmpeg got HTTP 403 on a segment URL.',
+      hint: 'Manifest parsed but segment fetch was rejected — typical for flagged IPs. Residential egress is the reliable fix.',
+      retryable: true,
+    };
+  }
+  return {
+    code: 'FFMPEG_EXIT_NONZERO',
+    source: 'ffmpeg',
+    message: `ffmpeg exited with code ${exitCode}.`,
+    detail: safe ? `Last stderr: ${safe.slice(-500).trim()}` : undefined,
+    retryable: true,
+  };
+}
+
+function deepgramDisconnectError(detail: string): SessionError {
+  return {
+    code: 'DEEPGRAM_DISCONNECTED',
+    source: 'deepgram',
+    message: 'Deepgram connection failed.',
+    detail,
+    retryable: true,
+  };
+}
 
 export type SessionMode = 'stream' | 'system-audio';
 
@@ -45,6 +148,8 @@ export class DeepgramClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private ffmpeg: ChildProcess | null = null;
   private ytdlp: ChildProcess | null = null;
+  private ytdlpStderr = '';
+  private ffmpegStderr = '';
   private keepAliveTimer: NodeJS.Timeout | null = null;
   private reconnectTimes: number[] = [];
   private reconnecting = false;
@@ -159,7 +264,9 @@ export class DeepgramClient extends EventEmitter {
       const timeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           ws.terminate();
-          settle(() => reject(new Error(`Deepgram WS connect timeout (${CONNECT_TIMEOUT_MS}ms)`)));
+          settle(() => reject(new SessionPipelineError(deepgramDisconnectError(
+            `Deepgram WS connect timeout (${CONNECT_TIMEOUT_MS}ms)`
+          ))));
         }
       }, CONNECT_TIMEOUT_MS);
 
@@ -183,7 +290,9 @@ export class DeepgramClient extends EventEmitter {
           // Auth failure / network reset before WS opened. Reject the initial
           // connect Promise — without this it would hang forever, blocking
           // the /api/session/start response and leaving `active` wedged.
-          settle(() => reject(new Error(`Deepgram WS closed before open (code=${code})`)));
+          settle(() => reject(new SessionPipelineError(deepgramDisconnectError(
+            `Deepgram WS closed before open (code=${code})`
+          ))));
           return;
         }
         if (!this.intentionalStop && this.active) {
@@ -193,10 +302,13 @@ export class DeepgramClient extends EventEmitter {
 
       ws.on('error', (err) => {
         console.error(`[deepgram] WS error: ${err.message}`);
-        this.emit('error', err);
         if (!opened) {
           clearTimeout(timeout);
-          settle(() => reject(err));
+          const wrapped = new SessionPipelineError(deepgramDisconnectError(err.message));
+          this.emit('error', wrapped);
+          settle(() => reject(wrapped));
+        } else {
+          this.emit('error', err);
         }
       });
 
@@ -268,11 +380,9 @@ export class DeepgramClient extends EventEmitter {
     this.reconnectTimes = this.reconnectTimes.filter((t) => t > cutoff);
 
     if (this.reconnectTimes.length >= MAX_RECONNECTS_PER_60S) {
-      const err = new Error(
-        `Deepgram WS reconnect failed: ${MAX_RECONNECTS_PER_60S} retries within 60s — giving up`
-      );
-      console.error(`[deepgram] CRITICAL: ${err.message}`);
-      this.emit('error', err);
+      const detail = `Deepgram WS reconnect failed: ${MAX_RECONNECTS_PER_60S} retries within 60s — giving up`;
+      console.error(`[deepgram] CRITICAL: ${detail}`);
+      this.emit('error', new SessionPipelineError(deepgramDisconnectError(detail)));
       this.reconnecting = false;
       this.active = false;
       this.killAudioPipeline();
@@ -319,6 +429,7 @@ export class DeepgramClient extends EventEmitter {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.ytdlp = ytdlp;
+    this.ytdlpStderr = '';
 
     let directUrl = '';
     ytdlp.stdout.on('data', (chunk) => {
@@ -326,7 +437,9 @@ export class DeepgramClient extends EventEmitter {
     });
 
     ytdlp.stderr.on('data', (chunk) => {
-      const msg = chunk.toString().trim();
+      const s = chunk.toString();
+      this.ytdlpStderr = appendBounded(this.ytdlpStderr, s);
+      const msg = s.trim();
       if (msg) console.warn(`[yt-dlp] ${msg}`);
     });
 
@@ -334,14 +447,21 @@ export class DeepgramClient extends EventEmitter {
       this.ytdlp = null;
       if (!this.active) return;
       if (code !== 0) {
-        const err = new Error(`yt-dlp exited with code ${code}`);
-        console.error(`[deepgram] ${err.message}`);
-        this.emit('error', err);
+        const se = classifyYtdlpError(code ?? -1, this.ytdlpStderr);
+        console.error(`[deepgram] yt-dlp failed: code=${se.code} message="${se.message}"`);
+        this.emit('error', new SessionPipelineError(se));
         return;
       }
       const cleanUrl = directUrl.trim().split('\n')[0];
       if (!cleanUrl) {
-        this.emit('error', new Error('yt-dlp returned no audio URL'));
+        const safe = redactUrls(this.ytdlpStderr);
+        this.emit('error', new SessionPipelineError({
+          code: 'YTDLP_EXIT_NONZERO',
+          source: 'yt-dlp',
+          message: 'yt-dlp succeeded but returned no audio URL.',
+          detail: safe ? `Last stderr: ${safe.slice(-500).trim()}` : undefined,
+          retryable: true,
+        }));
         return;
       }
       console.log('[deepgram] yt-dlp resolved direct audio URL');
@@ -424,7 +544,12 @@ export class DeepgramClient extends EventEmitter {
 
   private attachFfmpegStreams(ffmpeg: ChildProcess): void {
     if (!ffmpeg.stdout) {
-      this.emit('error', new Error('ffmpeg stdout pipe missing'));
+      this.emit('error', new SessionPipelineError({
+        code: 'FFMPEG_EXIT_NONZERO',
+        source: 'ffmpeg',
+        message: 'ffmpeg stdout pipe missing.',
+        retryable: true,
+      }));
       return;
     }
 
@@ -450,9 +575,12 @@ export class DeepgramClient extends EventEmitter {
       }
     });
 
+    this.ffmpegStderr = '';
     if (ffmpeg.stderr) {
       ffmpeg.stderr.on('data', (chunk) => {
-        const msg = chunk.toString().trim();
+        const s = chunk.toString();
+        this.ffmpegStderr = appendBounded(this.ffmpegStderr, s);
+        const msg = s.trim();
         if (msg) console.warn(`[ffmpeg] ${msg}`);
       });
     }
@@ -460,9 +588,9 @@ export class DeepgramClient extends EventEmitter {
     ffmpeg.on('close', (code) => {
       this.ffmpeg = null;
       if (this.active && !this.intentionalStop && code !== 0) {
-        const err = new Error(`ffmpeg exited unexpectedly with code ${code}`);
-        console.error(`[deepgram] ${err.message}`);
-        this.emit('error', err);
+        const se = classifyFfmpegError(code, this.ffmpegStderr);
+        console.error(`[deepgram] ffmpeg failed: code=${se.code}`);
+        this.emit('error', new SessionPipelineError(se));
       }
     });
   }
