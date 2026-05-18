@@ -9,7 +9,9 @@
     "build": "tsc",
     "build:frontend": "vite build",
     "start": "node dist/server/index.js",
-    "reembed": "tsx scripts/reembed-corpus.ts"
+    "reembed": "tsx scripts/reembed-corpus.ts",
+    "preflight:audio": "bash scripts/preflight-local-audio.sh",
+    "preflight:hosted": "bash scripts/preflight-hosted.sh"
   },
   "dependencies": {
     "@deepgram/sdk": "^5.1.0",
