@@ -12,10 +12,11 @@ import {
 
 config();
 
-// 50 keeps us well under the 1M TPM ceiling on text-embedding-3-small;
-// at ~800 tokens per ~600-word chunk this is ~40k tokens/batch.
+// ~800 tokens per ~600-word chunk × 50 = ~40k tokens/batch. With a 3s gap
+// that's ~800k tokens/min steady-state — under the tier-1 1M TPM ceiling on
+// text-embedding-3-small. Retries cover transient spikes.
 const BATCH_SIZE = 50;
-const BATCH_DELAY_MS = 200;
+const BATCH_DELAY_MS = 3000;
 const MAX_RATE_LIMIT_RETRIES = 3;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
