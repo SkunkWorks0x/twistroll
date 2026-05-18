@@ -103,7 +103,10 @@ const DOCKET_PARTIAL_ALLOWED: Set<string> = new Set(['appears', 'suggests']);
 
 function scanBlocklist(text: string, list: string[]): string[] {
   const lower = text.toLowerCase();
-  return list.filter((p) => lower.includes(p));
+  return list.filter((p) => {
+    const pat = new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    return pat.test(lower);
+  });
 }
 
 // ─── Tool definition for Docket ────────────────────────────────────────
@@ -621,6 +624,12 @@ export async function runDocket(
         const groundingFail = messages.find((m) => m.startsWith('Grounding exceeds'));
         if (explFail || groundingFail) {
           correctiveInstruction = buildCorrectiveInstruction(input, explFail, groundingFail);
+        } else {
+          // Non-word-count Zod failure (verdict-enum, tier-range, citation-url, etc.).
+          // Without a hint, attempt 2 retries identically and fails identically.
+          correctiveInstruction =
+            `Your previous fact_check input failed schema validation: ${messages.join('; ')}. ` +
+            `Retry strictly conforming to the fact_check tool schema.`;
         }
       }
       continue;
@@ -695,11 +704,15 @@ export async function runDocket(
     // exists for forward compatibility with the planned write-back feature.
     if (candidate.citations.length > 0 && candidate.verdict !== 'UNVERIFIABLE') {
       const allDerived = candidate.citations.every((c) => {
-        const matchSrc =
+        const matches =
           c.url !== null
-            ? sources.find((s) => s.url === c.url)
-            : sources.find((s) => s.url === null && s.title === c.title);
-        return matchSrc?.sourceKind === 'derived_verdict';
+            ? sources.filter((s) => s.url === c.url)
+            : sources.filter((s) => s.url === null && s.title === c.title);
+        // Conservative: if ANY matching source is primary, don't count this
+        // citation as all-derived. Avoids title-collision false positives
+        // where two LanceDB chunks (different episodes) share an exact title.
+        if (matches.length === 0) return false;
+        return matches.every((s) => s.sourceKind === 'derived_verdict');
       });
       if (allDerived) {
         console.log(`[DOCKET] Downgrade ${candidate.verdict} → UNVERIFIABLE: all citations reference derived_verdict sources`);
