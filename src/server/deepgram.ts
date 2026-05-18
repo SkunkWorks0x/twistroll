@@ -84,8 +84,27 @@ export class DeepgramClient extends EventEmitter {
     this.reconnectTimes = [];
     this.audioBuffer = [];
 
-    await this.connectDeepgram();
-    this.startAudioPipeline();
+    try {
+      await this.connectDeepgram();
+      this.startAudioPipeline();
+    } catch (err) {
+      // connectDeepgram or startAudioPipeline threw before the session was
+      // fully established. Without this rollback, `this.active` stays true
+      // forever — every subsequent startSession hits the guard above and
+      // throws "Session already active," leaving the client wedged until
+      // stopSession() is called (or the process restarts).
+      this.active = false;
+      this.intentionalStop = true;
+      this.stopKeepAlive();
+      this.killAudioPipeline();
+      if (this.ws) {
+        try { this.ws.close(); } catch { /* ignore */ }
+        this.ws = null;
+      }
+      this.audioBuffer = [];
+      this.sessionConfig = null;
+      throw err;
+    }
     const offsetSuffix = config.startOffsetSeconds !== undefined ? `, startOffsetSeconds=${config.startOffsetSeconds}` : '';
     console.log(`[deepgram] session started: mode=${config.mode}, source="${config.source}"${offsetSuffix}`);
   }
@@ -124,19 +143,33 @@ export class DeepgramClient extends EventEmitter {
         headers: { Authorization: `Token ${this.apiKey}` },
       });
 
+      // `settled` prevents double-resolve/reject from the multiple ws events
+      // that fire on auth failure (error → close → timeout). `opened` lets
+      // the close handler distinguish a pre-open failure (must reject the
+      // initial connect Promise) from a post-open disconnect (triggers
+      // reconnect logic, original Promise already resolved).
+      let opened = false;
+      let settled = false;
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        fn();
+      };
+
       const timeout = setTimeout(() => {
         if (ws.readyState !== WebSocket.OPEN) {
           ws.terminate();
-          reject(new Error(`Deepgram WS connect timeout (${CONNECT_TIMEOUT_MS}ms)`));
+          settle(() => reject(new Error(`Deepgram WS connect timeout (${CONNECT_TIMEOUT_MS}ms)`)));
         }
       }, CONNECT_TIMEOUT_MS);
 
       ws.on('open', () => {
         clearTimeout(timeout);
+        opened = true;
         console.log('[deepgram] WS connected');
         this.startKeepAlive();
         this.emit('connected');
-        resolve();
+        settle(() => resolve());
       });
 
       ws.on('message', (data) => this.handleMessage(data));
@@ -146,6 +179,13 @@ export class DeepgramClient extends EventEmitter {
         console.warn(`[deepgram] WS closed: code=${code}, reason="${reason.toString() || '(none)'}"`);
         this.stopKeepAlive();
         this.emit('disconnected');
+        if (!opened) {
+          // Auth failure / network reset before WS opened. Reject the initial
+          // connect Promise — without this it would hang forever, blocking
+          // the /api/session/start response and leaving `active` wedged.
+          settle(() => reject(new Error(`Deepgram WS closed before open (code=${code})`)));
+          return;
+        }
         if (!this.intentionalStop && this.active) {
           this.attemptReconnect();
         }
@@ -154,6 +194,10 @@ export class DeepgramClient extends EventEmitter {
       ws.on('error', (err) => {
         console.error(`[deepgram] WS error: ${err.message}`);
         this.emit('error', err);
+        if (!opened) {
+          clearTimeout(timeout);
+          settle(() => reject(err));
+        }
       });
 
       this.ws = ws;
