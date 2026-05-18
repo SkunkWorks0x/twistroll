@@ -184,10 +184,13 @@ export async function classifyWindow(
   }
   const latencyMs = Date.now() - start;
 
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim();
+  // Strip any prose before the first '{' (e.g. "Here is the JSON:" + fence),
+  // any opening/closing code fence, then trim. Tolerant of both bare JSON
+  // and Haiku occasionally wrapping in commentary.
+  let cleaned = raw.replace(/^[\s\S]*?(?=\{)/, '').replace(/\s*```$/, '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  }
 
   let parsed: any = null;
   try {
@@ -219,11 +222,13 @@ export async function classifyWindow(
   const reason = typeof parsed.reason === 'string' ? parsed.reason : '';
 
   let primaryEntity = isClaim && typeof parsed.primary_entity === 'string' ? parsed.primary_entity : '';
-  const entityType: EntityType = ENTITY_TYPES.includes(parsed.entity_type) ? parsed.entity_type : 'unknown';
+  const entityTypeRaw = typeof parsed.entity_type === 'string' ? parsed.entity_type.trim().toLowerCase() : '';
+  const entityType: EntityType = ENTITY_TYPES.includes(entityTypeRaw as EntityType) ? (entityTypeRaw as EntityType) : 'unknown';
   const keyNumbers: string[] = Array.isArray(parsed.key_numbers)
     ? parsed.key_numbers.filter((n: unknown): n is string => typeof n === 'string')
     : [];
-  const claimType: ClaimType = CLAIM_TYPES.includes(parsed.claim_type) ? parsed.claim_type : 'unknown';
+  const claimTypeRaw = typeof parsed.claim_type === 'string' ? parsed.claim_type.trim().toLowerCase() : '';
+  const claimType: ClaimType = CLAIM_TYPES.includes(claimTypeRaw as ClaimType) ? (claimTypeRaw as ClaimType) : 'unknown';
   let searchableNoun = isClaim && typeof parsed.searchable_noun === 'string' ? parsed.searchable_noun : '';
 
   const startSegmentId = labelToSegmentId(parsed.claim_span_start, window, current.id);
