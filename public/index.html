@@ -1569,6 +1569,7 @@
   }
 
   function renderSidebar() {
+    const savedScrollTop = autoFollow ? null : sidebarPane.scrollTop;
     // Keep the static "THE DOCKET / N CLAIMS" header in sync with live state.
     const countEl = document.getElementById('claim-count-display');
     if (countEl) {
@@ -1591,6 +1592,7 @@
       for (const card of state.cards) {
         sidebarEl.appendChild(renderCollapsedCard(card));
       }
+      if (savedScrollTop !== null) sidebarPane.scrollTop = savedScrollTop;
       return;
     }
 
@@ -1618,6 +1620,7 @@
         sidebarEl.appendChild(renderCollapsedCard(card));
       }
     }
+    if (savedScrollTop !== null) sidebarPane.scrollTop = savedScrollTop;
   }
 
   function verdictClass(v) {
