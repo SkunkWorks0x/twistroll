@@ -1138,7 +1138,7 @@
     if (role === 'host')   return { role, name: perId || 'HOST',   roleClass: 'role-host' };
     if (role === 'cohost') return { role, name: perId || 'COHOST', roleClass: 'role-cohost' };
     if (role === 'guest')  return { role, name: perId || 'GUEST',  roleClass: 'role-guest' };
-    return { role: null, name: `SPEAKER ${speakerId}`, roleClass: 'role-unmapped' };
+    return { role: 'guest', name: perId || 'GUEST', roleClass: 'role-guest' };
   }
 
   // Resolve a card's speaker for the claim-quote pill. Returns r.name as-is
