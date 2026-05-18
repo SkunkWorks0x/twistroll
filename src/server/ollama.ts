@@ -23,10 +23,9 @@ export async function callOllama(
   const timeout = firstCallDone ? 15000 : 30000;
 
   for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeout);
-
       const response = await fetch(`${appConfig.ollamaBaseUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -44,8 +43,6 @@ export async function callOllama(
         }),
         signal: controller.signal,
       });
-
-      clearTimeout(timer);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -76,9 +73,13 @@ export async function callOllama(
         await sleep(500);
       } else {
         console.error(`[ollama] Attempt 2 failed (${model}): ${msg}. Giving up.`);
-        ollamaAvailable = false;
+        // Do NOT set ollamaAvailable=false here — chat failure can be
+        // model-loading lag rather than daemon down. checkOllama is the
+        // source of truth for availability via /api/tags.
         throw err;
       }
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -89,18 +90,19 @@ export async function callOllama(
  * Check if Ollama is reachable
  */
 export async function checkOllama(): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 3000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(`${appConfig.ollamaBaseUrl}/api/tags`, {
       signal: controller.signal,
     });
-    clearTimeout(timer);
     ollamaAvailable = res.ok;
     return ollamaAvailable;
   } catch {
     ollamaAvailable = false;
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
