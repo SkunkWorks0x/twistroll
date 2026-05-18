@@ -14,6 +14,7 @@ import type {
   EntityType,
   TranscriptSegment,
 } from '../shared/types.js';
+import { normalizeEntities } from './entityAliases.js';
 
 export type SpeakerRole = 'host' | 'cohost' | 'guest';
 export type SpeakerMap = Record<number, SpeakerRole>;
@@ -214,19 +215,23 @@ export async function classifyWindow(
       ? parsed.confidence
       : 0;
 
-  const claimText = isClaim && typeof parsed.claim_text === 'string' ? parsed.claim_text : '';
+  let claimText = isClaim && typeof parsed.claim_text === 'string' ? parsed.claim_text : '';
   const reason = typeof parsed.reason === 'string' ? parsed.reason : '';
 
-  const primaryEntity = isClaim && typeof parsed.primary_entity === 'string' ? parsed.primary_entity : '';
+  let primaryEntity = isClaim && typeof parsed.primary_entity === 'string' ? parsed.primary_entity : '';
   const entityType: EntityType = ENTITY_TYPES.includes(parsed.entity_type) ? parsed.entity_type : 'unknown';
   const keyNumbers: string[] = Array.isArray(parsed.key_numbers)
     ? parsed.key_numbers.filter((n: unknown): n is string => typeof n === 'string')
     : [];
   const claimType: ClaimType = CLAIM_TYPES.includes(parsed.claim_type) ? parsed.claim_type : 'unknown';
-  const searchableNoun = isClaim && typeof parsed.searchable_noun === 'string' ? parsed.searchable_noun : '';
+  let searchableNoun = isClaim && typeof parsed.searchable_noun === 'string' ? parsed.searchable_noun : '';
 
   const startSegmentId = labelToSegmentId(parsed.claim_span_start, window, current.id);
   const endSegmentId = labelToSegmentId(parsed.claim_span_end, window, current.id);
+
+  claimText = normalizeEntities(claimText);
+  primaryEntity = normalizeEntities(primaryEntity);
+  searchableNoun = normalizeEntities(searchableNoun);
 
   return {
     classification: {
