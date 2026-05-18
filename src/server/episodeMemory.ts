@@ -91,6 +91,7 @@ export interface MemoryQueryResult {
 
 let connection: lancedb.Connection | null = null;
 let table: lancedb.Table | null = null;
+let initPromise: Promise<lancedb.Table> | null = null;
 
 /**
  * Run the one-time provenance-column migration if the table predates the
@@ -115,11 +116,21 @@ async function migrateProvenanceColumns(tbl: lancedb.Table): Promise<void> {
 
 /**
  * Open or create the LanceDB connection and episodes table.
- * Safe to call multiple times — caches the connection.
+ * Safe to call multiple times — caches the connection. Concurrent first
+ * callers share a single in-flight promise so neither double-creates the
+ * table; if init fails, the promise is cleared so a retry attempts fresh.
  */
 export async function initMemory(): Promise<lancedb.Table> {
   if (table) return table;
+  if (initPromise) return initPromise;
+  initPromise = openOrCreateTable().catch((err) => {
+    initPromise = null;
+    throw err;
+  });
+  return initPromise;
+}
 
+async function openOrCreateTable(): Promise<lancedb.Table> {
   if (!existsSync(DB_PATH)) {
     mkdirSync(DB_PATH, { recursive: true });
   }
@@ -242,15 +253,19 @@ export async function ingestEpisode(metadata: IngestMetadata): Promise<number> {
 
   // Upsert: delete any existing chunks for this episode first (backfill path only).
   if (metadata.episodeNumber != null) {
+    const epNum = Number(metadata.episodeNumber);
+    if (!Number.isInteger(epNum)) {
+      throw new Error(`commitEpisode: invalid episodeNumber ${JSON.stringify(metadata.episodeNumber)}`);
+    }
     const existing = await tbl
       .query()
-      .where(`episodeNumber = ${metadata.episodeNumber}`)
+      .where(`episodeNumber = ${epNum}`)
       .limit(100000)
       .toArray()
       .catch(() => [] as unknown[]);
     if (existing.length > 0) {
-      await tbl.delete(`episodeNumber = ${metadata.episodeNumber}`);
-      console.log(`[ingest] Replaced ${existing.length} existing chunks for Ep ${metadata.episodeNumber}`);
+      await tbl.delete(`episodeNumber = ${epNum}`);
+      console.log(`[ingest] Replaced ${existing.length} existing chunks for Ep ${epNum}`);
     }
   }
 
