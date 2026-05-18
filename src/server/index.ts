@@ -130,6 +130,27 @@ interface SessionStateMessage {
   url?: string;
   error?: SessionError;
 }
+
+interface DeepgramHealthState {
+  state: 'connected' | 'reconnecting' | 'disconnected';
+  attempt?: number;
+}
+interface DeepgramHealthMessage extends DeepgramHealthState {
+  type: 'deepgram_health';
+}
+let deepgramHealth: DeepgramHealthState | null = null;
+
+function setDeepgramHealth(next: DeepgramHealthState): void {
+  if (
+    deepgramHealth &&
+    deepgramHealth.state === next.state &&
+    deepgramHealth.attempt === next.attempt
+  ) return;
+  deepgramHealth = next;
+  const msg: DeepgramHealthMessage = { type: 'deepgram_health', state: next.state };
+  if (next.attempt !== undefined) msg.attempt = next.attempt;
+  broadcast(msg);
+}
 let sessionState: SessionUiState = 'idle';
 let sessionUrl: string | null = null;
 let sessionStartedAt: string | null = null;
@@ -326,7 +347,10 @@ if (deepgram) {
   });
   deepgram.on('reconnecting', ({ attempt }: { attempt: number }) => {
     console.warn(`[deepgram] reconnecting (attempt ${attempt})`);
+    setDeepgramHealth({ state: 'reconnecting', attempt });
   });
+  deepgram.on('connected', () => setDeepgramHealth({ state: 'connected' }));
+  deepgram.on('disconnected', () => setDeepgramHealth({ state: 'disconnected' }));
 } else {
   console.warn('[deepgram] DEEPGRAM_API_KEY not set — session endpoints will return 503');
 }
@@ -458,6 +482,8 @@ app.post('/api/session/start', async (req, res) => {
   activeSpans.length = 0;
   ttfcUtteranceEndMs.clear();
   clearAllStages();
+  // Bare reset (no broadcast) — fresh session will broadcast on first event.
+  deepgramHealth = null;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
 
   setSessionState('connecting', source);
@@ -550,6 +576,7 @@ app.get('/api/session/status', (_req, res) => {
     speakerMap: currentSpeakerMap,
     effectiveSpeakerMap,
     speakerMapSource: mapIsExplicit ? 'explicit' : 'default',
+    deepgramHealth,
   });
 });
 
@@ -610,6 +637,11 @@ wss.on('connection', (ws) => {
     state: !OLLAMA_NEEDED || isOllamaAvailable() ? 'connected' : 'ollama_down',
   };
   ws.send(JSON.stringify(status));
+  if (deepgramHealth) {
+    const hm: DeepgramHealthMessage = { type: 'deepgram_health', state: deepgramHealth.state };
+    if (deepgramHealth.attempt !== undefined) hm.attempt = deepgramHealth.attempt;
+    ws.send(JSON.stringify(hm));
+  }
 
   ws.on('message', (data) => {
     let msg: any;
@@ -664,6 +696,7 @@ function broadcast(
     | ClaimDetectedMessage
     | CardBroadcast
     | SessionStateMessage
+    | DeepgramHealthMessage
 ): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {

@@ -645,6 +645,39 @@
     box-shadow: 0 0 10px rgba(52, 211, 153, 0.6);
   }
   .session-bar.error .session-dot { background: #F87171; }
+  .deepgram-health {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .deepgram-health .deepgram-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .deepgram-health.reconnecting {
+    color: #FBBF24;
+    background: rgba(251, 191, 36, 0.08);
+    border: 1px solid rgba(251, 191, 36, 0.35);
+  }
+  .deepgram-health.reconnecting .deepgram-dot {
+    background: #FBBF24;
+    animation: session-pulse 900ms ease-in-out infinite;
+  }
+  .deepgram-health.disconnected {
+    color: #F87171;
+    background: rgba(248, 113, 113, 0.08);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+  }
+  .deepgram-health.disconnected .deepgram-dot { background: #F87171; }
   @keyframes session-pulse {
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.35; }
@@ -850,7 +883,7 @@
   // Uses `escape` defined later in this IIFE under Utilities — hoisted by
   // closure scope, available by the time renderSessionBar is invoked.
   const sessionBar = document.getElementById('session-bar');
-  const session = { state: 'idle', url: null, error: null };
+  const session = { state: 'idle', url: null, error: null, deepgramHealth: { state: 'connected' } };
   // Mode persists in sessionStorage so a reload keeps the operator in the
   // mode they were using ('youtube' or 'system-audio').
   let sessionMode = sessionStorage.getItem('sentinel_session_mode') === 'system-audio'
@@ -860,6 +893,15 @@
     sessionMode = next;
     sessionStorage.setItem('sentinel_session_mode', next);
     renderSessionBar();
+  }
+
+  function renderDeepgramHealth() {
+    const dh = session.deepgramHealth;
+    if (dh.state === 'connected') return '';
+    if (dh.state === 'reconnecting') {
+      return `<span class="deepgram-health reconnecting"><span class="deepgram-dot"></span>Reconnecting (attempt ${dh.attempt || '?'})…</span>`;
+    }
+    return `<span class="deepgram-health disconnected"><span class="deepgram-dot"></span>Connection lost</span>`;
   }
 
   function renderSessionBar(transientError) {
@@ -917,6 +959,7 @@
         <span class="session-dot"></span>
         <span class="session-label">Live</span>
         <span class="session-url">${escape(session.url || '')}</span>
+        ${renderDeepgramHealth()}
         <button class="session-action danger" id="session-stop">Stop</button>
       `;
       document.getElementById('session-stop').addEventListener('click', stopSession);
@@ -1233,6 +1276,10 @@
         if (msg.state === 'error' && msg.error) session.error = msg.error;
         renderSessionBar();
         break;
+      case 'deepgram_health':
+        session.deepgramHealth = { state: msg.state, attempt: msg.attempt };
+        if (session.state === 'live') renderSessionBar();
+        break;
       // claim_detected is informational; we wait for the synthesized card.
     }
   }
@@ -1240,7 +1287,10 @@
   // ─── Transcript rendering ──────────────────────────────────
   function addSegment(seg) {
     state.segments.push(seg);
-    while (state.segments.length > MAX_SEGMENTS) state.segments.shift();
+    while (state.segments.length > MAX_SEGMENTS) {
+      const dropped = state.segments.shift();
+      if (dropped) state.segmentsWithClaims.delete(dropped.id);
+    }
 
     if (state.segments.length === 1) transcriptEl.innerHTML = '';
 
