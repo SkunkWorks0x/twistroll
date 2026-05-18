@@ -140,6 +140,7 @@ interface DeepgramHealthMessage extends DeepgramHealthState {
   type: 'deepgram_health';
 }
 let deepgramHealth: DeepgramHealthState | null = null;
+let currentSpeakerNames: Record<number, string> = {};
 
 function setDeepgramHealth(next: DeepgramHealthState): void {
   if (
@@ -374,6 +375,18 @@ function validateSpeakerMap(input: unknown): SpeakerMap {
   return out;
 }
 
+function validateSpeakerNames(input: unknown): Record<number, string> {
+  if (!input || typeof input !== 'object') return {};
+  const out: Record<number, string> = {};
+  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+    const id = parseInt(k, 10);
+    if (Number.isNaN(id) || typeof v !== 'string') continue;
+    const label = v.trim().slice(0, 32);
+    if (label) out[id] = label;
+  }
+  return out;
+}
+
 // ─── Synthesis pipeline: claim queue → retrieval → synthesis → broadcast ─
 setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
   try {
@@ -435,6 +448,8 @@ app.post('/api/session/start', async (req, res) => {
     source?: string;
     url?: string;
     speakerMap?: unknown;
+    speakerNames?: unknown;
+    sessionContext?: { speakerNames?: unknown };
     startOffsetSeconds?: unknown;
   };
 
@@ -492,6 +507,7 @@ app.post('/api/session/start', async (req, res) => {
   // Bare reset (no broadcast) — fresh session will broadcast on first event.
   deepgramHealth = null;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
+  currentSpeakerNames = validateSpeakerNames(body.speakerNames ?? body.sessionContext?.speakerNames);
 
   setSessionState('connecting', source);
   const sessionId = crypto.randomUUID();
@@ -521,6 +537,17 @@ app.post('/api/session/start', async (req, res) => {
     setSessionState('error', undefined, se);
     res.status(500).json({ error: se.message, code: se.code });
   }
+});
+
+app.post('/api/session/speakers', (req, res) => {
+  const body = req.body as { speakerMap?: unknown; speakerNames?: unknown };
+  currentSpeakerMap = validateSpeakerMap(body.speakerMap);
+  currentSpeakerNames = validateSpeakerNames(body.speakerNames);
+  res.json({
+    status: 'ok',
+    speakerMap: currentSpeakerMap,
+    sessionContext: { speakerNames: currentSpeakerNames },
+  });
 });
 
 app.post('/api/session/stop', async (_req, res) => {
@@ -583,6 +610,7 @@ app.get('/api/session/status', (_req, res) => {
     speakerMap: currentSpeakerMap,
     effectiveSpeakerMap,
     speakerMapSource: mapIsExplicit ? 'explicit' : 'default',
+    sessionContext: { speakerNames: currentSpeakerNames },
     deepgramHealth,
     reResolutionAttempts: deepgram.getReResolutionAttempts(),
   });

@@ -235,6 +235,7 @@
     letter-spacing: 0.10em;
     text-transform: uppercase;
     white-space: nowrap;
+    cursor: pointer;
   }
   .seg .speaker::before {
     content: "";
@@ -1080,10 +1081,15 @@
 
   async function postStart(body) {
     try {
+      const speakerNames = state.session.sessionContext.speakerNames || {};
       const r = await authFetch('/api/session/start', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          ...body,
+          speakerMap: state.session.speakerMap || {},
+          speakerNames,
+        }),
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
@@ -1127,6 +1133,33 @@
       sessionContext: {},        // { speakerNames: {[id]: name}, … } — only `speakerNames` is consulted; names other than per-id explicit operator overrides are ignored.
     },
   };
+  const SPEAKER_ASSIGNMENTS = [
+    { role: 'host', name: 'HOST' },
+    { role: 'cohost', name: 'COHOST' },
+    { role: 'guest', name: 'GUEST 1' },
+    { role: 'guest', name: 'GUEST 2' },
+  ];
+
+  function loadSpeakerPrefs() {
+    try {
+      const raw = JSON.parse(sessionStorage.getItem('sentinel_speaker_prefs') || '{}');
+      return {
+        speakerMap: raw.speakerMap && typeof raw.speakerMap === 'object' ? raw.speakerMap : {},
+        speakerNames: raw.speakerNames && typeof raw.speakerNames === 'object' ? raw.speakerNames : {},
+      };
+    } catch {
+      return { speakerMap: {}, speakerNames: {} };
+    }
+  }
+
+  function saveSpeakerPrefs(speakerMap, speakerNames) {
+    sessionStorage.setItem('sentinel_speaker_prefs', JSON.stringify({ speakerMap, speakerNames }));
+  }
+
+  const speakerPrefs = loadSpeakerPrefs();
+  state.session.speakerMap = speakerPrefs.speakerMap;
+  state.session.effectiveSpeakerMap = speakerPrefs.speakerMap;
+  state.session.sessionContext = { speakerNames: speakerPrefs.speakerNames };
 
   const MAX_SEGMENTS = 250;
   const MAX_CARDS = 10;
@@ -1255,7 +1288,36 @@
       const { name, roleClass } = resolveSpeaker(id);
       speakerEl.textContent = name;
       speakerEl.className = `speaker ${roleClass}`;
+      speakerEl.title = 'Click to assign speaker';
     }
+  }
+
+  async function assignSpeaker(speakerId) {
+    if (!Number.isFinite(speakerId)) return;
+    const map = { ...(state.session.speakerMap || {}) };
+    const names = { ...((state.session.sessionContext || {}).speakerNames || {}) };
+    const currentRole = map[speakerId] ?? map[String(speakerId)] ?? null;
+    const currentName = names[speakerId] ?? names[String(speakerId)] ?? null;
+    const currentIdx = SPEAKER_ASSIGNMENTS.findIndex((o) => o.role === currentRole && o.name === currentName);
+    const next = SPEAKER_ASSIGNMENTS[(currentIdx + 1) % SPEAKER_ASSIGNMENTS.length];
+
+    map[speakerId] = next.role;
+    names[speakerId] = next.name;
+    state.session.speakerMap = map;
+    state.session.effectiveSpeakerMap = map;
+    state.session.speakerMapSource = 'explicit';
+    state.session.sessionContext = { ...(state.session.sessionContext || {}), speakerNames: names };
+    saveSpeakerPrefs(map, names);
+    applyMetaToTranscript();
+    renderSidebar();
+
+    try {
+      await authFetch('/api/session/speakers', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ speakerMap: map, speakerNames: names }),
+      });
+    } catch { /* authFetch handles auth; keep local labels responsive */ }
   }
 
   async function refreshSessionMeta() {
@@ -1264,11 +1326,13 @@
       if (!r.ok) return;
       const d = await r.json();
       let changed = false;
-      if (d.speakerMap && JSON.stringify(d.speakerMap) !== JSON.stringify(state.session.speakerMap)) {
+      const serverHasExplicitMap = d.speakerMapSource === 'explicit'
+        || (d.speakerMap && Object.keys(d.speakerMap).length > 0);
+      if (serverHasExplicitMap && d.speakerMap && JSON.stringify(d.speakerMap) !== JSON.stringify(state.session.speakerMap)) {
         state.session.speakerMap = d.speakerMap;
         changed = true;
       }
-      if (d.effectiveSpeakerMap && JSON.stringify(d.effectiveSpeakerMap) !== JSON.stringify(state.session.effectiveSpeakerMap)) {
+      if (serverHasExplicitMap && d.effectiveSpeakerMap && JSON.stringify(d.effectiveSpeakerMap) !== JSON.stringify(state.session.effectiveSpeakerMap)) {
         state.session.effectiveSpeakerMap = d.effectiveSpeakerMap;
         changed = true;
       }
@@ -1278,6 +1342,7 @@
       }
       if (d.sessionContext && JSON.stringify(d.sessionContext) !== JSON.stringify(state.session.sessionContext)) {
         state.session.sessionContext = d.sessionContext;
+        saveSpeakerPrefs(state.session.speakerMap || {}, d.sessionContext.speakerNames || {});
         changed = true;
       }
       if (changed) applyMetaToTranscript();
@@ -1393,6 +1458,14 @@
       <span class="text">${escape(seg.text)}</span>
       <span class="ts">${fmtTimestamp(seg.timestamp)}</span>
     `;
+    const speakerEl = el.querySelector('.speaker');
+    if (speakerEl) {
+      speakerEl.title = 'Click to assign speaker';
+      speakerEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        assignSpeaker(seg.speaker);
+      });
+    }
     el.addEventListener('click', () => {
       // Only react if this segment has a claim attached.
       if (!el.classList.contains('has-claim')) return;
