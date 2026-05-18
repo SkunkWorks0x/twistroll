@@ -110,6 +110,11 @@ if (rawToken !== undefined && rawToken.length < 24) {
 const ACCESS_TOKEN = rawToken ?? '';
 const AUTH_ENABLED = ACCESS_TOKEN.length >= 24;
 
+// When the cloud embedding provider is in use, Ollama isn't reachable and
+// isn't load-bearing — don't surface "OLLAMA DOWN" to the dashboard, and
+// skip the periodic health-check polling entirely.
+const OLLAMA_NEEDED = process.env.EMBED_PROVIDER !== 'openai';
+
 // ─── Session state machine ───
 type SessionUiState = 'idle' | 'connecting' | 'live' | 'error';
 interface SessionStateMessage {
@@ -543,10 +548,11 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   console.log(`[ws] Client connected (${clients.size} total)`);
 
-  // Send initial status
+  // Send initial status. When Ollama isn't needed (cloud embed mode), always
+  // report connected — its real availability is irrelevant to the dashboard.
   const status: StatusMessage = {
     type: 'status',
-    state: isOllamaAvailable() ? 'connected' : 'ollama_down',
+    state: !OLLAMA_NEEDED || isOllamaAvailable() ? 'connected' : 'ollama_down',
   };
   ws.send(JSON.stringify(status));
 
@@ -613,14 +619,17 @@ function broadcast(
 }
 
 async function main() {
-  // Check Ollama on startup
-  const ollamaOk = await checkOllama();
-  if (!ollamaOk) {
-    console.warn('⚠️  Ollama not detected at', appConfig.ollamaBaseUrl);
-    console.warn('   Start Ollama and pull the model: ollama pull qwen2.5:7b');
-    console.warn('   Sentinel will retry when utterances arrive.');
-  } else {
-    console.log('✅ Ollama connected');
+  // Check Ollama on startup — only when it's actually needed for embeddings
+  // or the classifier fallback. EMBED_PROVIDER=openai deploys skip this.
+  if (OLLAMA_NEEDED) {
+    const ollamaOk = await checkOllama();
+    if (!ollamaOk) {
+      console.warn('⚠️  Ollama not detected at', appConfig.ollamaBaseUrl);
+      console.warn('   Start Ollama and pull the model: ollama pull qwen2.5:7b');
+      console.warn('   Sentinel will retry when utterances arrive.');
+    } else {
+      console.log('✅ Ollama connected');
+    }
   }
 
   // Warmup LanceDB embedding path so the first claim doesn't hit 300ms
@@ -645,18 +654,20 @@ async function main() {
     console.log('');
   });
 
-  // Periodic Ollama health check
-  setInterval(async () => {
-    const wasAvailable = isOllamaAvailable();
-    await checkOllama();
-    if (!wasAvailable && isOllamaAvailable()) {
-      console.log('✅ Ollama reconnected');
-      broadcast({ type: 'status', state: 'connected' });
-    } else if (wasAvailable && !isOllamaAvailable()) {
-      console.warn('⚠️  Ollama disconnected');
-      broadcast({ type: 'status', state: 'ollama_down' });
-    }
-  }, 10000);
+  // Periodic Ollama health check — only when Ollama is actually load-bearing.
+  if (OLLAMA_NEEDED) {
+    setInterval(async () => {
+      const wasAvailable = isOllamaAvailable();
+      await checkOllama();
+      if (!wasAvailable && isOllamaAvailable()) {
+        console.log('✅ Ollama reconnected');
+        broadcast({ type: 'status', state: 'connected' });
+      } else if (wasAvailable && !isOllamaAvailable()) {
+        console.warn('⚠️  Ollama disconnected');
+        broadcast({ type: 'status', state: 'ollama_down' });
+      }
+    }, 10000);
+  }
 }
 
 // ─── Config Panel HTML ───
