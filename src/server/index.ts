@@ -402,12 +402,21 @@ app.post('/api/session/start', async (req, res) => {
     }
     mode = 'stream';
     source = body.url;
-  } else if (body.mode === 'stream' || body.mode === 'system-audio') {
+  } else if (body.mode === 'stream') {
     if (!body.source || typeof body.source !== 'string') {
-      return res.status(400).json({ error: 'source required' });
+      return res.status(400).json({ error: 'source required for mode=stream' });
     }
-    mode = body.mode;
+    mode = 'stream';
     source = body.source;
+  } else if (body.mode === 'system-audio') {
+    // Device-name resolution chain: explicit body.source → AUDIO_DEVICE env →
+    // BlackHole 2ch default. Spec'd so the dashboard can send just
+    // { mode: 'system-audio' } without a device-picker UI.
+    mode = 'system-audio';
+    source =
+      (typeof body.source === 'string' && body.source.trim()) ||
+      process.env.AUDIO_DEVICE ||
+      'BlackHole 2ch';
   } else {
     return res.status(400).json({ error: "mode must be 'youtube', 'stream' or 'system-audio'" });
   }

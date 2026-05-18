@@ -727,6 +727,47 @@
     color: var(--text-dim);
   }
   .session-action.secondary:hover { background: rgba(255, 255, 255, 0.08); }
+
+  /* Segmented mode toggle (YouTube / System Audio) — mirrors the replay
+     page's 1×/2×/4× speed buttons for visual consistency. */
+  .session-mode-toggle {
+    display: inline-flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .session-mode-toggle button {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    color: #8B8F9A;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .session-mode-toggle button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #D8DAE0;
+  }
+  .session-mode-toggle button.active {
+    border-color: rgba(255, 92, 0, 0.5);
+    background: rgba(255, 92, 0, 0.10);
+    color: #FF5C00;
+  }
+  .session-helper {
+    flex: 1;
+    color: var(--text-faint);
+    font-size: 11px;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
 </style>
 </head>
 <body>
@@ -810,6 +851,16 @@
   // closure scope, available by the time renderSessionBar is invoked.
   const sessionBar = document.getElementById('session-bar');
   const session = { state: 'idle', url: null, error: null };
+  // Mode persists in sessionStorage so a reload keeps the operator in the
+  // mode they were using ('youtube' or 'system-audio').
+  let sessionMode = sessionStorage.getItem('sentinel_session_mode') === 'system-audio'
+    ? 'system-audio'
+    : 'youtube';
+  function setSessionMode(next) {
+    sessionMode = next;
+    sessionStorage.setItem('sentinel_session_mode', next);
+    renderSessionBar();
+  }
 
   function renderSessionBar(transientError) {
     sessionBar.className = `session-bar ${session.state}`;
@@ -824,16 +875,35 @@
       return;
     }
     if (session.state === 'idle') {
-      sessionBar.innerHTML = `
-        <span class="session-dot"></span>
-        <span class="session-label">Stream</span>
-        <input class="session-input" id="session-url" type="url" placeholder="Paste YouTube URL..." />
-        <button class="session-action primary" id="session-start">Start Stream</button>
+      const toggle = `
+        <div class="session-mode-toggle">
+          <button data-mode="youtube" class="${sessionMode === 'youtube' ? 'active' : ''}">YouTube</button>
+          <button data-mode="system-audio" class="${sessionMode === 'system-audio' ? 'active' : ''}">System Audio</button>
+        </div>
       `;
-      const inp = document.getElementById('session-url');
-      const btn = document.getElementById('session-start');
-      btn.addEventListener('click', () => startSession(inp.value));
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startSession(inp.value); });
+      if (sessionMode === 'youtube') {
+        sessionBar.innerHTML = `
+          <span class="session-dot"></span>
+          ${toggle}
+          <input class="session-input" id="session-url" type="url" placeholder="Paste YouTube URL..." />
+          <button class="session-action primary" id="session-start">Start Stream</button>
+        `;
+        const inp = document.getElementById('session-url');
+        const btn = document.getElementById('session-start');
+        btn.addEventListener('click', () => startYouTube(inp.value));
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startYouTube(inp.value); });
+      } else {
+        sessionBar.innerHTML = `
+          <span class="session-dot"></span>
+          ${toggle}
+          <span class="session-helper">Captures local Mac system audio via BlackHole. For Zoom, route Zoom output to BlackHole 2ch.</span>
+          <button class="session-action primary" id="session-start">Start Capture</button>
+        `;
+        document.getElementById('session-start').addEventListener('click', () => startSystemAudio());
+      }
+      sessionBar.querySelectorAll('.session-mode-toggle button').forEach((b) => {
+        b.addEventListener('click', () => setSessionMode(b.dataset.mode));
+      });
     } else if (session.state === 'connecting') {
       sessionBar.innerHTML = `
         <span class="session-dot"></span>
@@ -900,25 +970,33 @@
     }
   }
 
-  async function startSession(urlValue) {
-    const url = (urlValue || '').trim();
-    if (!url) return;
+  async function postStart(body) {
     try {
       const r = await authFetch('/api/session/start', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ mode: 'youtube', url }),
+        body: JSON.stringify(body),
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
         renderSessionBar(err.error || `Start failed (${r.status})`);
-        return;
       }
-      // Server broadcasts 'session_state' = connecting; the bar re-renders
-      // from the WS message handler.
+      // On success the server broadcasts session_state=connecting, the bar
+      // re-renders via the WS handler. The full structured error (if any)
+      // arrives the same way on async pipeline failures.
     } catch {
       // authFetch already surfaced any 401.
     }
+  }
+
+  async function startYouTube(urlValue) {
+    const url = (urlValue || '').trim();
+    if (!url) return;
+    return postStart({ mode: 'youtube', url });
+  }
+
+  async function startSystemAudio() {
+    return postStart({ mode: 'system-audio' });
   }
 
   async function stopSession() {

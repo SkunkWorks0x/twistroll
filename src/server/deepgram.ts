@@ -83,8 +83,17 @@ function classifyYtdlpError(exitCode: number, stderr: string): SessionError {
 
 // HLS 403s surface here, not in yt-dlp's --get-url call. Manifest may parse
 // at resolve time but segment fetches hit YouTube's per-segment IP check.
+// avfoundation permission denial at CAPTURE time also surfaces here — the
+// stable anchor is ffmpeg's own "Failed to create AV capture input device"
+// prefix (see ffmpeg/libavdevice/avfoundation.m). The "Cannot use <name>"
+// suffix is Apple's NSError text and varies by device.
 function classifyFfmpegError(exitCode: number | null, stderr: string): SessionError {
   const safe = redactUrls(stderr);
+  if (/Failed to create AV capture input device/i.test(safe)) {
+    return avfoundationPermissionDenied(
+      safe ? `ffmpeg stderr: ${safe.slice(-500).trim()}` : undefined
+    );
+  }
   if (/HTTP Error 403|HTTP_403|HTTP error 403|403 Forbidden/i.test(safe)) {
     return {
       code: 'YOUTUBE_HLS_FORBIDDEN',
@@ -111,6 +120,27 @@ function deepgramDisconnectError(detail: string): SessionError {
     message: 'Deepgram connection failed.',
     detail,
     retryable: true,
+  };
+}
+
+function avfoundationDeviceNotFound(deviceName: string): SessionError {
+  return {
+    code: 'AVFOUNDATION_DEVICE_NOT_FOUND',
+    source: 'ffmpeg',
+    message: `Audio device "${deviceName}" not found.`,
+    hint: 'Install BlackHole 2ch, route system/Zoom audio to it, then retry. You can override the device with AUDIO_DEVICE.',
+    retryable: false,
+  };
+}
+
+function avfoundationPermissionDenied(detail?: string): SessionError {
+  return {
+    code: 'AVFOUNDATION_PERMISSION_DENIED',
+    source: 'ffmpeg',
+    message: 'macOS denied audio capture permission to this process.',
+    detail,
+    hint: 'Grant microphone permission to Terminal/iTerm/VS Code in macOS System Settings → Privacy & Security → Microphone, then restart Sentinel.',
+    retryable: false,
   };
 }
 
@@ -506,8 +536,23 @@ export class DeepgramClient extends EventEmitter {
         this.attachFfmpegStreams(ffmpeg);
       })
       .catch((err) => {
-        console.error(`[deepgram] system-audio device resolution failed: ${err.message}`);
-        this.emit('error', err);
+        // Device resolution failed (probe couldn't list devices, or the
+        // named device wasn't in the audio section). Roll back the active
+        // flag — otherwise the next start sees active=true and 409s.
+        const se = err instanceof SessionPipelineError
+          ? err.sessionError
+          : { code: 'FFMPEG_EXIT_NONZERO', source: 'ffmpeg', message: err.message, retryable: true } as SessionError;
+        console.error(`[deepgram] system-audio start failed: code=${se.code}`);
+        this.active = false;
+        this.intentionalStop = true;
+        this.stopKeepAlive();
+        if (this.ws) {
+          try { this.ws.close(); } catch { /* ignore */ }
+          this.ws = null;
+        }
+        this.audioBuffer = [];
+        this.sessionConfig = null;
+        this.emit('error', new SessionPipelineError(se));
       });
   }
 
@@ -528,14 +573,41 @@ export class DeepgramClient extends EventEmitter {
         //   [AVFoundation indev @ ...] AVFoundation audio devices:
         //   [AVFoundation indev @ ...] [0] BlackHole 2ch
         //   [AVFoundation indev @ ...] [1] MacBook Pro Microphone
-        const audioSection = stderr.split('AVFoundation audio devices:')[1] || '';
+        const audioSection = stderr.split('AVFoundation audio devices:')[1];
+        if (!audioSection) {
+          // No "AVFoundation audio devices:" header in stderr at all —
+          // ffmpeg couldn't load avfoundation. Treat as a generic probe
+          // failure (almost always not-macOS or ffmpeg build without
+          // avfoundation support).
+          return reject(new SessionPipelineError({
+            code: 'FFMPEG_EXIT_NONZERO',
+            source: 'ffmpeg',
+            message: 'Audio device probe failed (no avfoundation output).',
+            detail: stderr ? `ffmpeg stderr: ${stderr.slice(-500).trim()}` : undefined,
+            retryable: true,
+          }));
+        }
+        // Ventura+ TCC denial returns the header with zero `[N]` rows.
+        // No `[N]` markers in the audio section ⇒ permission denied.
+        const hasAudioEntries = /\[\d+\]/.test(audioSection);
+        if (!hasAudioEntries) {
+          return reject(new SessionPipelineError(avfoundationPermissionDenied(
+            'ffmpeg listed an empty AVFoundation audio devices section, which on macOS Ventura+ indicates TCC microphone-permission denial.'
+          )));
+        }
         const match = audioSection.split('\n').find((line) => line.includes(name));
         if (!match) {
-          return reject(new Error(`Audio device "${name}" not found in avfoundation list`));
+          return reject(new SessionPipelineError(avfoundationDeviceNotFound(name)));
         }
         const m = match.match(/\[(\d+)\]\s/);
         if (!m) {
-          return reject(new Error(`Could not parse device index from line: "${match.trim()}"`));
+          return reject(new SessionPipelineError({
+            code: 'FFMPEG_EXIT_NONZERO',
+            source: 'ffmpeg',
+            message: 'Could not parse audio device index from ffmpeg output.',
+            detail: `Line: "${match.trim().slice(0, 200)}"`,
+            retryable: true,
+          }));
         }
         resolve(parseInt(m[1], 10));
       });
