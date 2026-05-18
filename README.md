@@ -2,7 +2,11 @@
 
 Real-time podcast fact-checker for TWiST.
 
-<!-- TODO: add dashboard screenshot -->
+## Production Surface
+
+Sentinel is ready for live local demos using BlackHole 2ch system audio on macOS. The dashboard supports operator speaker assignment for `HOST`, `COHOST`, `GUEST 1`, `GUEST 2`, and `GUEST 3`; this keeps Jason, Alex, and multi-guest panels readable during recording.
+
+The local retrieval archive is rebuilt for Ollama EmbeddingGemma 768-dim vectors and contains 3,956 chunks across 127 TWiST episodes. Entity alias normalization is wired before retrieval to correct common Deepgram proper-noun misses such as Wayve/Waabi variants.
 
 ## What It Does
 
@@ -43,6 +47,15 @@ Open:
 ```text
 http://localhost:3000
 ```
+
+Demo recording path:
+
+```bash
+npm run preflight:audio
+npm run dev
+```
+
+Then open the dashboard, select `System Audio`, start the session, and click speaker pills as needed to assign `HOST`, `COHOST`, and `GUEST 1-3`.
 
 ## Quick Start: Hosted (Railway)
 
@@ -120,6 +133,7 @@ The dashboard is built for live production use:
 - Scrollable transcript pane, roughly 65% of the screen.
 - Docket sidebar, roughly 35% of the screen.
 - Speaker labels from Deepgram diarization and operator mappings.
+- Clickable speaker pills for live `HOST`, `COHOST`, and `GUEST 1-3` assignment.
 - Claim highlights that link transcript segments to verdict cards.
 - Verdict pills for fast scanning.
 - Citation rows with source tiers and copyable URLs.
@@ -137,6 +151,7 @@ The local LanceDB archive contains 127 TWiST episodes and 3,956 searchable chunk
 | `/api/session/start` | `POST` | Start a YouTube or system-audio session. |
 | `/api/session/stop` | `POST` | Stop the active session. |
 | `/api/session/status` | `GET` | Return session state, mode, uptime, speaker map, last error, and Deepgram health. |
+| `/api/session/speakers` | `POST` | Update operator speaker role assignments for the active session. |
 | `/api/queue/stats` | `GET` | Return claim retrieval/synthesis queue stats. |
 | `/api/classifier/stats` | `GET` | Return classifier throughput, latency, and backpressure stats. |
 | `/api/commit-episode` | `POST` | Commit provisional episode chunks. |

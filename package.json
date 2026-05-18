@@ -1,7 +1,7 @@
 {
   "name": "twistroll",
   "version": "1.0.0",
-  "description": "Real-time AI fact-checker + cynic for live podcasts — built for TWiST",
+  "description": "Real-time podcast fact-checker for TWiST with live transcription, retrieval, and cited verdicts",
   "type": "module",
   "scripts": {
     "dev": "tsx src/server/index.ts",
@@ -31,5 +31,9 @@
     "typescript": "^5.6.0"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SkunkWorks0x/twistroll.git"
+  },
   "author": "@SkunkWorks0x"
 }
