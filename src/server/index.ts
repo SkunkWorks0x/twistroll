@@ -706,6 +706,48 @@ function broadcast(
   }
 }
 
+let shuttingDown = false;
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] received ${signal} — draining`);
+
+  // Fallback hard-exit so a stuck close() can't keep the container alive
+  // past Railway/Fly SIGKILL grace window.
+  setTimeout(() => {
+    console.warn('[shutdown] drain timed out — forcing exit');
+    process.exit(1);
+  }, 10_000).unref();
+
+  if (deepgram?.isActive()) {
+    try { await deepgram.stopSession(); }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[shutdown] stopSession failed: ${msg}`);
+    }
+  }
+
+  for (const ws of clients) {
+    try { ws.close(1001, 'Server shutting down'); } catch { /* ignore */ }
+  }
+
+  await Promise.all([
+    new Promise<void>((resolve) => wss.close(() => resolve())),
+    new Promise<void>((resolve) => server.close(() => resolve())),
+  ]);
+
+  console.log('[shutdown] complete');
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
+process.on('SIGINT', () => { void gracefulShutdown('SIGINT'); });
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? (reason.stack || reason.message) : String(reason);
+  console.error(`[unhandled-rejection] ${msg}`);
+});
+
 async function main() {
   // Check Ollama on startup — only when it's actually needed for embeddings
   // or the classifier fallback. EMBED_PROVIDER=openai deploys skip this.
