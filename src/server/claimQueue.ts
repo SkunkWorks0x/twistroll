@@ -23,7 +23,11 @@ import { retrieve, RetrievalResult } from './retrieval.js';
 import { recordStage } from './ttfcStages.js';
 
 const MAX_CONCURRENCY = 2;
-const MAX_PENDING = parseInt(process.env.CLAIM_QUEUE_MAX_PENDING || '10', 10);
+function envInt(name: string, fallback: number): number {
+  const v = parseInt(process.env[name] ?? '', 10);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+const MAX_PENDING = envInt('CLAIM_QUEUE_MAX_PENDING', 10);
 const DEDUP_WINDOW_MS = 10_000;
 const ENTITY_OVERLAP_THRESHOLD = 0.8;
 const ENTITY_COOLDOWN_MS = 90_000;
@@ -172,10 +176,14 @@ let suppressedDedup = 0;
 
 function claimValueScore(entry: PendingEntry): number {
   const { claim, enqueuedAt } = entry;
+  // Scaled buckets so confidence (0..1 × 10_000) deltas dominate the
+  // enqueuedAt tiebreaker (~0.17 magnitude for Date.now() / 1e13).
+  // Pre-fix the deltas could collide; now keyNumbers > type > confidence >
+  // age is strictly ordered for any sub-percent confidence delta.
   let score = 0;
-  if (claim.keyNumbers && claim.keyNumbers.length > 0) score += 1000;
-  if (claim.claimType && VALUABLE_CLAIM_TYPES.has(claim.claimType)) score += 100;
-  score += claim.confidence * 10;
+  if (claim.keyNumbers && claim.keyNumbers.length > 0) score += 1_000_000;
+  if (claim.claimType && VALUABLE_CLAIM_TYPES.has(claim.claimType)) score += 100_000;
+  score += claim.confidence * 10_000;
   score += enqueuedAt / 1e13;
   return score;
 }
