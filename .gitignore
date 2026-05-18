@@ -13,3 +13,4 @@ data/diagnostics/*.heapsnapshot
 *.bak.*
 *.backup*
 .env.backup-*
+data/reembed-cache.ndjson
