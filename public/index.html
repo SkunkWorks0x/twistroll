@@ -148,6 +148,67 @@
     font-size: 12px;
   }
 
+  .empty-state-listening { font-style: normal; }
+  .empty-state-primary {
+    font-style: italic;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .empty-state-sub {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #8B8F9A;
+    letter-spacing: 0.04em;
+    animation: empty-state-pulse 3s ease-in-out infinite;
+  }
+  @keyframes empty-state-pulse {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1.0; }
+  }
+
+  .source-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .source-chip {
+    display: inline-block;
+    background: #18181C;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #8B8F9A;
+    line-height: 1.4;
+  }
+  .source-chip.tier-1 { border-left: 2px solid #34D399; }
+  .source-chip.tier-3 { border-left: 2px solid #FBBF24; }
+  .source-chip-more {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-faint);
+    padding: 2px 4px;
+  }
+
+  .follow-banner {
+    position: sticky;
+    bottom: 0;
+    margin: 8px -20px -16px;
+    background: #18181C;
+    color: #FF5C00;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+    cursor: pointer;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 2;
+  }
+  .follow-banner.hidden { display: none; }
+
   .seg {
     display: grid;
     grid-template-columns: 84px 1fr 44px;
@@ -835,8 +896,12 @@
       <span class="claim-count" id="claim-count-display">0 CLAIMS</span>
     </div>
     <div id="sidebar">
-      <div class="empty-state">No claims yet.</div>
+      <div class="empty-state empty-state-listening">
+        <div class="empty-state-primary">Listening for checkable claims</div>
+        <div class="empty-state-sub">Classifier active · Sources ready</div>
+      </div>
     </div>
+    <div id="follow-banner" class="follow-banner hidden">0 new claims ↑</div>
   </aside>
 </main>
 
@@ -1071,6 +1136,30 @@
   const sidebarEl = document.getElementById('sidebar');
   const statusEl = document.getElementById('status');
   const claimCountEl = document.getElementById('claim-count-display');
+  const sidebarPane = document.getElementById('sidebar-pane');
+  const followBanner = document.getElementById('follow-banner');
+  let autoFollow = true;
+  let pausedClaimCount = 0;
+
+  sidebarPane.addEventListener('scroll', () => {
+    // Newest cards render at the top of the sidebar (state.cards.unshift).
+    // Treat scrollTop ≤ 50 as "following the newest"; anything farther
+    // down means the operator is reading older cards — pause auto-follow.
+    if (sidebarPane.scrollTop > 50) {
+      autoFollow = false;
+    } else {
+      autoFollow = true;
+      pausedClaimCount = 0;
+      followBanner.classList.add('hidden');
+    }
+  });
+
+  followBanner.addEventListener('click', () => {
+    sidebarPane.scrollTop = 0;
+    autoFollow = true;
+    pausedClaimCount = 0;
+    followBanner.classList.add('hidden');
+  });
 
   // Docket-mode toggle: when true, sidebar collapses every card to a compact
   // accent-strip row (any row click-expandable). Default false = Live mode
@@ -1338,11 +1427,58 @@
   }
 
   // ─── Card rendering ─────────────────────────────────────────
+  // Pull a short publisher name + year for chip display. Returns null when
+  // we can't extract a sensible name — caller falls back to the "N sources"
+  // count.
+  function extractChipData(c) {
+    let name = '';
+    if (c.url) {
+      try {
+        const host = new URL(c.url).hostname.replace(/^www\./, '');
+        const parts = host.split('.');
+        const stem = parts.length >= 2 ? parts[parts.length - 2] : host;
+        name = stem.charAt(0).toUpperCase() + stem.slice(1);
+      } catch {}
+    }
+    if (!name && c.title) {
+      name = c.title.split(/[\s—\-:|]+/).slice(0, 3).join(' ');
+    }
+    if (!name) return null;
+    const yearMatch = ((c.title || '') + ' ' + (c.url || '')).match(/\b(?:19|20)\d{2}\b/);
+    return { name, year: yearMatch ? yearMatch[0] : '', tier: c.tier };
+  }
+
+  function renderSourceChips(citations) {
+    if (!citations || citations.length === 0) return null;
+    const chips = citations.map(extractChipData).filter(Boolean);
+    if (chips.length === 0) return null;
+    const wrapper = document.createElement('span');
+    wrapper.className = 'source-chips';
+    chips.slice(0, 2).forEach((chip) => {
+      const el = document.createElement('span');
+      el.className = `source-chip tier-${chip.tier}`;
+      el.textContent = chip.year ? `${chip.name} · ${chip.year}` : chip.name;
+      wrapper.appendChild(el);
+    });
+    if (chips.length > 2) {
+      const more = document.createElement('span');
+      more.className = 'source-chip-more';
+      more.textContent = `+${chips.length - 2} more`;
+      wrapper.appendChild(more);
+    }
+    return wrapper;
+  }
+
   function addCard(card, wsReceivedMs) {
     state.cards.unshift(card);
     while (state.cards.length > MAX_CARDS) state.cards.pop();
     markSegmentAsClaim(card.claimId);
     renderSidebar();
+    if (!autoFollow) {
+      pausedClaimCount++;
+      followBanner.textContent = `${pausedClaimCount} new claim${pausedClaimCount === 1 ? '' : 's'} ↑`;
+      followBanner.classList.remove('hidden');
+    }
     // Notify server that the card DOM is mounted, for TTFC delta computation.
     if (ws && ws.readyState === WebSocket.OPEN) {
       try {
@@ -1367,7 +1503,11 @@
     }
 
     if (state.cards.length === 0) {
-      sidebarEl.innerHTML = '<div class="empty-state">No claims yet.</div>';
+      sidebarEl.innerHTML =
+        '<div class="empty-state empty-state-listening">' +
+          '<div class="empty-state-primary">Listening for checkable claims</div>' +
+          '<div class="empty-state-sub">Classifier active · Sources ready</div>' +
+        '</div>';
       return;
     }
     sidebarEl.innerHTML = '';
@@ -1462,7 +1602,13 @@
         const toggle = document.createElement('div');
         toggle.className = 'citations-toggle';
         const n = docket.citations.length;
-        toggle.innerHTML = `<span class="caret">▸</span> ${n} ${n === 1 ? 'source' : 'sources'}`;
+        const chips = renderSourceChips(docket.citations);
+        if (chips) {
+          toggle.innerHTML = `<span class="caret">▸</span> `;
+          toggle.appendChild(chips);
+        } else {
+          toggle.innerHTML = `<span class="caret">▸</span> ${n} ${n === 1 ? 'source' : 'sources'}`;
+        }
 
         const list = document.createElement('div');
         list.className = 'citations-list';
