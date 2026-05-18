@@ -1341,7 +1341,10 @@
         state.session.speakerMapSource = d.speakerMapSource;
         // No re-paint needed — provenance is metadata only.
       }
-      if (d.sessionContext && JSON.stringify(d.sessionContext) !== JSON.stringify(state.session.sessionContext)) {
+      const serverHasExplicitNames = d.sessionContext
+        && d.sessionContext.speakerNames
+        && Object.keys(d.sessionContext.speakerNames).length > 0;
+      if (serverHasExplicitNames && JSON.stringify(d.sessionContext) !== JSON.stringify(state.session.sessionContext)) {
         state.session.sessionContext = d.sessionContext;
         saveSpeakerPrefs(state.session.speakerMap || {}, d.sessionContext.speakerNames || {});
         changed = true;
