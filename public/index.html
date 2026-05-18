@@ -775,13 +775,16 @@
   });
 
   async function authFetch(url, init) {
+    const hadToken = !!token;
     const headers = new Headers((init && init.headers) || {});
     if (token) headers.set('Authorization', `Bearer ${token}`);
     const res = await fetch(url, { ...(init || {}), headers });
     if (res.status === 401) {
       sessionStorage.removeItem('sentinel_token');
       token = null;
-      promptForToken('Invalid token');
+      // First-load 401 (no token to begin with) just means "auth required" —
+      // don't accuse the user of submitting a bad token they never submitted.
+      promptForToken(hadToken ? 'Invalid token' : undefined);
       throw new Error('Unauthorized');
     }
     return res;
