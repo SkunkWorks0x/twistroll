@@ -46,7 +46,14 @@ export async function callLLM(
   systemPrompt: string,
   context: string
 ): Promise<RouterResult> {
-  const chain = ROUTING[personaId] ?? ['haiku', 'groq', 'ollama'];
+  const baseChain = ROUTING[personaId] ?? ['haiku', 'groq', 'ollama'];
+  // In production, Ollama isn't reachable (no local model server on the PaaS).
+  // Drop it from the fallback chain so we fail fast to 'none' instead of
+  // burning a 15s timeout on every classifier call.
+  const chain =
+    process.env.NODE_ENV === 'production'
+      ? baseChain.filter((p) => p !== 'ollama')
+      : baseChain;
 
   for (let i = 0; i < chain.length; i++) {
     const provider = chain[i];

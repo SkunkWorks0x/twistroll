@@ -9,6 +9,16 @@ export const DB_PATH = resolve(__dirname, '..', '..', 'data', 'lance-db');
 export const TABLE_NAME = 'episodes';
 export const EMBED_MODEL = 'embeddinggemma';
 export const OLLAMA_EMBED_URL = 'http://localhost:11434/api/embeddings';
+export const OPENAI_EMBED_MODEL = 'text-embedding-3-small';
+export const OPENAI_EMBED_URL = 'https://api.openai.com/v1/embeddings';
+
+// Embedding provider. 'ollama' (default) for local dev with embeddinggemma.
+// 'openai' for cloud-hosted deploys where Ollama isn't available.
+// IMPORTANT: vectors from different providers occupy different spaces — the
+// corpus must be re-embedded when switching (see scripts/reembed-corpus.ts).
+type EmbedProvider = 'ollama' | 'openai';
+const EMBED_PROVIDER: EmbedProvider =
+  (process.env.EMBED_PROVIDER as EmbedProvider) === 'openai' ? 'openai' : 'ollama';
 
 // EXCLUDE_EPISODE_ID — env-gated filter for live runs against in-window
 // episodes. When set to a numeric episode ID, queryMemory excludes that
@@ -151,9 +161,15 @@ export async function initMemory(): Promise<lancedb.Table> {
 }
 
 /**
- * Embed text via Ollama's embeddinggemma model.
+ * Embed text via the configured provider (EMBED_PROVIDER env).
+ * - 'ollama' (default): local embeddinggemma, 768-dim
+ * - 'openai': text-embedding-3-small, 1536-dim
  */
 export async function embedText(text: string): Promise<number[]> {
+  return EMBED_PROVIDER === 'openai' ? embedOpenAI(text) : embedOllama(text);
+}
+
+async function embedOllama(text: string): Promise<number[]> {
   const res = await fetch(OLLAMA_EMBED_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -167,6 +183,30 @@ export async function embedText(text: string): Promise<number[]> {
     throw new Error('Ollama embeddings response missing "embedding" field');
   }
   return json.embedding;
+}
+
+async function embedOpenAI(text: string): Promise<number[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error('OPENAI_API_KEY not set (required for EMBED_PROVIDER=openai)');
+
+  const res = await fetch(OPENAI_EMBED_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: OPENAI_EMBED_MODEL, input: text }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`OpenAI embeddings HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const json = (await res.json()) as { data?: { embedding: number[] }[] };
+  const vec = json.data?.[0]?.embedding;
+  if (!vec || !Array.isArray(vec)) {
+    throw new Error('OpenAI embeddings response missing data[0].embedding');
+  }
+  return vec;
 }
 
 /**
@@ -271,7 +311,8 @@ export async function queryMemory(
   const tbl = await initMemory();
   const qVec = await embedText(queryText);
 
-  // EmbeddingGemma L2-normalizes outputs, so dot product == cosine similarity.
+  // Both EmbeddingGemma and OpenAI text-embedding-3-small L2-normalize their
+  // outputs, so dot product == cosine similarity for either provider.
   // LanceDB's 'dot' metric returns `_distance = 1 - dot_product`, so score = 1 - _distance
   // gives us cosine similarity in a clean 0..1 range (higher = better).
   let q = (tbl.search(qVec) as lancedb.VectorQuery).distanceType('dot').limit(topK);
