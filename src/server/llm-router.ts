@@ -92,7 +92,14 @@ async function callProvider(
     case 'groq':
       return callGroqDirect(systemPrompt, context);
     case 'ollama':
+      // NOTE: ollama branch uses callOllama's own timeouts (15s/30s) rather
+      // than PROVIDER_TIMEOUT_MS. Intentional — first-call model-load can
+      // exceed the 10s envelope. Don't tighten without a load-time benchmark.
       return callOllama(appConfig.ollamaModelTrolls, systemPrompt, context);
+    default:
+      // Exhaustive guard: if LlmProvider gains a member without a case here,
+      // throw rather than silently returning undefined.
+      throw new Error(`Unknown LLM provider: ${String(provider)}`);
   }
 }
 
