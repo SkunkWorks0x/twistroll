@@ -77,7 +77,7 @@ Confirm:
 - Dashboard loads.
 - Mode toggle visible.
 - Status connected.
-- No auth overlay unless hosted token is expected.
+- Auth overlay appears only when hosted auth is enabled and no valid token is stored.
 
 ## T-6: Transcript Test
 
@@ -123,6 +123,7 @@ If warmup fails, cards may still work but the first retrieval can be slow. Keep 
 ## T-3: WebSocket
 
 Confirm browser status pill shows connected/live.
+During a Deepgram reconnect, the session bar may show `Reconnecting (attempt N)...`; it should recover without operator action.
 
 If disconnected:
 
@@ -145,9 +146,25 @@ Confirm:
 
 - Transcript continues updating.
 - Claim cards appear for checkable claims.
-- No repeated reconnect loops.
+- No repeated reconnect loops beyond the built-in 8-attempt Deepgram backoff window.
 - No persistent `Deepgram disconnected`.
 - Errors, if any, show actionable messages.
+
+Check queue health:
+
+```bash
+curl http://localhost:3000/api/queue/stats
+curl http://localhost:3000/api/classifier/stats
+```
+
+For hosted auth:
+
+```bash
+curl "$SENTINEL_URL/api/queue/stats" \
+  -H "Authorization: Bearer $SENTINEL_ACCESS_TOKEN"
+curl "$SENTINEL_URL/api/classifier/stats" \
+  -H "Authorization: Bearer $SENTINEL_ACCESS_TOKEN"
+```
 
 ## Fallbacks
 
@@ -170,3 +187,12 @@ Fallback options in order:
 3. Restart Sentinel after changing macOS microphone permission.
 4. If BlackHole is not available and reboot is not possible, run YouTube/replay mode instead.
 
+## Shutdown Check
+
+After the rehearsal or show, stop cleanly:
+
+```bash
+curl -X POST http://localhost:3000/api/session/stop
+```
+
+Then terminate the server with `Ctrl-C`. The log should show a clean shutdown drain and exit without leaving a session active.

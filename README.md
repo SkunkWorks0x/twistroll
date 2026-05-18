@@ -133,11 +133,16 @@ The local LanceDB archive contains 127 TWiST episodes and 3,956 searchable chunk
 
 | Endpoint | Method | Purpose |
 | --- | --- | --- |
+| `/api/status` | `GET` | Return server status canary. |
 | `/api/session/start` | `POST` | Start a YouTube or system-audio session. |
 | `/api/session/stop` | `POST` | Stop the active session. |
-| `/api/session/status` | `GET` | Return session state, mode, uptime, speaker map, and last error. |
+| `/api/session/status` | `GET` | Return session state, mode, uptime, speaker map, last error, and Deepgram health. |
 | `/api/queue/stats` | `GET` | Return claim retrieval/synthesis queue stats. |
 | `/api/classifier/stats` | `GET` | Return classifier throughput, latency, and backpressure stats. |
+| `/api/commit-episode` | `POST` | Commit provisional episode chunks. |
+| `/api/dossier/load` | `POST` | Load a guest dossier. |
+
+Session states are `idle`, `connecting`, `live`, and `error`. Deepgram health broadcasts as `connected`, `reconnecting`, or `disconnected`; reconnects use eight jittered backoff attempts before surfacing a terminal session error.
 
 Hosted deployments with `SENTINEL_ACCESS_TOKEN` require:
 

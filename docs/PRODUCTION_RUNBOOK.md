@@ -11,7 +11,7 @@ Use this for Zoom/private meetings or any audio playing on Oliver's Mac.
 Required:
 
 - macOS
-- Node.js 18+
+- Node.js 20+
 - `ffmpeg`
 - `yt-dlp`
 - BlackHole 2ch
@@ -41,6 +41,14 @@ In the dashboard:
 2. Click `Start Capture`.
 3. Confirm status is connected.
 4. Play meeting/audio and watch transcript appear.
+
+Device resolution order for system audio:
+
+1. `source` in the `/api/session/start` request.
+2. `AUDIO_DEVICE` environment variable.
+3. `BlackHole 2ch`.
+
+The audio device is resolved when the session starts. Deepgram reconnects keep the existing audio pipeline; changing `AUDIO_DEVICE` or macOS routing requires stopping and starting the session.
 
 ### YouTube Hosted Or Replay
 
@@ -80,6 +88,40 @@ curl -X POST "$SENTINEL_URL/api/session/start" \
   -H "Content-Type: application/json" \
   -d '{"mode":"youtube","url":"YOUTUBE_URL_HERE"}'
 ```
+
+Hosted auth behavior:
+
+- Static dashboard HTML is public.
+- `/api/*` routes require `Authorization: Bearer <token>` when `SENTINEL_ACCESS_TOKEN` is set.
+- WebSocket auth uses `?token=...` because browser WebSockets cannot set custom headers.
+- `SENTINEL_ACCESS_TOKEN` must be at least 24 characters if set; shorter values refuse boot.
+
+## API Routes
+
+| Route | Method | Auth when token set | Purpose |
+| --- | --- | --- | --- |
+| `/api/status` | `GET` | Yes | Ollama/load-bearing status canary. |
+| `/api/session/start` | `POST` | Yes | Start `youtube`, `stream`, or `system-audio` session. |
+| `/api/session/stop` | `POST` | Yes | Stop the active session; waits for in-flight start. |
+| `/api/session/status` | `GET` | Yes | Session state, active flag, speaker map, error, and Deepgram health. |
+| `/api/queue/stats` | `GET` | Yes | Claim queue, backpressure, and retrieval breaker stats. |
+| `/api/classifier/stats` | `GET` | Yes | Classifier throughput and queue stats. |
+| `/api/commit-episode` | `POST` | Yes | Commit provisional episode chunks. |
+| `/api/dossier/load` | `POST` | Yes | Load a guest dossier by name. |
+| `/config` | `GET` | No | Minimal config/status panel. |
+
+Session states:
+
+- `idle`
+- `connecting`
+- `live`
+- `error`
+
+Deepgram health states shown during live sessions:
+
+- `connected`
+- `reconnecting` with attempt number
+- `disconnected`
 
 ## BlackHole Setup
 
@@ -174,6 +216,15 @@ Dashboard likely shows:
 
 - `DEEPGRAM_DISCONNECTED`
 
+Deepgram reconnect behavior:
+
+- Sentinel retries up to 8 times per incident.
+- Backoff schedule: 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s.
+- Each delay has jitter.
+- The live session bar shows `Reconnecting (attempt N)...` during reconnect.
+- Reconnect does not re-resolve the system-audio device; it restores the Deepgram WebSocket while the audio pipeline continues.
+- After all attempts fail, the session moves to `error` and releases the active session flag so a retry is possible.
+
 Check:
 
 ```bash
@@ -182,6 +233,21 @@ npm run preflight:hosted
 ```
 
 If the key is present and failures persist, rotate/test the key in Deepgram and restart Sentinel.
+
+### Unknown Session Error
+
+Dashboard may show:
+
+- `UNKNOWN_SESSION_ERROR`
+
+Meaning: an error escaped a structured pipeline classifier.
+
+Next steps:
+
+1. Click `Copy diagnostic`.
+2. Save the server log around the same timestamp.
+3. Stop the session and retry once.
+4. If it repeats, switch input mode or fallback path.
 
 ### Tavily Or Anthropic Rate Limit
 
@@ -210,8 +276,20 @@ These may call paid APIs.
 - Dashboard loads at `http://localhost:3000` or hosted URL.
 - Mode toggle is visible: `YouTube` / `System Audio`.
 - Status pill shows connected/live.
+- During a Deepgram reconnect, the live bar shows `Reconnecting (attempt N)...`.
 - Transcript lines appear within a few seconds of audio.
 - Claim cards appear in the Docket sidebar after checkable claims.
 - Errors show actionable messages, not generic failure text.
 - `Copy diagnostic` is available on session errors.
 
+## Shutdown Behavior
+
+On `SIGTERM` or `SIGINT`, Sentinel:
+
+1. Stops the active Deepgram session if one is running.
+2. Closes connected WebSocket clients.
+3. Closes the WebSocket server and HTTP server.
+4. Exits `0` after a clean drain.
+5. Forces exit `1` if drain exceeds 10 seconds.
+
+Unhandled promise rejections are logged and do not automatically exit the process.
