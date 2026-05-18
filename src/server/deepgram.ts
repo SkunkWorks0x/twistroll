@@ -169,6 +169,12 @@ const KEEPALIVE_INTERVAL_MS = 8000;
 const RECONNECT_BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000, 30000, 30000];
 const MAX_RECONNECT_ATTEMPTS = RECONNECT_BACKOFF_MS.length;
 const RECONNECT_JITTER_PCT = 0.2;
+// CDN URL re-resolution (stream mode only). Resets on first audio bytes
+// after each successful re-resolve so a long show can survive multiple
+// CDN expiries; cap is per-incident, not session-cumulative.
+const RERESOLUTION_BACKOFF_MS = [1000, 2000, 4000];
+const RERESOLUTION_MAX = RERESOLUTION_BACKOFF_MS.length;
+const RERESOLUTION_JITTER_PCT = 0.2;
 const CONNECT_TIMEOUT_MS = 5000;
 // Bounded audio buffer — at 16kHz mono s16le, ffmpeg emits ~2KB chunks every
 // ~30-60ms. 200 chunks ≈ 6-12s of audio. If WS is down longer than this, we
@@ -191,6 +197,14 @@ export class DeepgramClient extends EventEmitter {
   private apiKey: string;
   private audioBuffer: Buffer[] = [];
   private intentionalStop = false;
+  // Stream-mode only: the original YouTube URL, preserved across rollback
+  // for CDN re-resolution. sessionConfig.source is nulled on rollback.
+  private originalSourceUrl: string | null = null;
+  private reResolutionAttempts = 0;
+  private reResolving = false;
+  // Set after a re-resolution spawns a new ffmpeg; cleared on first audio
+  // byte, which is when we know the new CDN URL is actually working.
+  private expectingResolveAck = false;
 
   constructor(apiKey: string) {
     super();
@@ -210,6 +224,10 @@ export class DeepgramClient extends EventEmitter {
     return this.sessionConfig?.mode ?? null;
   }
 
+  getReResolutionAttempts(): number {
+    return this.reResolutionAttempts;
+  }
+
   async startSession(config: SessionConfig): Promise<void> {
     if (this.active) {
       throw new Error('Session already active. Call stopSession first.');
@@ -219,6 +237,10 @@ export class DeepgramClient extends EventEmitter {
     this.active = true;
     this.intentionalStop = false;
     this.reconnectAttempt = 0;
+    this.reResolutionAttempts = 0;
+    this.reResolving = false;
+    this.expectingResolveAck = false;
+    this.originalSourceUrl = config.mode === 'stream' ? config.source : null;
     this.audioBuffer = [];
 
     try {
@@ -252,7 +274,15 @@ export class DeepgramClient extends EventEmitter {
     }
     this.audioBuffer = [];
     this.sessionConfig = null;
+    this.clearReResolutionState();
     console.log('[deepgram] session stopped');
+  }
+
+  private clearReResolutionState(): void {
+    this.originalSourceUrl = null;
+    this.reResolutionAttempts = 0;
+    this.reResolving = false;
+    this.expectingResolveAck = false;
   }
 
   // Without this, an async failure wedges active=true and retries 409.
@@ -267,6 +297,7 @@ export class DeepgramClient extends EventEmitter {
     }
     this.audioBuffer = [];
     this.sessionConfig = null;
+    this.clearReResolutionState();
   }
 
   // ─── Deepgram WebSocket ────────────────────────────────────────────────
@@ -623,6 +654,12 @@ export class DeepgramClient extends EventEmitter {
     }
 
     ffmpeg.stdout.on('data', (chunk: Buffer) => {
+      if (this.expectingResolveAck) {
+        this.expectingResolveAck = false;
+        this.reResolutionAttempts = 0;
+        console.log('[deepgram] re-resolution: audio bytes flowing, attempt counter reset');
+        this.emit('reresolved');
+      }
       // Bounded buffer: drop oldest if full. Audio capture must never block.
       this.audioBuffer.push(chunk);
       while (this.audioBuffer.length > AUDIO_BUFFER_MAX_CHUNKS) {
@@ -656,12 +693,93 @@ export class DeepgramClient extends EventEmitter {
 
     ffmpeg.on('close', (code) => {
       this.ffmpeg = null;
-      if (this.active && !this.intentionalStop && code !== 0) {
-        const se = classifyFfmpegError(code, this.ffmpegStderr);
-        console.error(`[deepgram] ffmpeg failed: code=${se.code}`);
+      if (!(this.active && !this.intentionalStop && code !== 0)) return;
+      const se = classifyFfmpegError(code, this.ffmpegStderr);
+      console.error(`[deepgram] ffmpeg failed: code=${se.code}`);
+      if (
+        this.sessionConfig?.mode === 'stream' &&
+        se.retryable &&
+        this.reResolutionAttempts < RERESOLUTION_MAX &&
+        this.originalSourceUrl !== null
+      ) {
+        this.scheduleReResolution(se);
+        return;
+      }
+      this.rollbackActive();
+      this.emit('error', new SessionPipelineError(se));
+    });
+  }
+
+  private scheduleReResolution(originalError: SessionError): void {
+    if (this.reResolving) return;
+    this.reResolving = true;
+
+    this.reResolutionAttempts++;
+    const attempt = this.reResolutionAttempts;
+    const baseDelay = RERESOLUTION_BACKOFF_MS[attempt - 1];
+    const jitter = 1 + (Math.random() * 2 - 1) * RERESOLUTION_JITTER_PCT;
+    const delay = Math.round(baseDelay * jitter);
+    console.warn(
+      `[deepgram] CDN URL likely expired (code=${originalError.code}), re-resolving (attempt ${attempt}/${RERESOLUTION_MAX}) in ${delay}ms`
+    );
+    this.emit('reresolving', { attempt, cause: 'cdn-expiry' });
+
+    setTimeout(() => this.reResolveStream(), delay);
+  }
+
+  private reResolveStream(): void {
+    if (!this.active || this.intentionalStop || !this.originalSourceUrl) {
+      this.reResolving = false;
+      return;
+    }
+
+    const url = this.originalSourceUrl;
+    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '--get-url', url], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    this.ytdlp = ytdlp;
+    this.ytdlpStderr = '';
+    let directUrl = '';
+
+    ytdlp.stdout.on('data', (chunk) => { directUrl += chunk.toString(); });
+    ytdlp.stderr.on('data', (chunk) => {
+      const s = chunk.toString();
+      this.ytdlpStderr = appendBounded(this.ytdlpStderr, s);
+      const msg = s.trim();
+      if (msg) console.warn(`[yt-dlp] ${msg}`);
+    });
+
+    ytdlp.on('close', (code) => {
+      this.ytdlp = null;
+      this.reResolving = false;
+      if (!this.active || this.intentionalStop) return;
+      if (code !== 0) {
+        const se = classifyYtdlpError(code ?? -1, this.ytdlpStderr);
+        console.error(`[deepgram] re-resolution yt-dlp failed: code=${se.code}`);
         this.rollbackActive();
         this.emit('error', new SessionPipelineError(se));
+        return;
       }
+      const cleanUrl = directUrl.trim().split('\n')[0];
+      if (!cleanUrl) {
+        const safe = redactUrls(this.ytdlpStderr);
+        console.error('[deepgram] re-resolution: yt-dlp returned no audio URL');
+        this.rollbackActive();
+        this.emit('error', new SessionPipelineError({
+          code: 'YTDLP_EXIT_NONZERO',
+          source: 'yt-dlp',
+          message: 'yt-dlp re-resolution returned no audio URL.',
+          detail: safe ? `Last stderr: ${safe.slice(-500).trim()}` : undefined,
+          retryable: true,
+        }));
+        return;
+      }
+      console.log('[deepgram] re-resolution: new CDN URL acquired, restarting ffmpeg');
+      // Live streams: don't pass startOffsetSeconds on re-resolution — we
+      // want to resume at the live edge, not seek back to the original
+      // offset.
+      this.expectingResolveAck = true;
+      this.spawnFfmpegFromUrl(cleanUrl, undefined);
     });
   }
 

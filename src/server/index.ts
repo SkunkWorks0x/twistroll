@@ -134,6 +134,7 @@ interface SessionStateMessage {
 interface DeepgramHealthState {
   state: 'connected' | 'reconnecting' | 'disconnected';
   attempt?: number;
+  cause?: string;
 }
 interface DeepgramHealthMessage extends DeepgramHealthState {
   type: 'deepgram_health';
@@ -144,11 +145,13 @@ function setDeepgramHealth(next: DeepgramHealthState): void {
   if (
     deepgramHealth &&
     deepgramHealth.state === next.state &&
-    deepgramHealth.attempt === next.attempt
+    deepgramHealth.attempt === next.attempt &&
+    deepgramHealth.cause === next.cause
   ) return;
   deepgramHealth = next;
   const msg: DeepgramHealthMessage = { type: 'deepgram_health', state: next.state };
   if (next.attempt !== undefined) msg.attempt = next.attempt;
+  if (next.cause !== undefined) msg.cause = next.cause;
   broadcast(msg);
 }
 let sessionState: SessionUiState = 'idle';
@@ -351,6 +354,10 @@ if (deepgram) {
   });
   deepgram.on('connected', () => setDeepgramHealth({ state: 'connected' }));
   deepgram.on('disconnected', () => setDeepgramHealth({ state: 'disconnected' }));
+  deepgram.on('reresolving', ({ attempt, cause }: { attempt: number; cause: string }) => {
+    setDeepgramHealth({ state: 'reconnecting', attempt, cause });
+  });
+  deepgram.on('reresolved', () => setDeepgramHealth({ state: 'connected' }));
 } else {
   console.warn('[deepgram] DEEPGRAM_API_KEY not set — session endpoints will return 503');
 }
@@ -577,6 +584,7 @@ app.get('/api/session/status', (_req, res) => {
     effectiveSpeakerMap,
     speakerMapSource: mapIsExplicit ? 'explicit' : 'default',
     deepgramHealth,
+    reResolutionAttempts: deepgram.getReResolutionAttempts(),
   });
 });
 
