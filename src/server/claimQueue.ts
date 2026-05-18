@@ -1,8 +1,9 @@
 // Sentinel claim queue. Bridges classifier output to the retrieval layer and
 // then the synthesis layer.
 //
-// Concurrency cap: 2 in-flight retrievals. Bypasses cap → drop with a log so
-// the failure mode is visible.
+// Concurrency: 2 in-flight retrievals; overflow queues into a bounded
+// pending list. Pending overflow evicts the lowest-value claim. Set
+// CLAIM_QUEUE_MAX_PENDING=0 to disable pending and revert to drop-at-cap.
 //
 // Two dedup layers operate here:
 //   1. Entity + claim-fingerprint cooldown (90s). Keyed on the normalized
@@ -22,9 +23,14 @@ import { retrieve, RetrievalResult } from './retrieval.js';
 import { recordStage } from './ttfcStages.js';
 
 const MAX_CONCURRENCY = 2;
+const MAX_PENDING = parseInt(process.env.CLAIM_QUEUE_MAX_PENDING || '10', 10);
 const DEDUP_WINDOW_MS = 10_000;
 const ENTITY_OVERLAP_THRESHOLD = 0.8;
 const ENTITY_COOLDOWN_MS = 90_000;
+
+// claimType buckets we want to preserve under backpressure. Lower-value
+// types (opinion, prediction, etc.) get evicted first when pending is full.
+const VALUABLE_CLAIM_TYPES = new Set(['financial', 'historical', 'comparative']);
 
 const GENERIC_TERMS = new Set(
   [
@@ -150,6 +156,41 @@ interface ProcessedRecord {
 const recentlyProcessed: ProcessedRecord[] = [];
 let activeCount = 0;
 
+interface PendingEntry {
+  claim: ClaimClassification;
+  segmentSnapshot: TranscriptSegment[];
+  enqueuedAt: number;
+}
+const pending: PendingEntry[] = [];
+
+let droppedConcurrency = 0;
+let droppedBackpressure = 0;
+let processed = 0;
+let suppressedDedup = 0;
+
+function claimValueScore(entry: PendingEntry): number {
+  const { claim, enqueuedAt } = entry;
+  let score = 0;
+  if (claim.keyNumbers && claim.keyNumbers.length > 0) score += 1000;
+  if (claim.claimType && VALUABLE_CLAIM_TYPES.has(claim.claimType)) score += 100;
+  score += claim.confidence * 10;
+  score += enqueuedAt / 1e13;
+  return score;
+}
+
+function lowestValueIndex(entries: PendingEntry[]): number {
+  let minIdx = 0;
+  let minScore = claimValueScore(entries[0]);
+  for (let i = 1; i < entries.length; i++) {
+    const s = claimValueScore(entries[i]);
+    if (s < minScore) {
+      minScore = s;
+      minIdx = i;
+    }
+  }
+  return minIdx;
+}
+
 function extractEntities(claim: ClaimClassification): Set<string> {
   const tokens = new Set<string>();
   const blob = [claim.primaryEntity, claim.searchableNoun, ...(claim.keyNumbers || [])]
@@ -231,6 +272,7 @@ export function enqueueClaim(
   }
 
   if (shouldCooldown(claim)) {
+    suppressedDedup++;
     console.log(`[queue-dedup] cooldown-fingerprint: "${claim.primaryEntity}" claimType=${claim.claimType ?? 'unknown'}`);
     return { enqueued: false, reason: 'entity+fingerprint cooldown' };
   }
@@ -239,25 +281,55 @@ export function enqueueClaim(
   for (const rec of recentlyProcessed) {
     const overlap = entityOverlap(incoming, rec.entities);
     if (overlap > ENTITY_OVERLAP_THRESHOLD) {
+      suppressedDedup++;
       console.log(`[QUEUE] Deduped: ${claim.claimText}`);
       console.log(`[classifier-suppress] reason=queue_dedupe entity="${claim.primaryEntity}"`);
       return { enqueued: false, reason: `entity overlap ${overlap.toFixed(2)}` };
     }
   }
 
-  if (activeCount >= MAX_CONCURRENCY) {
-    console.warn(`[QUEUE] Concurrency cap (${MAX_CONCURRENCY}) reached — dropping claim: ${claim.claimText}`);
-    console.log(`[classifier-suppress] reason=concurrency_cap claimText="${claim.claimText.slice(0, 50)}"`);
-    return { enqueued: false, reason: 'concurrency cap' };
-  }
-
-  recentlyProcessed.push({ entities: incoming, processedAt: Date.now() });
-  activeCount++;
-
   // Snapshot segments at fire time so processing sees what was true when
   // the classifier emitted, not what's true after the retrieval round-trip.
   const segmentSnapshot = recentSegments.slice(-12);
 
+  if (activeCount < MAX_CONCURRENCY) {
+    recentlyProcessed.push({ entities: incoming, processedAt: Date.now() });
+    startProcessing(claim, segmentSnapshot);
+    return { enqueued: true };
+  }
+
+  // MAX_PENDING=0 reverts to legacy drop-at-cap so droppedConcurrency
+  // stays meaningful as a knob.
+  if (MAX_PENDING <= 0) {
+    droppedConcurrency++;
+    console.warn(`[QUEUE] Concurrency cap (${MAX_CONCURRENCY}) reached; pending disabled — dropping: ${claim.claimText.slice(0, 50)}`);
+    console.log(`[classifier-suppress] reason=concurrency_cap claimText="${claim.claimText.slice(0, 50)}"`);
+    return { enqueued: false, reason: 'concurrency cap (pending disabled)' };
+  }
+
+  const newEntry: PendingEntry = { claim, segmentSnapshot, enqueuedAt: Date.now() };
+
+  if (pending.length >= MAX_PENDING) {
+    // Score the newcomer alongside existing pending so it can lose to itself
+    // rather than displace a better-scored claim.
+    const candidates = [...pending, newEntry];
+    const evictIdx = lowestValueIndex(candidates);
+    droppedBackpressure++;
+    if (evictIdx === pending.length) {
+      console.warn(`[QUEUE] Pending full (${MAX_PENDING}); newcomer is lowest value — dropping: ${claim.claimText.slice(0, 50)}`);
+      return { enqueued: false, reason: 'backpressure (newcomer lowest value)' };
+    }
+    const [evicted] = pending.splice(evictIdx, 1);
+    console.warn(`[QUEUE] Pending full (${MAX_PENDING}); evicting lowest-value pending: ${evicted.claim.claimText.slice(0, 50)}`);
+  }
+
+  recentlyProcessed.push({ entities: incoming, processedAt: Date.now() });
+  pending.push(newEntry);
+  return { enqueued: true, reason: 'queued (pending)' };
+}
+
+function startProcessing(claim: ClaimClassification, segmentSnapshot: TranscriptSegment[]): void {
+  activeCount++;
   void (async () => {
     try {
       recordStage(claim.segmentId, 'retrievalStartMs', Date.now());
@@ -281,18 +353,31 @@ export function enqueueClaim(
       console.error(`[QUEUE] processing failed: ${msg}`);
     } finally {
       activeCount--;
+      processed++;
+      drainPending();
     }
   })();
+}
 
-  return { enqueued: true };
+function drainPending(): void {
+  while (activeCount < MAX_CONCURRENCY && pending.length > 0) {
+    const next = pending.shift()!;
+    startProcessing(next.claim, next.segmentSnapshot);
+  }
 }
 
 export function queueStats() {
   pruneOldRecords();
   return {
     active: activeCount,
+    pending: pending.length,
+    droppedConcurrency,
+    droppedBackpressure,
+    processed,
+    suppressedDedup,
     recentlyProcessedCount: recentlyProcessed.length,
     maxConcurrency: MAX_CONCURRENCY,
+    maxPending: MAX_PENDING,
     dedupWindowMs: DEDUP_WINDOW_MS,
   };
 }
