@@ -41,6 +41,17 @@ app.get('/config', (_req, res) => {
   res.send(configPanelHTML());
 });
 
+// Bearer-token gate for all /api/* routes. No-op when AUTH_ENABLED is false.
+app.use('/api', (req, res, next) => {
+  if (!AUTH_ENABLED) return next();
+  const header = req.header('authorization') || '';
+  const match = /^Bearer\s+(.+)$/i.exec(header);
+  if (!match || match[1] !== ACCESS_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+});
+
 // API: Get current state
 app.get('/api/status', (_req, res) => {
   res.json({
@@ -84,6 +95,20 @@ const deepgramApiKey = process.env.DEEPGRAM_API_KEY || '';
 const deepgram: DeepgramClient | null = deepgramApiKey
   ? new DeepgramClient(deepgramApiKey)
   : null;
+
+// ─── Auth (single shared bearer token) ───
+// SENTINEL_ACCESS_TOKEN unset → auth disabled (local dev).
+// Set but <24 chars (including empty string) → refuse to start so an
+// accidentally-empty Railway env var doesn't silently disable auth.
+const rawToken = process.env.SENTINEL_ACCESS_TOKEN;
+if (rawToken !== undefined && rawToken.length < 24) {
+  throw new Error(
+    'SENTINEL_ACCESS_TOKEN is set but shorter than 24 characters — refusing to start. ' +
+      'Set a longer token or unset the env var to disable auth.'
+  );
+}
+const ACCESS_TOKEN = rawToken ?? '';
+const AUTH_ENABLED = ACCESS_TOKEN.length >= 24;
 
 // ─── Classifier state ───
 const SEGMENT_BUFFER_MAX = 12;
@@ -403,7 +428,23 @@ app.get('/api/classifier/stats', (_req, res) => {
 const server = createServer(app);
 // Mount WS on the HTTP server so the whole app binds to one port — PaaS
 // (Railway, Fly.io) only exposes a single port per service.
-const wss = new WebSocketServer({ server, path: '/ws' });
+//
+// Auth: browser WebSocket API can't set custom headers, so the client
+// passes the token via ?token=... query param. The token appears in
+// Railway's HTTP access logs as part of the upgrade request path — rotate
+// if log access is ever shared. Acceptable tradeoff for a single-token
+// share-with-one-teammate gate; not suitable for multi-user auth.
+const wss = new WebSocketServer({
+  server,
+  path: '/ws',
+  verifyClient: (info, cb) => {
+    if (!AUTH_ENABLED) return cb(true);
+    const url = new URL(info.req.url || '', `http://${info.req.headers.host}`);
+    const token = url.searchParams.get('token');
+    if (token !== ACCESS_TOKEN) return cb(false, 401, 'Unauthorized');
+    cb(true);
+  },
+});
 
 const clients = new Set<WebSocket>();
 
@@ -503,6 +544,7 @@ async function main() {
     console.log('🔴 TWiST Sentinel is running');
     console.log(`   Config:    http://localhost:${appConfig.port}/config`);
     console.log(`   WebSocket: ws://localhost:${appConfig.port}/ws`);
+    console.log(`   Auth:      ${AUTH_ENABLED ? 'enabled' : 'disabled (SENTINEL_ACCESS_TOKEN unset)'}`);
     console.log('');
   });
 

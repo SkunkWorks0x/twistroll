@@ -552,6 +552,68 @@
   }
   .card.collapsed.expanded > .pill,
   .card.collapsed.expanded > .truncated-claim { display: none; }
+
+  /* ─── Auth overlay ─── */
+  .auth-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 8, 10, 0.96);
+  }
+  .auth-overlay.hidden { display: none; }
+  .auth-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 24px;
+    border-radius: 12px;
+    background: #18181C;
+    border: 1px solid rgba(255, 92, 0, 0.4);
+    box-shadow: 0 0 40px rgba(255, 92, 0, 0.2);
+    min-width: 320px;
+  }
+  .auth-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #FF5C00;
+  }
+  .auth-input {
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 12px;
+    background: #08080A;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    color: #E8E8E8;
+    outline: none;
+  }
+  .auth-input:focus { border-color: #FF5C00; }
+  .auth-button {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    background: #FF5C00;
+    border: none;
+    border-radius: 6px;
+    color: #08080A;
+    cursor: pointer;
+  }
+  .auth-button:hover { background: #FF7A2D; }
+  .auth-error {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #F87171;
+    min-height: 12px;
+  }
 </style>
 </head>
 <body>
@@ -562,6 +624,15 @@
     <span class="dot"></span><span class="label">connecting…</span>
   </div>
 </header>
+
+<div id="auth-overlay" class="auth-overlay hidden">
+  <form class="auth-card" id="auth-form">
+    <div class="auth-title">Sentinel Access</div>
+    <input type="password" class="auth-input" id="auth-input" placeholder="Enter access token" autocomplete="off" />
+    <button type="submit" class="auth-button">Connect</button>
+    <div class="auth-error" id="auth-error"></div>
+  </form>
+</div>
 
 <main>
   <section id="transcript-pane">
@@ -582,6 +653,40 @@
 
 <script>
 (() => {
+  // ─── Auth ───────────────────────────────────────────────────
+  let token = sessionStorage.getItem('sentinel_token') || null;
+  const authOverlay = document.getElementById('auth-overlay');
+  const authInput = document.getElementById('auth-input');
+  const authError = document.getElementById('auth-error');
+  const authForm = document.getElementById('auth-form');
+
+  function promptForToken(errorMsg) {
+    if (errorMsg) authError.textContent = errorMsg;
+    authOverlay.classList.remove('hidden');
+    authInput.focus();
+  }
+
+  authForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = authInput.value.trim();
+    if (!v) return;
+    sessionStorage.setItem('sentinel_token', v);
+    location.reload();
+  });
+
+  async function authFetch(url, init) {
+    const headers = new Headers((init && init.headers) || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    const res = await fetch(url, { ...(init || {}), headers });
+    if (res.status === 401) {
+      sessionStorage.removeItem('sentinel_token');
+      token = null;
+      promptForToken('Invalid token');
+      throw new Error('Unauthorized');
+    }
+    return res;
+  }
+
   // ─── State ──────────────────────────────────────────────────
   const state = {
     segments: [],          // append-only ring of TranscriptSegment
@@ -705,7 +810,7 @@
 
   async function refreshSessionMeta() {
     try {
-      const r = await fetch('/api/session/status');
+      const r = await authFetch('/api/session/status');
       if (!r.ok) return;
       const d = await r.json();
       let changed = false;
@@ -747,7 +852,8 @@
   // ─── WebSocket ──────────────────────────────────────────────
   function wsUrl() {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    return `${proto}://${window.location.host}/ws`;
+    const base = `${proto}://${window.location.host}/ws`;
+    return token ? `${base}?token=${encodeURIComponent(token)}` : base;
   }
 
   let ws;
@@ -1068,9 +1174,24 @@
   }
 
   // ─── Boot ───────────────────────────────────────────────────
-  refreshSessionMeta();
-  setInterval(refreshSessionMeta, 10000);
-  connect();
+  // /api/status is the auth canary. On 200 (or auth-disabled server) we
+  // proceed to open the WS. On 401, authFetch surfaces the overlay and
+  // we skip connect() — browser WS can't distinguish 401 from network
+  // failure in its close event, so the fetch is our reliable signal.
+  (async function boot() {
+    try {
+      const r = await authFetch('/api/status');
+      if (!r.ok) {
+        promptForToken('Auth check failed');
+        return;
+      }
+    } catch {
+      return;
+    }
+    refreshSessionMeta();
+    setInterval(refreshSessionMeta, 10000);
+    connect();
+  })();
 })();
 </script>
 </body>
