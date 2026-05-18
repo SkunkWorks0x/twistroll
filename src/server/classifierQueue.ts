@@ -1,8 +1,12 @@
 import { classifyWindow, SpeakerMap } from './classifier.js';
 import type { TranscriptSegment, ClaimClassification } from '../shared/types.js';
 
-const MAX_CONCURRENCY = parseInt(process.env.CLASSIFIER_MAX_CONCURRENCY || '2', 10);
-const MAX_PENDING = parseInt(process.env.CLASSIFIER_MAX_PENDING || '10', 10);
+function envInt(name: string, fallback: number): number {
+  const v = parseInt(process.env[name] ?? '', 10);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+const MAX_CONCURRENCY = envInt('CLASSIFIER_MAX_CONCURRENCY', 2);
+const MAX_PENDING = envInt('CLASSIFIER_MAX_PENDING', 10);
 
 export interface ClassifierTask {
   window: TranscriptSegment[];
@@ -39,6 +43,15 @@ export function setClassifierHandlers(
 export function enqueueClassifierTask(task: ClassifierTask): void {
   if (activeCount < MAX_CONCURRENCY) {
     runTask(task);
+    return;
+  }
+  if (MAX_PENDING <= 0) {
+    // Pending disabled — drop newcomer rather than corrupt queue with a
+    // doomed shift() on an empty array.
+    droppedByBackpressure++;
+    console.warn(
+      `[CLASSIFIER-QUEUE] pending disabled (MAX_PENDING=${MAX_PENDING}) — dropped segmentId=${task.segmentId}`
+    );
     return;
   }
   if (pending.length >= MAX_PENDING) {
