@@ -8,7 +8,12 @@ import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier, setCurrentDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
-import { classifyWindow, SpeakerMap } from './classifier.js';
+import { SpeakerMap } from './classifier.js';
+import {
+  enqueueClassifierTask,
+  setClassifierHandlers,
+  classifierQueueStats,
+} from './classifierQueue.js';
 import { enqueueClaim, queueStats, setProcessHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
 import { synthesize } from './synthesis.js';
@@ -235,6 +240,43 @@ function markSpanActive(window: TranscriptSegment[], span: ClaimClassification['
   });
 }
 
+setClassifierHandlers(
+  ({ classification, latencyMs, task }) => {
+    const classifierEndMs = Date.now();
+    classifierStats.segmentsProcessed++;
+    classifierStats.sumLatencyMs += latencyMs;
+
+    if (classification.isClaim && classification.confidence >= CLAIM_CONFIDENCE_THRESHOLD) {
+      classifierStats.claimsDetected++;
+      classifierStats.sumConfidence += classification.confidence;
+      if (classification.speaker === 'host') classifierStats.claimsByHost++;
+      else if (classification.speaker === 'cohost') classifierStats.claimsByCohost++;
+      else classifierStats.claimsByGuest++;
+
+      markSpanActive(task.window, classification.claimSpan);
+      broadcast({ type: 'claim_detected', data: classification });
+      console.log(
+        `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
+      );
+
+      recordStage(classification.segmentId, 'classifierEndMs', classifierEndMs);
+      enqueueClaim(classification, lastSegments);
+    } else if (classification.isClaim) {
+      console.log(
+        `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
+      );
+      console.log(`[classifier-suppress] reason=low_confidence confidence=${classification.confidence.toFixed(2)} claimText="${classification.claimText.slice(0, 50)}"`);
+    } else {
+      console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
+      console.log(`[classifier-suppress] reason=not_a_claim segmentId=${task.segmentId}`);
+    }
+  },
+  (err, _task) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[classifier] unhandled error: ${msg}`);
+  }
+);
+
 if (deepgram) {
   deepgram.on('segment', (segment: TranscriptSegment) => {
     // First segment after startSession → transition from 'connecting' to 'live'.
@@ -260,43 +302,13 @@ if (deepgram) {
     const window = lastSegments.slice(-WINDOW_SIZE);
     const prior = lastSegments.slice(0, -WINDOW_SIZE);
 
-    classifyWindow(window, prior, currentSpeakerMap)
-      .then(({ classification, latencyMs }) => {
-        const classifierEndMs = Date.now();
-        classifierStats.segmentsProcessed++;
-        classifierStats.sumLatencyMs += latencyMs;
-
-        if (classification.isClaim && classification.confidence >= CLAIM_CONFIDENCE_THRESHOLD) {
-          classifierStats.claimsDetected++;
-          classifierStats.sumConfidence += classification.confidence;
-          if (classification.speaker === 'host') classifierStats.claimsByHost++;
-          else if (classification.speaker === 'cohost') classifierStats.claimsByCohost++;
-          else classifierStats.claimsByGuest++;
-
-          markSpanActive(window, classification.claimSpan);
-          broadcast({ type: 'claim_detected', data: classification });
-          console.log(
-            `[CLASSIFIER] Claim detected: "${classification.claimText}" (speaker: ${classification.speaker}, confidence: ${classification.confidence.toFixed(2)})`
-          );
-
-          recordStage(classification.segmentId, 'classifierEndMs', classifierEndMs);
-          // Enqueue for retrieval. Snapshot of last 12 segments captured inside
-          // the queue so processing sees fire-time state.
-          enqueueClaim(classification, lastSegments);
-        } else if (classification.isClaim) {
-          console.log(
-            `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
-          );
-          console.log(`[classifier-suppress] reason=low_confidence confidence=${classification.confidence.toFixed(2)} claimText="${classification.claimText.slice(0, 50)}"`);
-        } else {
-          console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
-          console.log(`[classifier-suppress] reason=not_a_claim segmentId=${segment.id}`);
-        }
-      })
-      .catch((err: unknown) => {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[classifier] unhandled error: ${msg}`);
-      });
+    enqueueClassifierTask({
+      window,
+      prior,
+      speakerMap: currentSpeakerMap,
+      segmentId: segment.id,
+      enqueuedAt: Date.now(),
+    });
   });
   deepgram.on('error', (err: Error) => {
     console.error(`[deepgram] error event: ${err.message}`);
@@ -548,6 +560,7 @@ app.get('/api/classifier/stats', (_req, res) => {
     averageLatencyMs: segmentsProcessed > 0 ? sumLatencyMs / segmentsProcessed : 0,
     confidenceThreshold: CLAIM_CONFIDENCE_THRESHOLD,
     activeSpans: activeSpans.length,
+    ...classifierQueueStats(),
   });
 });
 
