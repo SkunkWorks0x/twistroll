@@ -216,6 +216,22 @@ function pruneOldRecords(): void {
   }
 }
 
+// shouldCooldown filters lazily on read, so an entity mentioned once and
+// never again retains its stale entries forever. Walk the map periodically
+// to evict them. Throttled by COOLDOWN_PRUNE_INTERVAL_MS.
+const COOLDOWN_PRUNE_INTERVAL_MS = 30_000;
+let lastCooldownPruneAt = 0;
+
+function pruneCooldowns(now = Date.now()): void {
+  if (now - lastCooldownPruneAt < COOLDOWN_PRUNE_INTERVAL_MS) return;
+  lastCooldownPruneAt = now;
+  for (const [entity, entries] of cooldownsByEntity) {
+    const live = entries.filter((e) => e.expiresAt > now);
+    if (live.length === 0) cooldownsByEntity.delete(entity);
+    else if (live.length !== entries.length) cooldownsByEntity.set(entity, live);
+  }
+}
+
 export interface QueueProcessResult {
   claim: ClaimClassification;
   segmentSnapshot: TranscriptSegment[];
@@ -240,6 +256,7 @@ export function enqueueClaim(
   recentSegments: TranscriptSegment[]
 ): EnqueueResult {
   pruneOldRecords();
+  pruneCooldowns();
 
   // Empty / whitespace primaryEntity → drop. Without an entity anchor the
   // retrieval discriminator can't build a useful Tavily query and the Docket
@@ -368,6 +385,7 @@ function drainPending(): void {
 
 export function queueStats() {
   pruneOldRecords();
+  pruneCooldowns();
   return {
     active: activeCount,
     pending: pending.length,

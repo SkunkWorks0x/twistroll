@@ -17,7 +17,7 @@ import {
 import { enqueueClaim, queueStats, setProcessHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
 import { synthesize } from './synthesis.js';
-import { recordStage, getStages, dropStages } from './ttfcStages.js';
+import { recordStage, getStages, dropStages, clearAllStages } from './ttfcStages.js';
 import type {
   TrollReaction,
   StatusMessage,
@@ -178,12 +178,18 @@ const CLAIM_CONFIDENCE_THRESHOLD = parseFloat(process.env.CLAIM_CONFIDENCE_THRES
 const CLAIM_SPAN_TTL_MS = 15000;
 const lastSegments: TranscriptSegment[] = [];
 
-// Bounded Map for TTFC pairing. claimId → utteranceEndMs (epoch ms at
-// is_final receipt). Cap at 200 entries; evict oldest on insert when full.
-// JS Map preserves insertion order so .keys().next() yields the oldest.
+// claimId → utteranceEndMs (epoch ms at is_final receipt). 200-entry cap
+// plus a 5-min TTL so claims that never get a card_rendered ack don't
+// leak forever.
 const TTFC_MAP_MAX = 200;
+const TTFC_ANCHOR_TTL_MS = 5 * 60 * 1000;
 const ttfcUtteranceEndMs = new Map<string, number>();
 function recordTtfcAnchor(claimId: string, ms: number): void {
+  const now = Date.now();
+  for (const [k, ts] of ttfcUtteranceEndMs) {
+    if (now - ts > TTFC_ANCHOR_TTL_MS) ttfcUtteranceEndMs.delete(k);
+    else break;
+  }
   if (ttfcUtteranceEndMs.size >= TTFC_MAP_MAX) {
     const oldest = ttfcUtteranceEndMs.keys().next().value;
     if (oldest !== undefined) ttfcUtteranceEndMs.delete(oldest);
@@ -450,6 +456,8 @@ app.post('/api/session/start', async (req, res) => {
   // across sessions — clear with a fresh process if the producer wants to.
   lastSegments.length = 0;
   activeSpans.length = 0;
+  ttfcUtteranceEndMs.clear();
+  clearAllStages();
   currentSpeakerMap = validateSpeakerMap(speakerMap);
 
   setSessionState('connecting', source);
@@ -499,6 +507,8 @@ app.post('/api/session/stop', async (_req, res) => {
   try {
     await deepgram.stopSession();
     setSessionState('idle');
+    ttfcUtteranceEndMs.clear();
+    clearAllStages();
     res.json({ status: 'stopped' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
