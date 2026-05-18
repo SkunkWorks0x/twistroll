@@ -44,7 +44,6 @@ function aliasPattern(alias: string): RegExp {
 
 function applyCasing(match: string, replacement: string): string {
   if (match.toUpperCase() === match && !/\d/.test(replacement)) return replacement.toUpperCase();
-  if (match.toLowerCase() === match) return replacement.toLowerCase();
   return replacement;
 }
 
