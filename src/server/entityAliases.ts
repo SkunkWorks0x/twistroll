@@ -9,13 +9,10 @@
 
 export const entityAliases = new Map<string, string>([
   ['Wade', 'Wayve'],
-  ['WAVE', 'Wayve'],
-  ['Wave', 'Wayve'],
   ['Wobby', 'Waabi'],
   ['Wabi', 'Waabi'],
   ['Open AI', 'OpenAI'],
   ['Chat GPT', 'ChatGPT'],
-  ['Anthropic', 'Anthropic'],
   ['In Vidia', 'NVIDIA'],
   ['N Vidia', 'NVIDIA'],
   ['Navidia', 'NVIDIA'],
