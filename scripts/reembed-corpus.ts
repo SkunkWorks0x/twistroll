@@ -12,25 +12,39 @@ import {
 
 config();
 
-const BATCH_SIZE = 100;
+// 50 keeps us well under the 1M TPM ceiling on text-embedding-3-small;
+// at ~800 tokens per ~600-word chunk this is ~40k tokens/batch.
+const BATCH_SIZE = 50;
+const BATCH_DELAY_MS = 200;
+const MAX_RATE_LIMIT_RETRIES = 3;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 async function embedBatch(texts: string[], apiKey: string): Promise<number[][]> {
-  const res = await fetch(OPENAI_EMBED_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ model: OPENAI_EMBED_MODEL, input: texts }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`OpenAI embeddings HTTP ${res.status}: ${body.slice(0, 200)}`);
+  for (let retry = 0; retry <= MAX_RATE_LIMIT_RETRIES; retry++) {
+    const res = await fetch(OPENAI_EMBED_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: OPENAI_EMBED_MODEL, input: texts }),
+    });
+    if (res.status === 429 && retry < MAX_RATE_LIMIT_RETRIES) {
+      console.log('Rate limited — waiting 60s before retry...');
+      await sleep(60_000);
+      continue;
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`OpenAI embeddings HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const json = (await res.json()) as { data: { embedding: number[]; index: number }[] };
+    // OpenAI docs document an `index` field but don't explicitly guarantee
+    // positional order — sort to be safe. Free at this batch size.
+    return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
   }
-  const json = (await res.json()) as { data: { embedding: number[]; index: number }[] };
-  // OpenAI docs document an `index` field but don't explicitly guarantee
-  // positional order — sort to be safe. Free at this batch size.
-  return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+  throw new Error('unreachable');
 }
 
 async function main() {
@@ -80,6 +94,7 @@ async function main() {
       });
     }
     console.log(`Re-embedded ${Math.min(i + BATCH_SIZE, rows.length)}/${rows.length} chunks…`);
+    if (i + BATCH_SIZE < rows.length) await sleep(BATCH_DELAY_MS);
   }
 
   // Atomic replace — `mode: 'overwrite'` swaps the table in one operation so
@@ -88,7 +103,7 @@ async function main() {
   // providers (768-dim embeddinggemma → 1536-dim text-embedding-3-small).
   await conn.createTable(TABLE_NAME, out, { mode: 'overwrite' });
   const dim = (out[0]?.vector as number[] | undefined)?.length ?? 0;
-  console.log(`Replaced "${TABLE_NAME}" with ${out.length} chunks (${dim}-dim)`);
+  console.log(`Re-embed complete. ${out.length} chunks written (${dim}-dim).`);
 }
 
 main().catch((err) => {
