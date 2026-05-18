@@ -108,20 +108,18 @@ function predicateBucket(normalizedText: string): string | null {
   return null;
 }
 
-function shouldCooldown(claim: ClaimClassification, now = Date.now()): boolean {
+// Read-only — mutation lives in registerCooldown so a claim dropped after
+// this check doesn't poison the map against the next legitimate claim.
+function checkCooldown(claim: ClaimClassification, now = Date.now()): boolean {
   const entity = normalizeEntity(claim.primaryEntity);
   const entries = (cooldownsByEntity.get(entity) ?? []).filter((e) => e.expiresAt > now);
-
   const normalized = normalizeClaimText(claim.claimText);
 
   for (const entry of entries) {
     const sameClaimType = entry.claimType === claim.claimType;
     const overlap = tokenJaccard(normalized, entry.normalizedClaim);
 
-    // Same entity + same claim type + high text overlap = suppress (restatement)
     if (sameClaimType && overlap >= 0.72) return true;
-
-    // Same entity + very high text overlap regardless of claim type = suppress
     if (overlap >= 0.85) return true;
 
     // Short opinion/assessment restatements with no numeric anchors —
@@ -134,8 +132,13 @@ function shouldCooldown(claim: ClaimClassification, now = Date.now()): boolean {
       if (entryPred !== null && entryPred === claimPred) return true;
     }
   }
+  return false;
+}
 
-  // Not suppressed — register this claim in cooldown.
+function registerCooldown(claim: ClaimClassification, now = Date.now()): void {
+  const entity = normalizeEntity(claim.primaryEntity);
+  const normalized = normalizeClaimText(claim.claimText);
+  const entries = (cooldownsByEntity.get(entity) ?? []).filter((e) => e.expiresAt > now);
   entries.push({
     entity,
     claimType: claim.claimType,
@@ -144,7 +147,6 @@ function shouldCooldown(claim: ClaimClassification, now = Date.now()): boolean {
     expiresAt: now + ENTITY_COOLDOWN_MS,
   });
   cooldownsByEntity.set(entity, entries);
-  return false;
 }
 
 // ─── In-flight token-overlap dedup (10s window) ────────────────────────
@@ -288,7 +290,7 @@ export function enqueueClaim(
     return { enqueued: false, reason: 'weak entity (generic term)' };
   }
 
-  if (shouldCooldown(claim)) {
+  if (checkCooldown(claim)) {
     suppressedDedup++;
     console.log(`[queue-dedup] cooldown-fingerprint: "${claim.primaryEntity}" claimType=${claim.claimType ?? 'unknown'}`);
     return { enqueued: false, reason: 'entity+fingerprint cooldown' };
@@ -311,6 +313,7 @@ export function enqueueClaim(
 
   if (activeCount < MAX_CONCURRENCY) {
     recentlyProcessed.push({ entities: incoming, processedAt: Date.now() });
+    registerCooldown(claim);
     startProcessing(claim, segmentSnapshot);
     return { enqueued: true };
   }
@@ -341,6 +344,7 @@ export function enqueueClaim(
   }
 
   recentlyProcessed.push({ entities: incoming, processedAt: Date.now() });
+  registerCooldown(claim);
   pending.push(newEntry);
   return { enqueued: true, reason: 'queued (pending)' };
 }
