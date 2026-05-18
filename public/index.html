@@ -40,7 +40,7 @@
     font-size: 13px;
     line-height: 1.5;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
   }
 
   /* ─── Header ─────────────────────────────────────────────── */
@@ -614,6 +614,104 @@
     color: #F87171;
     min-height: 12px;
   }
+
+  /* ─── Session control bar ─── */
+  .session-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    padding: 0 14px;
+    background: #111114;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 -1px 0 rgba(255, 92, 0, 0.06);
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .session-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .session-bar.idle .session-dot { background: var(--text-faint); }
+  .session-bar.connecting .session-dot {
+    background: #FBBF24;
+    animation: session-pulse 900ms ease-in-out infinite;
+  }
+  .session-bar.live .session-dot {
+    background: #34D399;
+    box-shadow: 0 0 10px rgba(52, 211, 153, 0.6);
+  }
+  .session-bar.error .session-dot { background: #F87171; }
+  @keyframes session-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+  }
+  .session-label {
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .session-input {
+    flex: 1;
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 10px;
+    background: #08080A;
+    border: 1px solid #555861;
+    border-radius: 6px;
+    color: #E2E4E9;
+    outline: none;
+    min-width: 0;
+  }
+  .session-input::placeholder { color: var(--text-faint); }
+  .session-input:focus { border-color: #FF5C00; }
+  .session-input:disabled { opacity: 0.5; }
+  .session-url {
+    flex: 1;
+    color: var(--text-dim);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .session-action {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .session-action.primary {
+    background: #FF5C00;
+    color: #FFFFFF;
+  }
+  .session-action.primary:hover { background: #FF7A2D; }
+  .session-action.danger {
+    background: rgba(248, 113, 113, 0.14);
+    border: 1px solid rgba(248, 113, 113, 0.5);
+    color: #F87171;
+  }
+  .session-action.danger:hover { background: rgba(248, 113, 113, 0.24); }
+  .session-error-msg {
+    color: #F87171;
+    flex: 1;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
 </style>
 </head>
 <body>
@@ -634,10 +732,12 @@
   </form>
 </div>
 
+<div id="session-bar" class="session-bar idle"></div>
+
 <main>
   <section id="transcript-pane">
     <div id="transcript">
-      <div class="empty-state">Waiting for transcript…</div>
+      <div class="empty-state">Stream idle.</div>
     </div>
   </section>
   <aside id="sidebar-pane">
@@ -685,6 +785,93 @@
       throw new Error('Unauthorized');
     }
     return res;
+  }
+
+  // ─── Session control bar ──────────────────────────────────
+  // Uses `escape` defined later in this IIFE under Utilities — hoisted by
+  // closure scope, available by the time renderSessionBar is invoked.
+  const sessionBar = document.getElementById('session-bar');
+  const session = { state: 'idle', url: null };
+
+  function renderSessionBar(transientError) {
+    sessionBar.className = `session-bar ${session.state}`;
+    if (transientError) {
+      sessionBar.innerHTML = `
+        <span class="session-dot"></span>
+        <span class="session-label">Error</span>
+        <span class="session-error-msg">${escape(transientError)}</span>
+        <button class="session-action primary" id="session-dismiss">Dismiss</button>
+      `;
+      document.getElementById('session-dismiss').addEventListener('click', () => renderSessionBar());
+      return;
+    }
+    if (session.state === 'idle') {
+      sessionBar.innerHTML = `
+        <span class="session-dot"></span>
+        <span class="session-label">Stream</span>
+        <input class="session-input" id="session-url" type="url" placeholder="Paste YouTube URL..." />
+        <button class="session-action primary" id="session-start">Start Stream</button>
+      `;
+      const inp = document.getElementById('session-url');
+      const btn = document.getElementById('session-start');
+      btn.addEventListener('click', () => startSession(inp.value));
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startSession(inp.value); });
+    } else if (session.state === 'connecting') {
+      sessionBar.innerHTML = `
+        <span class="session-dot"></span>
+        <span class="session-label">Connecting…</span>
+        <span class="session-url">${escape(session.url || '')}</span>
+        <button class="session-action danger" id="session-stop">Stop</button>
+      `;
+      document.getElementById('session-stop').addEventListener('click', stopSession);
+    } else if (session.state === 'live') {
+      sessionBar.innerHTML = `
+        <span class="session-dot"></span>
+        <span class="session-label">Live</span>
+        <span class="session-url">${escape(session.url || '')}</span>
+        <button class="session-action danger" id="session-stop">Stop</button>
+      `;
+      document.getElementById('session-stop').addEventListener('click', stopSession);
+    } else { // error
+      sessionBar.innerHTML = `
+        <span class="session-dot"></span>
+        <span class="session-label">Error</span>
+        <span class="session-error-msg">Session failed</span>
+        <button class="session-action primary" id="session-retry">Retry</button>
+      `;
+      document.getElementById('session-retry').addEventListener('click', () => {
+        session.state = 'idle';
+        session.url = null;
+        renderSessionBar();
+      });
+    }
+  }
+
+  async function startSession(urlValue) {
+    const url = (urlValue || '').trim();
+    if (!url) return;
+    try {
+      const r = await authFetch('/api/session/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode: 'youtube', url }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        renderSessionBar(err.error || `Start failed (${r.status})`);
+        return;
+      }
+      // Server broadcasts 'session_state' = connecting; the bar re-renders
+      // from the WS message handler.
+    } catch {
+      // authFetch already surfaced any 401.
+    }
+  }
+
+  async function stopSession() {
+    try {
+      await authFetch('/api/session/stop', { method: 'POST' });
+    } catch {}
   }
 
   // ─── State ──────────────────────────────────────────────────
@@ -906,6 +1093,12 @@
       case 'status':
         if (msg.state === 'connected') setStatus('connected', 'live');
         else if (msg.state === 'ollama_down') setStatus('connected', 'live · ollama down');
+        break;
+      case 'session_state':
+        session.state = msg.state;
+        if (msg.url !== undefined) session.url = msg.url || null;
+        if (msg.state === 'idle') session.url = null;
+        renderSessionBar();
         break;
       // claim_detected is informational; we wait for the synthesized card.
     }
@@ -1188,6 +1381,19 @@
     } catch {
       return;
     }
+    // Seed the session bar from server state before opening the WS, so a
+    // reload mid-stream renders 'live' immediately instead of flashing idle.
+    try {
+      const r = await authFetch('/api/session/status');
+      if (r.ok) {
+        const d = await r.json();
+        if (d && typeof d.state === 'string') {
+          session.state = d.state;
+          session.url = d.url || null;
+        }
+      }
+    } catch {}
+    renderSessionBar();
     refreshSessionMeta();
     setInterval(refreshSessionMeta, 10000);
     connect();

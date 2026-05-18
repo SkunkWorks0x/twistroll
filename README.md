@@ -134,8 +134,12 @@ With the server running at http://localhost:3000:
 ```bash
 curl -X POST http://localhost:3000/api/session/start \
   -H "Content-Type: application/json" \
-  -d '{"source": "YOUTUBE_URL_HERE", "mode": "stream"}'
+  -d '{"mode": "youtube", "url": "YOUTUBE_URL_HERE"}'
+# → { "status": "connecting", "sessionId": "<uuid>" }
 ```
+
+(The legacy `{"mode": "stream", "source": "..."}` body still works.)
+If `SENTINEL_ACCESS_TOKEN` is set, add `-H "Authorization: Bearer <token>"`.
 
 ### Estimated Cost
 

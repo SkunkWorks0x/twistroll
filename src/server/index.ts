@@ -110,6 +110,37 @@ if (rawToken !== undefined && rawToken.length < 24) {
 const ACCESS_TOKEN = rawToken ?? '';
 const AUTH_ENABLED = ACCESS_TOKEN.length >= 24;
 
+// ─── Session state machine ───
+type SessionUiState = 'idle' | 'connecting' | 'live' | 'error';
+interface SessionStateMessage {
+  type: 'session_state';
+  state: SessionUiState;
+  url?: string;
+}
+let sessionState: SessionUiState = 'idle';
+let sessionUrl: string | null = null;
+let sessionStartedAt: string | null = null;
+// Tracks an in-flight startSession() so /api/session/stop can wait for it
+// before deciding the session is gone. Without this, a Stop click during
+// 'connecting' can race past a half-spawned ffmpeg and orphan it.
+let pendingStart: Promise<void> | null = null;
+
+function setSessionState(next: SessionUiState, url?: string): void {
+  if (sessionState === next) return;
+  sessionState = next;
+  if (next === 'connecting' && url) {
+    sessionUrl = url;
+    sessionStartedAt = new Date().toISOString();
+  } else if (next === 'idle') {
+    sessionUrl = null;
+    sessionStartedAt = null;
+  }
+  console.log(`[session] state=${next}${sessionUrl ? ` url=${sessionUrl}` : ''}`);
+  const msg: SessionStateMessage = { type: 'session_state', state: next };
+  if (sessionUrl) msg.url = sessionUrl;
+  broadcast(msg);
+}
+
 // ─── Classifier state ───
 const SEGMENT_BUFFER_MAX = 12;
 const WINDOW_SIZE = 3;
@@ -181,6 +212,9 @@ function markSpanActive(window: TranscriptSegment[], span: ClaimClassification['
 
 if (deepgram) {
   deepgram.on('segment', (segment: TranscriptSegment) => {
+    // First segment after startSession → transition from 'connecting' to 'live'.
+    if (sessionState === 'connecting') setSessionState('live');
+
     // Broadcast first — never gate transcript visibility on classifier latency.
     broadcast({ type: 'transcript_segment', data: segment });
 
@@ -241,6 +275,11 @@ if (deepgram) {
   });
   deepgram.on('error', (err: Error) => {
     console.error(`[deepgram] error event: ${err.message}`);
+    // Ignore teardown noise: ws close + ffmpeg SIGTERM during stopSession()
+    // fire 'error' after we've already reset to 'idle'. Without this guard
+    // the state ends in 'error' instead of 'idle'.
+    if (sessionState === 'idle') return;
+    setSessionState('error');
   });
   deepgram.on('reconnecting', ({ attempt }: { attempt: number }) => {
     console.warn(`[deepgram] reconnecting (attempt ${attempt})`);
@@ -317,18 +356,38 @@ app.post('/api/session/start', async (req, res) => {
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
-  const { mode, source, speakerMap, startOffsetSeconds } = req.body as {
-    mode?: SessionMode;
+  const body = req.body as {
+    mode?: SessionMode | 'youtube';
     source?: string;
+    url?: string;
     speakerMap?: unknown;
     startOffsetSeconds?: unknown;
   };
-  if (mode !== 'stream' && mode !== 'system-audio') {
-    return res.status(400).json({ error: "mode must be 'stream' or 'system-audio'" });
+
+  // Normalize the spec'd dashboard alias { mode: 'youtube', url } to the
+  // existing { mode: 'stream', source } shape. URL must look like YouTube.
+  let mode: SessionMode;
+  let source: string;
+  if (body.mode === 'youtube') {
+    if (!body.url || typeof body.url !== 'string') {
+      return res.status(400).json({ error: 'url required for mode=youtube' });
+    }
+    if (!/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//.test(body.url)) {
+      return res.status(400).json({ error: 'url must be a youtube.com or youtu.be URL' });
+    }
+    mode = 'stream';
+    source = body.url;
+  } else if (body.mode === 'stream' || body.mode === 'system-audio') {
+    if (!body.source || typeof body.source !== 'string') {
+      return res.status(400).json({ error: 'source required' });
+    }
+    mode = body.mode;
+    source = body.source;
+  } else {
+    return res.status(400).json({ error: "mode must be 'youtube', 'stream' or 'system-audio'" });
   }
-  if (!source || typeof source !== 'string') {
-    return res.status(400).json({ error: 'source required' });
-  }
+
+  const { speakerMap, startOffsetSeconds } = body;
   if (
     startOffsetSeconds !== undefined &&
     (typeof startOffsetSeconds !== 'number' ||
@@ -347,21 +406,31 @@ app.post('/api/session/start', async (req, res) => {
   activeSpans.length = 0;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
 
+  setSessionState('connecting', source);
+  const sessionId = crypto.randomUUID();
+
+  const startPromise = deepgram.startSession({
+    mode,
+    source,
+    startOffsetSeconds: typeof startOffsetSeconds === 'number' ? startOffsetSeconds : undefined,
+  });
+  pendingStart = startPromise.then(
+    () => {
+      pendingStart = null;
+    },
+    () => {
+      pendingStart = null;
+    }
+  );
   try {
-    await deepgram.startSession({
-      mode,
-      source,
-      startOffsetSeconds: typeof startOffsetSeconds === 'number' ? startOffsetSeconds : undefined,
-    });
-    res.json({
-      ok: true,
-      mode,
-      source,
-      speakerMap: currentSpeakerMap,
-    });
+    await startPromise;
+    res.json({ status: 'connecting', sessionId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[session/start] ${msg}`);
+    // startSession threw before the deepgram socket opened — roll back the
+    // connecting state so the dashboard doesn't get stuck.
+    setSessionState('idle');
     res.status(500).json({ error: msg });
   }
 });
@@ -370,9 +439,20 @@ app.post('/api/session/stop', async (_req, res) => {
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
+  // If a startSession is mid-flight, let it finish (or fail) before checking
+  // isActive() — otherwise we report 'already_stopped' while ffmpeg/ws are
+  // still coming up, and the half-built session orphans those processes.
+  if (pendingStart) {
+    await pendingStart.catch(() => {});
+  }
+  if (!deepgram.isActive()) {
+    setSessionState('idle');
+    return res.json({ status: 'already_stopped' });
+  }
   try {
     await deepgram.stopSession();
-    res.json({ ok: true });
+    setSessionState('idle');
+    res.json({ status: 'stopped' });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`[session/stop] ${msg}`);
@@ -382,7 +462,15 @@ app.post('/api/session/stop', async (_req, res) => {
 
 app.get('/api/session/status', (_req, res) => {
   if (!deepgram) {
-    return res.json({ active: false, mode: null, uptime: null, configured: false });
+    return res.json({
+      state: 'idle' as SessionUiState,
+      url: null,
+      startedAt: null,
+      active: false,
+      mode: null,
+      uptime: null,
+      configured: false,
+    });
   }
   // effectiveSpeakerMap: what consumers should actually use. Operator-provided
   // map wins; absent that, fall back to the classifier's legacy default
@@ -393,6 +481,9 @@ app.get('/api/session/status', (_req, res) => {
   const mapIsExplicit = Object.keys(currentSpeakerMap).length > 0;
   const effectiveSpeakerMap = mapIsExplicit ? currentSpeakerMap : { 0: 'host', 1: 'guest' };
   res.json({
+    state: sessionState,
+    url: sessionUrl,
+    startedAt: sessionStartedAt,
     active: deepgram.isActive(),
     mode: deepgram.getMode(),
     uptime: deepgram.getUptime(),
@@ -505,7 +596,13 @@ wss.on('connection', (ws) => {
 });
 
 function broadcast(
-  message: TrollReaction | StatusMessage | TranscriptSegmentMessage | ClaimDetectedMessage | CardBroadcast
+  message:
+    | TrollReaction
+    | StatusMessage
+    | TranscriptSegmentMessage
+    | ClaimDetectedMessage
+    | CardBroadcast
+    | SessionStateMessage
 ): void {
   const payload = JSON.stringify(message);
   for (const client of clients) {
