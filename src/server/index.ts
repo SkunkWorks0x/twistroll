@@ -401,7 +401,9 @@ app.get('/api/classifier/stats', (_req, res) => {
 // ─── WebSocket Server ───
 
 const server = createServer(app);
-const wss = new WebSocketServer({ port: appConfig.wsPort });
+// Mount WS on the HTTP server so the whole app binds to one port — PaaS
+// (Railway, Fly.io) only exposes a single port per service.
+const wss = new WebSocketServer({ server, path: '/ws' });
 
 const clients = new Set<WebSocket>();
 
@@ -496,11 +498,11 @@ async function main() {
   }
 
   // Start Express server
-  server.listen(appConfig.overlayPort, () => {
+  server.listen(appConfig.port, () => {
     console.log('');
     console.log('🔴 TWiST Sentinel is running');
-    console.log(`   Config:    http://localhost:${appConfig.overlayPort}/config`);
-    console.log(`   WebSocket: ws://localhost:${appConfig.wsPort}`);
+    console.log(`   Config:    http://localhost:${appConfig.port}/config`);
+    console.log(`   WebSocket: ws://localhost:${appConfig.port}/ws`);
     console.log('');
   });
 

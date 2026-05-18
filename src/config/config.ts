@@ -8,6 +8,5 @@ export const appConfig: AppConfig = {
   // Historical name — actually the classifier-fallback model. Consumed by
   // llm-router.ts when both Anthropic and Groq are unavailable.
   ollamaModelTrolls: process.env.OLLAMA_MODEL_TROLLS || 'qwen2.5:7b',
-  wsPort: parseInt(process.env.WS_PORT || '3001', 10),
-  overlayPort: parseInt(process.env.OVERLAY_PORT || '3000', 10),
+  port: parseInt(process.env.PORT || '3000', 10),
 };

@@ -161,6 +161,5 @@ export interface AppConfig {
   ollamaBaseUrl: string;
   // Historical name — actually the classifier-fallback Ollama model.
   ollamaModelTrolls: string;
-  wsPort: number;
-  overlayPort: number;
+  port: number;
 }

@@ -747,10 +747,7 @@
   // ─── WebSocket ──────────────────────────────────────────────
   function wsUrl() {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    // Server WS port is one above the HTTP port by convention (3000→3001).
-    const httpPort = parseInt(window.location.port, 10) || 3000;
-    const wsPort = httpPort + 1;
-    return `${proto}://${window.location.hostname}:${wsPort}`;
+    return `${proto}://${window.location.host}/ws`;
   }
 
   let ws;
