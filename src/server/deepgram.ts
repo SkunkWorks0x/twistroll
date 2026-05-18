@@ -189,6 +189,7 @@ export class DeepgramClient extends EventEmitter {
   private ytdlpStderr = '';
   private ffmpegStderr = '';
   private keepAliveTimer: NodeJS.Timeout | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
   private reconnecting = false;
   private active = false;
@@ -259,6 +260,11 @@ export class DeepgramClient extends EventEmitter {
     this.intentionalStop = true;
     this.active = false;
     this.stopKeepAlive();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnecting = false;
     this.killAudioPipeline();
     if (this.ws) {
       try {
@@ -290,6 +296,11 @@ export class DeepgramClient extends EventEmitter {
     this.active = false;
     this.intentionalStop = true;
     this.stopKeepAlive();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnecting = false;
     this.killAudioPipeline();
     if (this.ws) {
       try { this.ws.close(); } catch { /* ignore */ }
@@ -464,7 +475,8 @@ export class DeepgramClient extends EventEmitter {
     console.warn(`[deepgram] reconnect attempt ${attempt}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
     this.emit('reconnecting', { attempt });
 
-    setTimeout(async () => {
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
       try {
         await this.connectDeepgram();
         this.reconnecting = false;
@@ -496,6 +508,18 @@ export class DeepgramClient extends EventEmitter {
     });
     this.ytdlp = ytdlp;
     this.ytdlpStderr = '';
+
+    ytdlp.on('error', (err) => {
+      this.ytdlp = null;
+      if (!this.active) return;
+      this.rollbackActive();
+      this.emit('error', new SessionPipelineError({
+        code: 'YTDLP_EXIT_NONZERO',
+        source: 'yt-dlp',
+        message: `Failed to spawn yt-dlp: ${err.message}`,
+        retryable: false,
+      }));
+    });
 
     let directUrl = '';
     ytdlp.stdout.on('data', (chunk) => {
@@ -553,6 +577,17 @@ export class DeepgramClient extends EventEmitter {
     );
     const ffmpeg = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.ffmpeg = ffmpeg;
+    ffmpeg.on('error', (err) => {
+      this.ffmpeg = null;
+      if (!this.active) return;
+      this.rollbackActive();
+      this.emit('error', new SessionPipelineError({
+        code: 'FFMPEG_EXIT_NONZERO',
+        source: 'ffmpeg',
+        message: `Failed to spawn ffmpeg: ${err.message}`,
+        retryable: false,
+      }));
+    });
     this.attachFfmpegStreams(ffmpeg);
   }
 
@@ -593,6 +628,12 @@ export class DeepgramClient extends EventEmitter {
       ], { stdio: ['ignore', 'pipe', 'pipe'] });
       let stderr = '';
       probe.stderr.on('data', (c) => { stderr += c.toString(); });
+      probe.on('error', (err) => reject(new SessionPipelineError({
+        code: 'FFMPEG_EXIT_NONZERO',
+        source: 'ffmpeg',
+        message: `Failed to spawn ffmpeg probe: ${err.message}`,
+        retryable: false,
+      })));
       probe.on('close', () => {
         // Output format:
         //   [AVFoundation indev @ ...] AVFoundation video devices:
@@ -728,8 +769,23 @@ export class DeepgramClient extends EventEmitter {
   }
 
   private reResolveStream(): void {
-    if (!this.active || this.intentionalStop || !this.originalSourceUrl) {
+    if (!this.active || this.intentionalStop) {
       this.reResolving = false;
+      return;
+    }
+    if (!this.originalSourceUrl) {
+      // Paradox: active session entered re-resolution without an
+      // original-source-URL snapshot. Should be unreachable since
+      // startSession seeds it for stream mode. Roll back rather than
+      // hang the session in half-dead state.
+      this.reResolving = false;
+      this.rollbackActive();
+      this.emit('error', new SessionPipelineError({
+        code: 'YTDLP_EXIT_NONZERO',
+        source: 'yt-dlp',
+        message: 'Re-resolution requested but original source URL is missing.',
+        retryable: false,
+      }));
       return;
     }
 
@@ -740,6 +796,19 @@ export class DeepgramClient extends EventEmitter {
     this.ytdlp = ytdlp;
     this.ytdlpStderr = '';
     let directUrl = '';
+
+    ytdlp.on('error', (err) => {
+      this.ytdlp = null;
+      this.reResolving = false;
+      if (!this.active) return;
+      this.rollbackActive();
+      this.emit('error', new SessionPipelineError({
+        code: 'YTDLP_EXIT_NONZERO',
+        source: 'yt-dlp',
+        message: `Failed to spawn yt-dlp for re-resolution: ${err.message}`,
+        retryable: false,
+      }));
+    });
 
     ytdlp.stdout.on('data', (chunk) => { directUrl += chunk.toString(); });
     ytdlp.stderr.on('data', (chunk) => {
@@ -785,10 +854,14 @@ export class DeepgramClient extends EventEmitter {
 
   private killAudioPipeline(): void {
     if (this.ytdlp) {
+      this.ytdlp.stdout?.removeAllListeners();
+      this.ytdlp.stderr?.removeAllListeners();
       try { this.ytdlp.kill('SIGKILL'); } catch { /* ignore */ }
       this.ytdlp = null;
     }
     if (this.ffmpeg) {
+      this.ffmpeg.stdout?.removeAllListeners();
+      this.ffmpeg.stderr?.removeAllListeners();
       try { this.ffmpeg.kill('SIGKILL'); } catch { /* ignore */ }
       this.ffmpeg = null;
     }
