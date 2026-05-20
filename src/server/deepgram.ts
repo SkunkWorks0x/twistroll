@@ -29,6 +29,21 @@ function appendBounded(buf: string, chunk: string): string {
   return next.length > STDERR_TAIL_MAX ? next.slice(-STDERR_TAIL_MAX) : next;
 }
 
+// Residential/unblocker proxy for cloud deploys where Railway/Fly/AWS egress
+// IPs get bot-checked by YouTube. Unset on local Mac — flags become no-ops.
+// Threaded through both yt-dlp manifest resolution AND ffmpeg segment fetch
+// because the per-segment IP check fails if only yt-dlp is proxied.
+const YTDLP_PROXY = process.env.YTDLP_PROXY?.trim() || null;
+function ytdlpProxyArgs(): string[] {
+  return YTDLP_PROXY ? ['--proxy', YTDLP_PROXY] : [];
+}
+function ffmpegProxyArgs(): string[] {
+  return YTDLP_PROXY ? ['-http_proxy', YTDLP_PROXY] : [];
+}
+if (YTDLP_PROXY) {
+  console.log('[deepgram] YTDLP_PROXY configured — yt-dlp + ffmpeg will use proxy');
+}
+
 // yt-dlp stderr can echo the input URL, which may contain query params / auth.
 // Redact before any stderr substring lands in a dashboard-bound `detail`.
 function redactUrls(s: string): string {
@@ -503,7 +518,7 @@ export class DeepgramClient extends EventEmitter {
     // Two-step: yt-dlp resolves the direct audio URL, then ffmpeg pulls and
     // converts to PCM. Splitting this way avoids piping yt-dlp's container
     // output through ffmpeg, which is fragile for live HLS streams.
-    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '--get-url', url], {
+    const ytdlp = spawn('yt-dlp', [...ytdlpProxyArgs(), '-f', 'bestaudio', '--get-url', url], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.ytdlp = ytdlp;
@@ -566,6 +581,8 @@ export class DeepgramClient extends EventEmitter {
     if (offsetSeconds !== undefined && offsetSeconds > 0) {
       args.push('-ss', String(offsetSeconds));
     }
+    // Proxy flag is an input option — must precede -i. No-op when YTDLP_PROXY unset.
+    args.push(...ffmpegProxyArgs());
     args.push(
       '-i', url,
       '-f', 's16le',
@@ -790,7 +807,7 @@ export class DeepgramClient extends EventEmitter {
     }
 
     const url = this.originalSourceUrl;
-    const ytdlp = spawn('yt-dlp', ['-f', 'bestaudio', '--get-url', url], {
+    const ytdlp = spawn('yt-dlp', [...ytdlpProxyArgs(), '-f', 'bestaudio', '--get-url', url], {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     this.ytdlp = ytdlp;

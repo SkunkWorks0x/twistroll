@@ -863,6 +863,49 @@
     white-space: nowrap;
     min-width: 0;
   }
+
+  /* Secondary actions row — sits below the session-bar with quick-start
+     buttons. Visible only in idle+youtube state. */
+  .demo-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 14px;
+    background: #0C0C0F;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .demo-bar.visible { display: flex; }
+  .demo-bar button {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    color: #B8BAC2;
+    cursor: pointer;
+  }
+  .demo-bar button:hover { background: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
+  .demo-bar button.disabled,
+  .demo-bar button[disabled] {
+    color: #555861;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .demo-bar button.disabled:hover { background: rgba(255, 255, 255, 0.02); color: #555861; }
+  .demo-bar .demo-bar-label {
+    color: #555861;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-right: 4px;
+  }
 </style>
 </head>
 <body>
@@ -884,6 +927,7 @@
 </div>
 
 <div id="session-bar" class="session-bar idle"></div>
+<div id="demo-bar" class="demo-bar"></div>
 
 <main>
   <section id="transcript-pane">
@@ -949,7 +993,44 @@
   // Uses `escape` defined later in this IIFE under Utilities — hoisted by
   // closure scope, available by the time renderSessionBar is invoked.
   const sessionBar = document.getElementById('session-bar');
+  const demoBar = document.getElementById('demo-bar');
   const session = { state: 'idle', url: null, error: null, deepgramHealth: { state: 'connected' } };
+
+  // Secondary-row quick actions. Shown only in idle+youtube; hidden in
+  // connecting/live/error and in system-audio mode so the bar stays clean.
+  function renderDemoBar(visible) {
+    if (!visible) {
+      demoBar.className = 'demo-bar';
+      demoBar.innerHTML = '';
+      return;
+    }
+    demoBar.className = 'demo-bar visible';
+    demoBar.innerHTML = `
+      <span class="demo-bar-label">Quick start:</span>
+      <button id="demo-twist">Try with latest TWiST episode</button>
+      <button id="demo-capture" class="disabled" title="Coming soon — capture audio from any browser tab">Capture Browser Audio (coming soon)</button>
+    `;
+    document.getElementById('demo-twist').addEventListener('click', startDemo);
+    document.getElementById('demo-capture').addEventListener('click', () => {
+      window.alert('Coming soon — capture audio from any browser tab.');
+    });
+  }
+
+  async function startDemo() {
+    try {
+      const r = await authFetch('/api/session/demo', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        renderSessionBar(err.error || `Demo failed (${r.status})`);
+      }
+    } catch {
+      // authFetch already surfaced any 401.
+    }
+  }
   // Mode persists in sessionStorage so a reload keeps the operator in the
   // mode they were using ('youtube' or 'system-audio').
   let sessionMode = sessionStorage.getItem('sentinel_session_mode') === 'system-audio'
@@ -980,6 +1061,7 @@
         <button class="session-action primary" id="session-dismiss">Dismiss</button>
       `;
       document.getElementById('session-dismiss').addEventListener('click', () => renderSessionBar());
+      renderDemoBar(false);
       return;
     }
     if (session.state === 'idle') {
@@ -1012,6 +1094,7 @@
       sessionBar.querySelectorAll('.session-mode-toggle button').forEach((b) => {
         b.addEventListener('click', () => setSessionMode(b.dataset.mode));
       });
+      renderDemoBar(sessionMode === 'youtube');
     } else if (session.state === 'connecting') {
       sessionBar.innerHTML = `
         <span class="session-dot"></span>
@@ -1020,6 +1103,7 @@
         <button class="session-action danger" id="session-stop">Stop</button>
       `;
       document.getElementById('session-stop').addEventListener('click', stopSession);
+      renderDemoBar(false);
     } else if (session.state === 'live') {
       sessionBar.innerHTML = `
         <span class="session-dot"></span>
@@ -1029,6 +1113,7 @@
         <button class="session-action danger" id="session-stop">Stop</button>
       `;
       document.getElementById('session-stop').addEventListener('click', stopSession);
+      renderDemoBar(false);
     } else { // error
       const err = session.error || {};
       const msg = err.message || 'Session failed';
@@ -1050,6 +1135,7 @@
         session.error = null;
         renderSessionBar();
       });
+      renderDemoBar(false);
     }
   }
 

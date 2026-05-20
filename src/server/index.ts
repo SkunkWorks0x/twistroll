@@ -1,8 +1,10 @@
 import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { resolve, dirname } from 'path';
+import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync, existsSync, readdirSync } from 'fs';
+import { randomUUID } from 'crypto';
 import { appConfig } from '../config/config.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { commitEpisode } from './episodeMemory.js';
@@ -308,38 +310,45 @@ setClassifierHandlers(
   }
 );
 
+// Shared segment ingest — called by Deepgram's 'segment' event in live mode,
+// and by the replay loop in demo mode. Both paths must run the same gate
+// stack and classifier so cards are live-generated either way.
+function processIncomingSegment(segment: TranscriptSegment): void {
+  // First segment after startSession → transition from 'connecting' to 'live'.
+  if (sessionState === 'connecting') setSessionState('live');
+
+  // Broadcast first — never gate transcript visibility on classifier latency.
+  broadcast({ type: 'transcript_segment', data: segment });
+
+  // Roll the context buffer.
+  lastSegments.push(segment);
+  while (lastSegments.length > SEGMENT_BUFFER_MAX) lastSegments.shift();
+
+  // Dedup: if this segment is already inside an active claimSpan, the prior
+  // claim covered it — don't re-classify.
+  if (isSegmentInActiveSpan(segment.id)) {
+    classifierStats.segmentsSkippedBySpan++;
+    console.log(`[CLASSIFIER] Segment ${segment.id} within active claimSpan, skipping`);
+    console.log(`[classifier-suppress] reason=span_dedup segmentId=${segment.id}`);
+    return;
+  }
+
+  // Build the 3-segment evaluation window plus prior context behind it.
+  const window = lastSegments.slice(-WINDOW_SIZE);
+  const prior = lastSegments.slice(0, -WINDOW_SIZE);
+
+  enqueueClassifierTask({
+    window,
+    prior,
+    speakerMap: currentSpeakerMap,
+    segmentId: segment.id,
+    enqueuedAt: Date.now(),
+  });
+}
+
 if (deepgram) {
   deepgram.on('segment', (segment: TranscriptSegment) => {
-    // First segment after startSession → transition from 'connecting' to 'live'.
-    if (sessionState === 'connecting') setSessionState('live');
-
-    // Broadcast first — never gate transcript visibility on classifier latency.
-    broadcast({ type: 'transcript_segment', data: segment });
-
-    // Roll the context buffer.
-    lastSegments.push(segment);
-    while (lastSegments.length > SEGMENT_BUFFER_MAX) lastSegments.shift();
-
-    // Dedup: if this segment is already inside an active claimSpan, the prior
-    // claim covered it — don't re-classify.
-    if (isSegmentInActiveSpan(segment.id)) {
-      classifierStats.segmentsSkippedBySpan++;
-      console.log(`[CLASSIFIER] Segment ${segment.id} within active claimSpan, skipping`);
-      console.log(`[classifier-suppress] reason=span_dedup segmentId=${segment.id}`);
-      return;
-    }
-
-    // Build the 3-segment evaluation window plus prior context behind it.
-    const window = lastSegments.slice(-WINDOW_SIZE);
-    const prior = lastSegments.slice(0, -WINDOW_SIZE);
-
-    enqueueClassifierTask({
-      window,
-      prior,
-      speakerMap: currentSpeakerMap,
-      segmentId: segment.id,
-      enqueuedAt: Date.now(),
-    });
+    processIncomingSegment(segment);
   });
   deepgram.on('error', (err: Error) => {
     console.error(`[deepgram] error event: ${err.message}`);
@@ -539,6 +548,160 @@ app.post('/api/session/start', async (req, res) => {
   }
 });
 
+// ─── Demo replay path ──────────────────────────────────────────
+// JSONL transcript playback for the hosted "Try with latest TWiST" button.
+// Lets the dashboard demo end-to-end even when Railway YouTube ingest is
+// blocked (no proxy, soft-block, etc.). Each line is a TranscriptSegment-
+// shaped record; missing fields are filled in at replay time. Segments are
+// scheduled by their `timestamp` (seconds from start) so retrieval/synthesis
+// see the same cadence the real pipeline would have produced.
+const DEMO_DIR = resolve(__dirname, '..', '..', 'data', 'demo');
+const DEMO_YOUTUBE_URL = process.env.DEMO_YOUTUBE_URL?.trim() || 'https://www.youtube.com/@TWiStartups';
+const DEMO_FORCE_REPLAY = process.env.DEMO_FORCE_REPLAY === '1';
+
+interface ReplaySegmentRecord {
+  text: string;
+  speaker?: number;
+  speakerLabel?: string;
+  timestamp?: number;  // seconds from session start
+  duration?: number;
+  confidence?: number;
+}
+
+let replayActive = false;
+const replayTimers: NodeJS.Timeout[] = [];
+
+function listReplayFiles(): string[] {
+  if (!existsSync(DEMO_DIR)) return [];
+  return readdirSync(DEMO_DIR).filter((f) => f.endsWith('.jsonl')).sort();
+}
+
+function loadReplayFile(filename: string): ReplaySegmentRecord[] {
+  const path = join(DEMO_DIR, filename);
+  const raw = readFileSync(path, 'utf-8');
+  const records: ReplaySegmentRecord[] = [];
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    try {
+      const obj = JSON.parse(trimmed);
+      if (obj && typeof obj.text === 'string') records.push(obj as ReplaySegmentRecord);
+    } catch {
+      // Skip malformed lines — replay must not crash on a single bad row.
+    }
+  }
+  return records;
+}
+
+function clearReplay(): void {
+  for (const t of replayTimers) clearTimeout(t);
+  replayTimers.length = 0;
+  replayActive = false;
+}
+
+function startReplay(records: ReplaySegmentRecord[], displayUrl: string): void {
+  replayActive = true;
+  setSessionState('connecting', displayUrl);
+  // First segment fires immediately; subsequent ones are spaced by the gap
+  // between their timestamps. If timestamps are missing or non-monotonic,
+  // fall back to `duration` of the previous segment, then to 2s.
+  let prevTs = 0;
+  let cumulativeDelayMs = 0;
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const ts = typeof r.timestamp === 'number' ? r.timestamp : prevTs + (records[i - 1]?.duration ?? 2);
+    const gapSec = i === 0 ? 0 : Math.max(0, ts - prevTs);
+    cumulativeDelayMs += gapSec * 1000;
+    const speakerNum = typeof r.speaker === 'number' ? r.speaker : 0;
+    const captureTs = ts;
+    const t = setTimeout(() => {
+      if (!replayActive) return;
+      const segment: TranscriptSegment = {
+        id: randomUUID(),
+        text: r.text.trim(),
+        speaker: speakerNum,
+        speakerLabel: r.speakerLabel || `Speaker ${speakerNum}`,
+        timestamp: captureTs,
+        duration: typeof r.duration === 'number' ? r.duration : 0,
+        isFinal: true,
+        confidence: typeof r.confidence === 'number' ? r.confidence : 0.95,
+        createdAt: Date.now(),
+      };
+      processIncomingSegment(segment);
+    }, cumulativeDelayMs);
+    replayTimers.push(t);
+    prevTs = ts;
+  }
+  // After the last segment, hold 'live' state for 10s then return to 'idle'.
+  const closeoutMs = cumulativeDelayMs + 10_000;
+  const closeoutTimer = setTimeout(() => {
+    if (!replayActive) return;
+    console.log('[demo] replay complete — returning to idle');
+    clearReplay();
+    setSessionState('idle');
+  }, closeoutMs);
+  replayTimers.push(closeoutTimer);
+  console.log(`[demo] replay started: ${records.length} segments, ~${Math.round(cumulativeDelayMs / 1000)}s total`);
+}
+
+app.post('/api/session/demo', async (req, res) => {
+  const body = (req.body || {}) as { replay?: boolean; file?: string };
+  const forceReplay = body.replay === true || DEMO_FORCE_REPLAY;
+
+  if (deepgram?.isActive() || replayActive) {
+    return res.status(409).json({ error: 'Session already active. Stop it first.' });
+  }
+
+  // Reset per-session state — same as /api/session/start.
+  lastSegments.length = 0;
+  activeSpans.length = 0;
+  ttfcUtteranceEndMs.clear();
+  clearAllStages();
+  deepgramHealth = null;
+
+  // Path 1: try live YouTube first unless forced to replay.
+  if (!forceReplay && deepgram) {
+    setSessionState('connecting', DEMO_YOUTUBE_URL);
+    const sessionId = randomUUID();
+    try {
+      await deepgram.startSession({ mode: 'stream', source: DEMO_YOUTUBE_URL });
+      return res.json({ status: 'connecting', mode: 'live', sessionId, source: DEMO_YOUTUBE_URL });
+    } catch (err) {
+      const se = toSessionError(err);
+      console.warn(`[demo] live attempt failed code=${se.code} — falling back to replay`);
+      // Don't surface the live failure as a session error; we're falling back.
+      setSessionState('idle');
+    }
+  }
+
+  // Path 2: cached replay.
+  const files = listReplayFiles();
+  const chosen = (body.file && files.includes(body.file)) ? body.file : files[0];
+  if (!chosen) {
+    setSessionState('error', undefined, {
+      code: 'UNKNOWN_SESSION_ERROR',
+      source: 'server',
+      message: 'No demo replay files found.',
+      detail: `Expected at least one .jsonl in ${DEMO_DIR}`,
+      hint: 'Add a cached transcript or set YTDLP_PROXY so the live path works.',
+      retryable: false,
+    });
+    return res.status(503).json({ error: 'No demo replay files available', detail: `Place a .jsonl in ${DEMO_DIR}` });
+  }
+  let records: ReplaySegmentRecord[];
+  try {
+    records = loadReplayFile(chosen);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ error: `Failed to load replay file ${chosen}: ${msg}` });
+  }
+  if (records.length === 0) {
+    return res.status(500).json({ error: `Replay file ${chosen} contained no valid segments` });
+  }
+  startReplay(records, `demo://${chosen}`);
+  res.json({ status: 'connecting', mode: 'replay', file: chosen, segments: records.length, source: `demo://${chosen}` });
+});
+
 app.post('/api/session/speakers', (req, res) => {
   const body = req.body as { speakerMap?: unknown; speakerNames?: unknown };
   currentSpeakerMap = validateSpeakerMap(body.speakerMap);
@@ -551,6 +714,14 @@ app.post('/api/session/speakers', (req, res) => {
 });
 
 app.post('/api/session/stop', async (_req, res) => {
+  // Replay mode has no Deepgram connection — just cancel timers and idle.
+  if (replayActive) {
+    clearReplay();
+    setSessionState('idle');
+    ttfcUtteranceEndMs.clear();
+    clearAllStages();
+    return res.json({ status: 'stopped', mode: 'replay' });
+  }
   if (!deepgram) {
     return res.status(503).json({ error: 'DEEPGRAM_API_KEY not configured' });
   }
@@ -756,6 +927,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
     process.exit(1);
   }, 10_000).unref();
 
+  if (replayActive) {
+    clearReplay();
+  }
   if (deepgram?.isActive()) {
     try { await deepgram.stopSession(); }
     catch (err) {
