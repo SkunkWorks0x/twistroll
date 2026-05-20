@@ -142,12 +142,24 @@ export interface CardBroadcast {
   };
 }
 
+// Periodic snapshot of pipeline counters — feeds the bottom-of-sidebar
+// stats bar so producers can see the system is alive even when no card
+// has rendered yet.
+export interface PipelineStatsMessage {
+  type: 'pipeline_stats';
+  segments: number;       // transcript segments ingested this session
+  claimsHeard: number;    // classifier-emitted positive claims above threshold
+  cards: number;          // verdict cards broadcast
+  suppressed: number;     // claimsHeard - cards - currently in flight
+}
+
 export type WSMessage =
   | TrollReaction
   | StatusMessage
   | TranscriptSegmentMessage
   | ClaimDetectedMessage
   | ClaimProgressMessage
+  | PipelineStatsMessage
   | CardBroadcast;
 
 // Structured pipeline failure surfaced from the server to the dashboard.

@@ -26,6 +26,7 @@ import type {
   TranscriptSegmentMessage,
   ClaimDetectedMessage,
   ClaimProgressMessage,
+  PipelineStatsMessage,
   TranscriptSegment,
   ClaimClassification,
   CardBroadcast,
@@ -243,6 +244,20 @@ const classifierStats = {
   sumLatencyMs: 0,
 };
 
+// Per-session counters for the pipeline_stats bar. classifierStats is kept
+// cumulative for /api/classifier/stats compatibility, so the bar uses its
+// own session-local counters that reset on each start.
+const sessionPipelineCounters = {
+  segmentsReceived: 0,
+  claimsHeard: 0,
+  cardsEmitted: 0,
+};
+function resetSessionPipelineCounters(): void {
+  sessionPipelineCounters.segmentsReceived = 0;
+  sessionPipelineCounters.claimsHeard = 0;
+  sessionPipelineCounters.cardsEmitted = 0;
+}
+
 function pruneExpiredSpans(): void {
   const now = Date.now();
   for (let i = activeSpans.length - 1; i >= 0; i--) {
@@ -282,6 +297,7 @@ setClassifierHandlers(
 
     if (classification.isClaim && classification.confidence >= CLAIM_CONFIDENCE_THRESHOLD) {
       classifierStats.claimsDetected++;
+      sessionPipelineCounters.claimsHeard++;
       classifierStats.sumConfidence += classification.confidence;
       if (classification.speaker === 'host') classifierStats.claimsByHost++;
       else if (classification.speaker === 'cohost') classifierStats.claimsByCohost++;
@@ -330,6 +346,7 @@ function processIncomingSegment(segment: TranscriptSegment): void {
   // First segment after startSession → transition from 'connecting' to 'live'.
   if (sessionState === 'connecting') setSessionState('live');
 
+  sessionPipelineCounters.segmentsReceived++;
   // Broadcast first — never gate transcript visibility on classifier latency.
   broadcast({ type: 'transcript_segment', data: segment });
 
@@ -452,6 +469,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
     };
     recordStage(claim.segmentId, 'broadcastSendMs', Date.now());
     broadcast(card);
+    sessionPipelineCounters.cardsEmitted++;
     const stages = getStages(claim.segmentId);
     const utteranceEnd = ttfcUtteranceEndMs.get(claim.segmentId);
     if (
@@ -543,6 +561,7 @@ app.post('/api/session/start', async (req, res) => {
   activeSpans.length = 0;
   ttfcUtteranceEndMs.clear();
   clearAllStages();
+  resetSessionPipelineCounters();
   // Bare reset (no broadcast) — fresh session will broadcast on first event.
   deepgramHealth = null;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
@@ -687,6 +706,7 @@ app.post('/api/session/demo', async (req, res) => {
   activeSpans.length = 0;
   ttfcUtteranceEndMs.clear();
   clearAllStages();
+  resetSessionPipelineCounters();
   deepgramHealth = null;
 
   // Path 1: try live YouTube first unless forced to replay.
@@ -932,6 +952,7 @@ function broadcast(
     | TranscriptSegmentMessage
     | ClaimDetectedMessage
     | ClaimProgressMessage
+    | PipelineStatsMessage
     | CardBroadcast
     | SessionStateMessage
     | DeepgramHealthMessage
@@ -943,6 +964,28 @@ function broadcast(
     }
   }
 }
+
+// Pipeline stats bar feed — 1.5s cadence is the sweet spot: fast enough
+// that producers see counters tick while a claim is in flight, slow enough
+// that the WS isn't flooded. Only emits during non-idle states so the
+// bar disappears between sessions instead of showing stale zeros.
+const PIPELINE_STATS_INTERVAL_MS = 1500;
+setInterval(() => {
+  if (sessionState === 'idle' && !replayActive) return;
+  const queue = queueStats();
+  const inFlight = queue.active + queue.pending;
+  const suppressed = Math.max(
+    0,
+    sessionPipelineCounters.claimsHeard - sessionPipelineCounters.cardsEmitted - inFlight,
+  );
+  broadcast({
+    type: 'pipeline_stats',
+    segments: sessionPipelineCounters.segmentsReceived,
+    claimsHeard: sessionPipelineCounters.claimsHeard,
+    cards: sessionPipelineCounters.cardsEmitted,
+    suppressed,
+  });
+}, PIPELINE_STATS_INTERVAL_MS).unref();
 
 let shuttingDown = false;
 

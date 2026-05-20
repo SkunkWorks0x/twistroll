@@ -197,6 +197,29 @@
     50%      { opacity: 1.0; }
   }
 
+  /* Pipeline stats bar — pinned to the bottom of the Docket sidebar via
+     position:sticky so it stays visible as cards scroll. Hidden between
+     sessions so the empty-state isn't obscured by stale zeros. */
+  .pipeline-stats {
+    position: sticky;
+    bottom: -16px;            /* offset matches #sidebar-pane padding-bottom */
+    margin: 12px -20px -16px; /* extend full-width past sidebar-pane padding */
+    padding: 6px 14px;
+    background: #08080A;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    color: #555861;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pipeline-stats.hidden { display: none; }
+  .pipeline-stats .stat-sep { color: rgba(255, 255, 255, 0.10); margin: 0 6px; }
+  .pipeline-stats .stat-num { color: #8B8F9A; }
+
   .source-chips {
     display: flex;
     flex-wrap: wrap;
@@ -977,6 +1000,7 @@
       </div>
     </div>
     <div id="follow-banner" class="follow-banner hidden">0 new claims ↑</div>
+    <div id="pipeline-stats" class="pipeline-stats hidden"></div>
   </aside>
 </main>
 
@@ -1545,6 +1569,9 @@
       case 'claim_progress':
         updatePendingClaim(msg);
         break;
+      case 'pipeline_stats':
+        renderPipelineStats(msg);
+        break;
       case 'status':
         if (msg.state === 'connected') setStatus('connected', 'live');
         else if (msg.state === 'ollama_down') setStatus('connected', 'live · ollama down');
@@ -1552,7 +1579,7 @@
       case 'session_state':
         session.state = msg.state;
         if (msg.url !== undefined) session.url = msg.url || null;
-        if (msg.state === 'idle') { session.url = null; session.error = null; }
+        if (msg.state === 'idle') { session.url = null; session.error = null; hidePipelineStats(); }
         if (msg.state === 'connecting') session.error = null;
         if (msg.state === 'error' && msg.error) session.error = msg.error;
         renderSessionBar();
@@ -1667,6 +1694,25 @@
       wrapper.appendChild(more);
     }
     return wrapper;
+  }
+
+  const pipelineStatsEl = document.getElementById('pipeline-stats');
+  function renderPipelineStats(msg) {
+    // Server only emits during non-idle sessions; once the bar receives any
+    // message it stays visible until session_state→idle hides it.
+    pipelineStatsEl.classList.remove('hidden');
+    pipelineStatsEl.innerHTML =
+      `Segments <span class="stat-num">${msg.segments}</span>` +
+      `<span class="stat-sep">|</span>` +
+      `Claims heard <span class="stat-num">${msg.claimsHeard}</span>` +
+      `<span class="stat-sep">|</span>` +
+      `Cards <span class="stat-num">${msg.cards}</span>` +
+      `<span class="stat-sep">|</span>` +
+      `Suppressed <span class="stat-num">${msg.suppressed}</span>`;
+  }
+  function hidePipelineStats() {
+    pipelineStatsEl.classList.add('hidden');
+    pipelineStatsEl.innerHTML = '';
   }
 
   function updatePendingClaim(msg) {
