@@ -90,6 +90,18 @@ export interface ClaimDetectedMessage {
   data: ClaimClassification;
 }
 
+// Intermediate pipeline progress — keeps the dashboard from looking dead
+// between a claim landing in the queue and a verdict card arriving. Sent
+// at three stages: queue accept (detected), retrieval start (retrieving),
+// and synthesis start (analyzing).
+export interface ClaimProgressMessage {
+  type: 'claim_progress';
+  claimId: string;
+  stage: 'detected' | 'retrieving' | 'analyzing';
+  primaryEntity: string;
+  claimText: string;  // first 60 chars
+}
+
 // ─── Synthesis layer outputs (shipped on the 'claim_card' broadcast) ───
 export interface DocketCitationPayload {
   title: string;
@@ -135,6 +147,7 @@ export type WSMessage =
   | StatusMessage
   | TranscriptSegmentMessage
   | ClaimDetectedMessage
+  | ClaimProgressMessage
   | CardBroadcast;
 
 // Structured pipeline failure surfaced from the server to the dashboard.

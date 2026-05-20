@@ -16,7 +16,7 @@ import {
   setClassifierHandlers,
   classifierQueueStats,
 } from './classifierQueue.js';
-import { enqueueClaim, queueStats, setProcessHandler } from './claimQueue.js';
+import { enqueueClaim, queueStats, setProcessHandler, setRetrievalStartHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
 import { synthesize } from './synthesis.js';
 import { recordStage, getStages, dropStages, clearAllStages } from './ttfcStages.js';
@@ -25,6 +25,7 @@ import type {
   StatusMessage,
   TranscriptSegmentMessage,
   ClaimDetectedMessage,
+  ClaimProgressMessage,
   TranscriptSegment,
   ClaimClassification,
   CardBroadcast,
@@ -293,7 +294,19 @@ setClassifierHandlers(
       );
 
       recordStage(classification.segmentId, 'classifierEndMs', classifierEndMs);
-      enqueueClaim(classification, lastSegments);
+      const enqueueResult = enqueueClaim(classification, lastSegments);
+      // Only emit 'detected' progress for claims that survived the gate stack
+      // (sponsor/weak-entity/cooldown/dedup). Suppressed claims would render
+      // a pending card that never resolves.
+      if (enqueueResult.enqueued) {
+        broadcast({
+          type: 'claim_progress',
+          claimId: classification.segmentId,
+          stage: 'detected',
+          primaryEntity: classification.primaryEntity,
+          claimText: classification.claimText.slice(0, 60),
+        });
+      }
     } else if (classification.isClaim) {
       console.log(
         `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
@@ -397,12 +410,29 @@ function validateSpeakerNames(input: unknown): Record<number, string> {
 }
 
 // ─── Synthesis pipeline: claim queue → retrieval → synthesis → broadcast ─
+setRetrievalStartHandler((claim) => {
+  broadcast({
+    type: 'claim_progress',
+    claimId: claim.segmentId,
+    stage: 'retrieving',
+    primaryEntity: claim.primaryEntity,
+    claimText: claim.claimText.slice(0, 60),
+  });
+});
+
 setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
   try {
     const triggerSeg = segmentSnapshot.find((s) => s.id === claim.segmentId);
     const utteranceEndMs = triggerSeg ? triggerSeg.createdAt : Date.now();
     recordTtfcAnchor(claim.segmentId, utteranceEndMs);
     console.log(`[ttfc-server] claimId=${claim.segmentId} utteranceEndMs=${utteranceEndMs}`);
+    broadcast({
+      type: 'claim_progress',
+      claimId: claim.segmentId,
+      stage: 'analyzing',
+      primaryEntity: claim.primaryEntity,
+      claimText: claim.claimText.slice(0, 60),
+    });
     const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
     recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
     if (!result.docket?.verdict) {
@@ -901,6 +931,7 @@ function broadcast(
     | StatusMessage
     | TranscriptSegmentMessage
     | ClaimDetectedMessage
+    | ClaimProgressMessage
     | CardBroadcast
     | SessionStateMessage
     | DeepgramHealthMessage

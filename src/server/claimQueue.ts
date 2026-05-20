@@ -261,6 +261,15 @@ export function setProcessHandler(handler: QueueProcessHandler | null): void {
   processHandler = handler;
 }
 
+// Notified when a claim leaves the pending queue and enters the retrieve()
+// call. Distinct from process_handler (post-retrieval) so the dashboard can
+// surface a 'retrieving' progress event with no information leak.
+export type RetrievalStartHandler = (claim: ClaimClassification) => void;
+let retrievalStartHandler: RetrievalStartHandler | null = null;
+export function setRetrievalStartHandler(handler: RetrievalStartHandler | null): void {
+  retrievalStartHandler = handler;
+}
+
 export function enqueueClaim(
   claim: ClaimClassification,
   recentSegments: TranscriptSegment[]
@@ -362,6 +371,9 @@ function startProcessing(claim: ClaimClassification, segmentSnapshot: Transcript
   void (async () => {
     try {
       recordStage(claim.segmentId, 'retrievalStartMs', Date.now());
+      if (retrievalStartHandler) {
+        try { retrievalStartHandler(claim); } catch { /* never crash retrieval on a handler bug */ }
+      }
       const retrieval = await retrieve(claim);
       recordStage(claim.segmentId, 'retrievalEndMs', Date.now());
       const lanceTitles = retrieval.lance.map((s) => s.title).join('; ') || '(none)';
