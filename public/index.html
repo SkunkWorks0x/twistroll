@@ -2059,13 +2059,13 @@
     // message it stays visible until session_state→idle hides it.
     pipelineStatsEl.classList.remove('hidden');
     pipelineStatsEl.innerHTML =
-      `Segments <span class="stat-num">${msg.segments}</span>` +
+      `Seg <span class="stat-num">${msg.segments}</span>` +
       `<span class="stat-sep">|</span>` +
-      `Claims heard <span class="stat-num">${msg.claimsHeard}</span>` +
+      `Heard <span class="stat-num">${msg.claimsHeard}</span>` +
       `<span class="stat-sep">|</span>` +
       `Cards <span class="stat-num">${msg.cards}</span>` +
       `<span class="stat-sep">|</span>` +
-      `Suppressed <span class="stat-num">${msg.suppressed}</span>`;
+      `Sup <span class="stat-num">${msg.suppressed}</span>`;
     state.latestStats = msg;
     if (state.cards.length === 0 && state.pending.size === 0) renderSidebar();
   }
