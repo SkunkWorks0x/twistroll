@@ -113,6 +113,8 @@ export interface DocketCitationPayload {
   // for ones the LanceDB injection added. Logged on the server for tuning;
   // the dashboard does not render this field.
   citationSource?: 'haiku' | 'post_processor';
+  // ≤150-char excerpt from the matched RetrievedSource — drives tooltip hover.
+  snippet?: string;
 }
 export interface DocketPayload {
   grounding: string;

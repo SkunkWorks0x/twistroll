@@ -42,6 +42,8 @@ export interface DocketCitation {
   // for ones the LanceDB injection added. Logged for tuning, not rendered on
   // the dashboard.
   citationSource?: 'haiku' | 'post_processor';
+  // ≤150-char excerpt from the matched RetrievedSource — passthrough only.
+  snippet?: string;
 }
 
 export interface DocketOutput {
@@ -530,11 +532,15 @@ export function applyLanceDBInjection(
   const epTitle = top.metadata.episodeTitle || '';
   const archiveTitle = `TWiST Ep ${ep} (${date})${epTitle ? ' – ' + epTitle : ''}`;
   const injectedIdx = candidate.citations.length + 1;
+  const lanceTrim = (top.content || '').trim();
+  const lanceSnippet = !lanceTrim
+    ? undefined
+    : lanceTrim.length > 150 ? lanceTrim.slice(0, 150).trim() + '…' : lanceTrim;
   let next: DocketOutput = {
     ...candidate,
     citations: [
       ...candidate.citations,
-      { title: archiveTitle, url: null, tier: 1, citationSource: 'post_processor' as const },
+      { title: archiveTitle, url: null, tier: 1, citationSource: 'post_processor' as const, snippet: lanceSnippet },
     ],
   };
   console.log(`[DOCKET] Injected LanceDB archive citation [${injectedIdx}]: Ep ${ep} (score=${top.score.toFixed(4)})`);
@@ -729,10 +735,16 @@ export async function runDocket(
     // injection below tags its citations 'post_processor'.
     candidate = {
       ...candidate,
-      citations: candidate.citations.map((c) => ({
-        ...c,
-        citationSource: 'haiku' as const,
-      })),
+      citations: candidate.citations.map((c) => {
+        const match = c.url !== null
+          ? sources.find((s) => s.url === c.url)
+          : sources.find((s) => s.url === null && s.title === c.title);
+        const trimmed = (match?.content || '').trim();
+        const snippet = !trimmed
+          ? undefined
+          : trimmed.length > 150 ? trimmed.slice(0, 150).trim() + '…' : trimmed;
+        return { ...c, citationSource: 'haiku' as const, snippet };
+      }),
     };
 
     candidate = applyLanceDBInjection(candidate, sources, claim, explanationWordMax);
