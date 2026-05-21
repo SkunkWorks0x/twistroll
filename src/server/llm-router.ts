@@ -12,6 +12,8 @@ import type { LlmProvider, PersonaId } from '../shared/types.js';
  * Model IDs and behavior constraints:
  * - haiku: Anthropic Messages API, claude-haiku-4-5-20251001 (authoritative ID
  *   used in config.ts; spec had a typo). Uses system/user message split.
+ * - gemini: Google Generative Language API, gemini-3.5-flash (GA May 2026).
+ *   systemInstruction + contents split. Enabled via CLASSIFIER_PROVIDER=gemini.
  * - grok: xAI chat completions, grok-4-1-fast. System/user split.
  * - groq: Groq llama-3.3-70b-versatile. System/user split.
  * - ollama: Delegated to existing callOllama client (handles its own timeouts,
@@ -33,6 +35,7 @@ const PROVIDER_TIMEOUT_MS = 10_000;
 const GROK_TIMEOUT_MS = 13_000; // Grok needs longer tail — retry-once on abort handles the rest
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const GEMINI_MODEL = 'gemini-3.5-flash';
 const GROK_MODEL = 'grok-4-1-fast';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
@@ -46,7 +49,14 @@ export async function callLLM(
   systemPrompt: string,
   context: string
 ): Promise<RouterResult> {
-  const baseChain = ROUTING[personaId] ?? ['haiku', 'groq', 'ollama'];
+  // CLASSIFIER_PROVIDER=gemini routes the classifier through Gemini → Groq →
+  // Ollama instead of the Haiku-first default. Stops Anthropic credit spend
+  // on the highest-volume LLM call.
+  const baseChain = ROUTING[personaId] ?? (
+    personaId === 'classifier' && process.env.CLASSIFIER_PROVIDER === 'gemini'
+      ? ['gemini', 'groq', 'ollama']
+      : ['haiku', 'groq', 'ollama']
+  );
   // In production, Ollama isn't reachable (no local model server on the PaaS).
   // Drop it from the fallback chain so we fail fast to 'none' instead of
   // burning a 15s timeout on every classifier call.
@@ -91,6 +101,8 @@ async function callProvider(
       return callGrok(systemPrompt, context);
     case 'groq':
       return callGroqDirect(systemPrompt, context);
+    case 'gemini':
+      return callGemini(systemPrompt, context);
     case 'ollama':
       // NOTE: ollama branch uses callOllama's own timeouts (15s/30s) rather
       // than PROVIDER_TIMEOUT_MS. Intentional — first-call model-load can
@@ -136,6 +148,49 @@ async function callHaiku(systemPrompt: string, context: string): Promise<string>
     const text = data?.content?.[0]?.text?.trim();
     if (!text) throw new Error('haiku empty response');
     return text;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callGemini(systemPrompt: string, context: string): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY not set');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: context }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          generationConfig: {
+            maxOutputTokens: 200,
+            // gemini-3.5-flash defaults to thinking mode that consumes the
+            // output budget. Disable for structured-output classification.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+        signal: controller.signal,
+      },
+    );
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`gemini HTTP ${res.status}: ${body.slice(0, 120)}`);
+    }
+
+    const data: any = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) throw new Error('gemini empty response');
+    // Gemini wraps JSON in ```json ... ``` markdown fences; strip them.
+    return text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   } finally {
     clearTimeout(timer);
   }

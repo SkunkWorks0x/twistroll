@@ -202,7 +202,7 @@ export interface FeedbackData {
 
 export type LlmMode = 'local' | 'cloud' | 'hybrid';
 export type LlmEngine = 'cloud' | 'groq' | 'ollama' | 'haiku' | 'grok';
-export type LlmProvider = 'haiku' | 'grok' | 'groq' | 'ollama';
+export type LlmProvider = 'haiku' | 'grok' | 'groq' | 'ollama' | 'gemini';
 
 export interface AppConfig {
   ollamaBaseUrl: string;
