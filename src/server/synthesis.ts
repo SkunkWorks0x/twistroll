@@ -3,9 +3,6 @@
 // One Haiku call per claim:
 //   - Docket  (tool_use, deterministic, 5-verdict fact-check + citations)
 //
-// checkHostContradiction is wired in but always returns null today — see the
-// inline comment on that function.
-//
 // Conventions reused from elsewhere in the codebase: raw fetch for the
 // Anthropic Messages API (matches llm-router.ts; the project does not currently
 // depend on @anthropic-ai/sdk and the claude-api skill prohibits mixing raw
@@ -53,20 +50,10 @@ export interface DocketOutput {
   citations: DocketCitation[];
 }
 
-export interface HostContradictionOutput {
-  episodeNumber: number;
-  episodeDate: string;
-  paraphrase: string;
-  followUp: string;
-  priorChunkId: string;
-}
-
 export interface SynthesisResult {
   docket: DocketOutput | null;
-  hostContradiction: HostContradictionOutput | null;
   timing: {
     docketMs: number;
-    contradictionMs: number;
     totalMs: number;
   };
 }
@@ -827,24 +814,6 @@ export async function runDocket(
   return { output: parsed, ms: Date.now() - start };
 }
 
-// ─── Host Contradiction (DISABLED at this layer) ──────────────────────
-
-let contradictionDisabledLogged = false;
-
-export async function checkHostContradiction(
-  _claim: ClaimClassification,
-  _recentSegments: TranscriptSegment[]
-): Promise<{ output: HostContradictionOutput | null; ms: number }> {
-  // EpisodeChunk does not carry a per-chunk speaker field — chunks are
-  // mixed-speaker conversation slices. The spec gates this feature on
-  // chunk-level speaker metadata, so we skip and log once.
-  if (!contradictionDisabledLogged) {
-    console.log('[CONTRADICTION] Speaker metadata not available in LanceDB — feature disabled');
-    contradictionDisabledLogged = true;
-  }
-  return { output: null, ms: 0 };
-}
-
 // ─── synthesize() ──────────────────────────────────────────────────────
 
 export async function synthesize(
@@ -856,15 +825,12 @@ export async function synthesize(
   console.log(`[classifier-pass] claimId=${claim.segmentId} claimType=${claim.claimType} primaryEntity="${claim.primaryEntity}"`);
   const docketContext = formatForDocket(sources, claim, recentSegments);
 
-  const { output: contradictionOutput, ms: contradictionMs } = await checkHostContradiction(claim, recentSegments);
   const { output: docketOutput, ms: docketMs } = await runDocket(claim, sources, docketContext);
 
   return {
     docket: docketOutput,
-    hostContradiction: contradictionOutput,
     timing: {
       docketMs,
-      contradictionMs,
       totalMs: Date.now() - tStart,
     },
   };

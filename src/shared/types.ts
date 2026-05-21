@@ -125,13 +125,6 @@ export interface DocketPayload {
   explanation: string;
   citations: DocketCitationPayload[];
 }
-export interface HostContradictionPayload {
-  episodeNumber: number;
-  episodeDate: string;
-  paraphrase: string;
-  followUp: string;
-  priorChunkId: string;
-}
 export interface CardBroadcast {
   type: 'claim_card';
   claimId: string;
@@ -140,10 +133,8 @@ export interface CardBroadcast {
   speakerNumber: number;       // raw Deepgram id — dashboard resolves per-id name
   timestamp: number;
   docket: DocketPayload | null;
-  hostContradiction: HostContradictionPayload | null;
   timing: {
     docketMs: number;
-    contradictionMs: number;
     totalMs: number;
   };
 }
