@@ -499,6 +499,10 @@ export class DeepgramClient extends EventEmitter {
         this.reconnecting = false;
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[deepgram] reconnect attempt ${attempt} failed: ${msg}`);
+        // Re-arm the retry chain. Without this, the loop dies after one
+        // failure and the >= MAX_RECONNECT_ATTEMPTS rollback branch never
+        // fires, leaving deepgram.isActive() true and blocking restart.
+        this.attemptReconnect();
       }
     }, delay);
   }
