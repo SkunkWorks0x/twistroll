@@ -48,9 +48,10 @@ const GENERIC_TERMS = new Set(
 
 const SPONSOR_NAMES = new Set(
   [
-    'sentry', 'render', 'deel', 'plaud', 'im8 health', 'im8', 'lemon.io',
-    'linkedin', 'northwest registered agent', 'northwest', 'squarespace',
-    'vanta', 'google cloud', 'hubspot', 'gusto', 'gamma', 'netsuite', 'agree',
+    'sentry', 'render', 'deel', 'plaud', 'plaud.ai', 'im8 health', 'im8',
+    'lemon.io', 'linkedin', 'northwest registered agent', 'northwest',
+    'squarespace', 'vanta', 'google cloud', 'hubspot', 'gusto', 'gamma',
+    'netsuite', 'agree', 'grasshopper', 'grasshopper bank',
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
 
