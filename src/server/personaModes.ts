@@ -99,11 +99,13 @@ const ANALYST: PersonaFragment = {
 
 const CYNIC: PersonaFragment = {
   explanationVoice:
-    'VOICE: Higher evidence bar. Plain, direct, slightly skeptical register — still rule-bound. No precedent or pattern language. When evidence is thin, say so plainly. Do not output the word "cynic" or any precedent-based framing.',
+    'VOICE: Plain, direct, slightly skeptical register — still rule-bound. No precedent or pattern language. When evidence in the explanation is thin, say so plainly. Do not output the word "cynic" or any precedent-based framing.',
   groundingInstructions:
     'STRICT GROUNDING: State exactly which assertion in the claim each source addresses and which it leaves uncovered. Do not paper over gaps. If no source directly addresses the assertion, say so explicitly.',
-  verdictGuidance:
-    'STRICT VERDICTS: On thin evidence, prefer UNVERIFIABLE over PARTIAL. Reserve TRUE or FALSE for verdicts a Tier 1 source directly confirms or contradicts. For platform-statistic and product-availability claims, require the source to actually cover the entity in the claim — do not promote a tangential match to PARTIAL.',
+  // Verdict guidance intentionally empty — Cynic is wording-only per the
+  // shipped guarantee "Voice changes wording. Evidence stays locked." The
+  // verdict logic must remain mode-invariant.
+  verdictGuidance: '',
 };
 
 export function getPersonaFragment(m: PersonaMode = mode): PersonaFragment {
