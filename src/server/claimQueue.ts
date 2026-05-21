@@ -55,6 +55,14 @@ const SPONSOR_NAMES = new Set(
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
 
+// Sponsor-read phrase detection — catches reads with non-blocklisted entities
+// (e.g., Twist promo-code reads). Conservative pattern: requires a strong
+// sponsor-specific signal (promo code, use/with code + word, cash bonus, or
+// explicit "brought to you by" / "sponsored by"). Does NOT match generic
+// "partner", "save", or "twist" alone — those have legitimate uses in
+// banking/startup discussion.
+const SPONSOR_PHRASE_RE = /promo code|(use|using|enter|with) (the )?code \w+|cash bonus|sponsored by|brought to you by/i;
+
 function normalizeEntity(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -292,6 +300,10 @@ export function enqueueClaim(
   if (SPONSOR_NAMES.has(normEntity)) {
     console.log(`[queue-filter] sponsor-read: "${claim.primaryEntity}"`);
     return { enqueued: false, reason: 'sponsor read' };
+  }
+  if (SPONSOR_PHRASE_RE.test(claim.claimText)) {
+    console.log(`[queue-filter] sponsor-phrase: "${claim.claimText.slice(0, 60)}"`);
+    return { enqueued: false, reason: 'sponsor phrase' };
   }
 
   const tokenCount = claim.primaryEntity.trim().split(/\s+/).length;
