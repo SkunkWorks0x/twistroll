@@ -599,6 +599,20 @@
     font-family: var(--mono);
     font-size: 9px;
   }
+  .memory-badge {
+    display: inline-block;
+    margin: 6px 0;
+    padding: 4px 8px;
+    background: var(--orange-wash);
+    border-left: 2px solid var(--orange);
+    border-radius: 0 3px 3px 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
 
   /* Host contradiction */
   .contradiction {
@@ -2224,6 +2238,15 @@
       exp.className = 'explanation';
       exp.innerHTML = formatExplanationWithRefs(docket.explanation);
       el.appendChild(exp);
+
+      const lanceHits = (docket.citations || []).filter((c) => c.url === null);
+      if (lanceHits.length > 0) {
+        const badge = document.createElement('div');
+        badge.className = 'memory-badge';
+        const epMatch = lanceHits[0].title.match(/TWiST Ep (\d+)/);
+        badge.textContent = epMatch ? `TWiST Memory · Ep ${epMatch[1]}` : 'TWiST Memory';
+        el.appendChild(badge);
+      }
 
       // 4) Citations — collapsed by default
       if (docket.citations && docket.citations.length > 0) {
