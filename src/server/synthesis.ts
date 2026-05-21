@@ -710,6 +710,19 @@ export async function runDocket(
       }
       candidate = { ...candidate, explanation: cleaned.trim() };
     }
+    // Same ref cross-check for grounding — helper is text-agnostic despite its name.
+    if (candidate.grounding) {
+      const groundingRefs = citationsRefInExplanation(candidate.grounding);
+      if (groundingRefs.length > candidate.citations.length) {
+        let cleanedG = candidate.grounding;
+        for (const n of groundingRefs) {
+          if (n > candidate.citations.length) {
+            cleanedG = cleanedG.replace(new RegExp(`\\s*\\[${n}\\]`, 'g'), '');
+          }
+        }
+        candidate = { ...candidate, grounding: cleanedG.trim() };
+      }
+    }
 
     // URL cross-check: every cited URL must be in the retrieved sources.
     // Strip hallucinated URLs. null-URL citations are LanceDB archive
