@@ -162,6 +162,13 @@
     letter-spacing: 0.04em;
     animation: empty-state-pulse 3s ease-in-out infinite;
   }
+  .empty-state-stats {
+    margin-top: 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #555861;
+    letter-spacing: 0.04em;
+  }
   @keyframes empty-state-pulse {
     0%, 100% { opacity: 0.4; }
     50%      { opacity: 1.0; }
@@ -1478,6 +1485,7 @@
     // claimId → { stage, primaryEntity, claimText, updatedAt }
     // Cleared when the matching claim_card arrives or after PENDING_TTL_MS.
     pending: new Map(),
+    latestStats: null,         // most recent pipeline_stats msg — drives empty-state numbers
     // Session metadata cached from /api/session/status — drives the
     // speaker name/role rendering on each transcript segment.
     session: {
@@ -2058,6 +2066,8 @@
       `Cards <span class="stat-num">${msg.cards}</span>` +
       `<span class="stat-sep">|</span>` +
       `Suppressed <span class="stat-num">${msg.suppressed}</span>`;
+    state.latestStats = msg;
+    if (state.cards.length === 0 && state.pending.size === 0) renderSidebar();
   }
   function hidePipelineStats() {
     pipelineStatsEl.classList.add('hidden');
@@ -2130,10 +2140,16 @@
       .sort((a, b) => b.updatedAt - a.updatedAt);
 
     if (state.cards.length === 0 && pendingEntries.length === 0) {
+      const s = state.latestStats;
+      const hasFlow = s && (s.claimsHeard > 0 || s.segments > 0);
+      const statsLine = hasFlow
+        ? `<div class="empty-state-stats">${s.claimsHeard} claims heard · ${s.suppressed} filtered · ${s.cards} cards shown</div>`
+        : '';
       sidebarEl.innerHTML =
         '<div class="empty-state empty-state-listening">' +
           '<div class="empty-state-primary">Listening for checkable claims</div>' +
           '<div class="empty-state-sub">Classifier active · Sources ready</div>' +
+          statsLine +
         '</div>';
       return;
     }
