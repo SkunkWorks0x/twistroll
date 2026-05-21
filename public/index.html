@@ -1344,7 +1344,7 @@
     demoBar.innerHTML = `
       <span class="demo-bar-label">Quick start:</span>
       <button id="demo-twist">Try with latest TWiST episode</button>
-      <button id="demo-capture" class="disabled" title="Coming soon — capture audio from any browser tab">Capture Browser Audio (coming soon)</button>
+      <button id="demo-capture" class="disabled" style="display:none" title="Coming soon — capture audio from any browser tab">Capture Browser Audio (coming soon)</button>
     `;
     document.getElementById('demo-twist').addEventListener('click', startDemo);
     document.getElementById('demo-capture').addEventListener('click', () => {
