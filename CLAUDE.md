@@ -6,9 +6,37 @@
 
 ## Product
 
-TWiST Sentinel. Real-time podcast fact-checker. Single agent: The Docket. No cynic persona, no comedy, no sound effects. Jason's spec: "A real time podcast fact checker."
+TWiST Sentinel. Real-time podcast fact-checker. Single agent: The Docket, with four evidence-locked voice modes (Producer/On-Air/Analyst/Cynic). The Cynic *mode* is a voice setting; it is NOT the Pattern-Recognizer cynic *persona* (deleted May 12, commit 0aec10a — remains deleted). No comedy, no sound effects. Jason's spec: "A real time podcast fact checker."
 
 Pipeline: Deepgram Nova-3 → claim classifier (Haiku) → gate stack (empty-entity → sponsor → speaker-label → weak-entity → entity-cooldown → queue-dedup) → parallel retrieval (LanceDB + Tavily) → The Docket (Haiku, tool_use JSON) → post-processing (Zod, citation cross-check, word limits, anti-pattern scan, LanceDB injection) → WebSocket → browser dashboard.
+
+---
+
+## Shipped
+
+**Customize panel (May 2026):** Dashboard `public/index.html` exposes a runtime panel that mutates The Docket's voice without touching evidence. Controls:
+
+- **Mode** — Producer (default) / On-Air / Analyst / Cynic. Each is a voice fragment (`groundingInstructions`, `explanationVoice`, `verdictGuidance`) interpolated into the Docket prompt.
+- **Length** — slider, four stops [20 / 28 / 40 / 80]; Standard 40 default.
+- **Strictness** — Tier 1 / Balanced (default) / Broad. Display-filter on source chips; citation pipeline unchanged.
+- **Density** — Quiet / Normal (default) / Aggro. Re-routes classifier confidence threshold (0.85 / 0.7 / 0.55).
+
+Mode-invariant: verdict logic, citation cross-check, retrieval, gate stack, post-processing.
+
+**Cynic mode vs. Cynic persona:**
+
+- **Cynic *mode*** — evidence-locked voice setting on The Docket. Higher evidence bar; leans UNVERIFIABLE on thin evidence. Produces structured verdicts with citations. Shipped, on `main`.
+- **Cynic *persona*** — the Pattern Recognizer (precedent-based counterarguments, implication language). Deleted May 12 (commit 0aec10a). Remains deleted.
+- The word "cynic" in the codebase refers to the mode. Do not halt on it.
+
+**Wiring:**
+
+- `src/server/personaModes.ts` — exports `getPersonaFragment(mode) → { groundingInstructions, explanationVoice, verdictGuidance }`. Also holds wordMax / strictness / density runtime state. **Not sacred** — edit for mode tuning, adding modes, or adjusting defaults.
+- `src/server/synthesis.ts` (sacred) — interpolates fragments into Docket system prompt.
+- `src/server/index.ts` — `/api/session/mode` GET+POST endpoint for runtime control.
+- `public/index.html` (sacred) — customize panel UI and hydrate logic.
+- Defaults: Producer mode, Standard 40 wordMax, Balanced strictness, Normal density.
+- UI copy below the controls: "Voice changes wording. Evidence stays locked."
 
 ---
 
