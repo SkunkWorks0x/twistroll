@@ -13,4 +13,5 @@ data/diagnostics/*.heapsnapshot
 *.bak.*
 *.backup*
 .env.backup-*
+sentinel-codebase-dump.txt
 data/reembed-cache.ndjson
