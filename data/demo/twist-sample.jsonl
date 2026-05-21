@@ -1,12 +1,674 @@
-{"text": "Welcome back to This Week in Startups, I'm Jason Calacanis.", "speaker": 0, "speakerLabel": "Jason", "timestamp": 0.0, "duration": 3.2}
-{"text": "We've got a great show today, and Alex Wilhelm is joining me as always.", "speaker": 0, "speakerLabel": "Jason", "timestamp": 3.4, "duration": 3.5}
-{"text": "Thanks Jason. Big news this week — Anthropic just raised four billion dollars from Google.", "speaker": 1, "speakerLabel": "Alex", "timestamp": 7.1, "duration": 4.8}
-{"text": "Four billion. That values the company at around eighteen billion if I'm remembering right.", "speaker": 0, "speakerLabel": "Jason", "timestamp": 12.2, "duration": 4.6}
-{"text": "And meanwhile, Stripe is now valued at ninety-five billion dollars in the secondary market.", "speaker": 1, "speakerLabel": "Alex", "timestamp": 17.1, "duration": 4.7}
-{"text": "Stripe is bigger than most public fintech companies at this point.", "speaker": 0, "speakerLabel": "Jason", "timestamp": 22.0, "duration": 3.5}
-{"text": "Speaking of valuations, OpenAI raised a tender at a hundred and fifty-seven billion dollar valuation last fall.", "speaker": 1, "speakerLabel": "Alex", "timestamp": 25.8, "duration": 5.4}
-{"text": "And they're reportedly going to do another round at three hundred billion this year.", "speaker": 1, "speakerLabel": "Alex", "timestamp": 31.5, "duration": 4.2}
-{"text": "That's wild. The AI boom is just unrelenting at this point.", "speaker": 0, "speakerLabel": "Jason", "timestamp": 36.0, "duration": 3.4}
-{"text": "Let's pivot to the IPO market. Klarna filed last week — they're targeting a fifteen billion dollar valuation.", "speaker": 1, "speakerLabel": "Alex", "timestamp": 39.7, "duration": 5.6}
-{"text": "Down from forty-five billion at their peak. That's a brutal markdown.", "speaker": 0, "speakerLabel": "Jason", "timestamp": 45.5, "duration": 3.9}
-{"text": "Yeah, but still a good outcome for the late-stage investors who got in below ten billion.", "speaker": 1, "speakerLabel": "Alex", "timestamp": 49.6, "duration": 4.5}
+{"text":"Another company cut and paste everything you do and steals your idea, allegedly. After","speaker":0,"speakerLabel":"Speaker 0","timestamp":0,"duration":4.73,"confidence":0.9707031}
+{"text":"stealing your idea, you go public with it. I woke up to that post","speaker":0,"speakerLabel":"Speaker 0","timestamp":4.73,"duration":3.3799996,"confidence":0.99902344}
+{"text":"and noticed a very, very blaring resemblance","speaker":1,"speakerLabel":"Speaker 1","timestamp":8.11,"duration":3.83,"confidence":0.9604492}
+{"text":"our website. Like, they photocopied your website to a level that was absurd. I was talking","speaker":1,"speakerLabel":"Speaker 1","timestamp":11.94,"duration":4.9399996,"confidence":0.99869794}
+{"text":"to General Catalyst. They were gonna invest that money into us. The first five minutes of the post, I was messaged by, like, baby","speaker":1,"speakerLabel":"Speaker 1","timestamp":16.88,"duration":6.370001,"confidence":0.9980469}
+{"text":"three of them saying, Avi, you need to take this down right now. I call another PC by name. You","speaker":1,"speakerLabel":"Speaker 1","timestamp":23.25,"duration":4.3999996,"confidence":0.97802734}
+{"text":"you really stepped on the blanket. Alright, everybody. Welcome back to Twist for May 20. May 20, 05/20. It's not 04:20. It's 05:20.","speaker":0,"speakerLabel":"Speaker 0","timestamp":27.65,"duration":9.219999,"confidence":0.9873047}
+{"text":"Summer is upon us. Graduations have occurred.","speaker":0,"speakerLabel":"Speaker 0","timestamp":36.87,"duration":3.9500008,"confidence":0.99853516}
+{"text":"And it's gonna be a wild summer.","speaker":0,"speakerLabel":"Speaker 0","timestamp":40.82,"duration":3.7999992,"confidence":0.9980469}
+{"text":"The pace at which things have been happening in AI","speaker":0,"speakerLabel":"Speaker 0","timestamp":44.62,"duration":3.0800018,"confidence":1}
+{"text":"in, global politics, it is just","speaker":0,"speakerLabel":"Speaker 0","timestamp":47.7,"duration":3.6800003,"confidence":0.9951172}
+{"text":"fast and furious, and we help you process it here.","speaker":0,"speakerLabel":"Speaker 0","timestamp":51.38,"duration":3.3199997,"confidence":1}
+{"text":"Three days a week, Monday, Wednesday, Friday on Twist.","speaker":0,"speakerLabel":"Speaker 0","timestamp":54.7,"duration":3.2299995,"confidence":0.9970703}
+{"text":"Today, we're very lucky because one of the great","speaker":0,"speakerLabel":"Speaker 0","timestamp":57.93,"duration":3.5600014,"confidence":1}
+{"text":"startup stories of the past twenty years, or maybe it's","speaker":0,"speakerLabel":"Speaker 0","timestamp":61.49,"duration":3.289997,"confidence":0.9980469}
+{"text":"fifteen, Mercury Bank is gonna be on, talking about their latest fundraising,","speaker":0,"speakerLabel":"Speaker 0","timestamp":64.78,"duration":4.7300034,"confidence":0.9951172}
+{"text":"and then we're gonna tell the story of what happens","speaker":0,"speakerLabel":"Speaker 0","timestamp":69.51,"duration":3.0199966,"confidence":0.99902344}
+{"text":"when you create a startup and allegedly","speaker":0,"speakerLabel":"Speaker 0","timestamp":72.53,"duration":4.040001,"confidence":0.99902344}
+{"text":"another company from Y Combinator cut and paste everything you do and steals your idea, allegedly.","speaker":0,"speakerLabel":"Speaker 0","timestamp":76.57,"duration":6.970001,"confidence":0.97509766}
+{"text":"And","speaker":0,"speakerLabel":"Speaker 0","timestamp":83.54,"duration":1.6900024,"confidence":0.9970703}
+{"text":"after stealing your idea, you go public with it. And that","speaker":0,"speakerLabel":"Speaker 0","timestamp":85.23,"duration":3.2899933,"confidence":0.99853516}
+{"text":"strategy. This is our two guests today. Yeah, Alex?","speaker":0,"speakerLabel":"Speaker 0","timestamp":88.52,"duration":2.8700027,"confidence":0.99365234}
+{"text":"Absolutely. It's gonna be an absolute corker of a show. But, Jason, before we get into","speaker":2,"speakerLabel":"Speaker 2","timestamp":91.39,"duration":4.0699997,"confidence":0.9970703}
+{"text":"talking about Mercury and their latest round, I think we should pause and discuss our favorite","speaker":2,"speakerLabel":"Speaker 2","timestamp":95.46,"duration":4.340004,"confidence":0.99902344}
+{"text":"wearable gadget. Oh, well, I have applaud here on my wrist.","speaker":2,"speakerLabel":"Speaker 2","timestamp":99.8,"duration":3.4699936,"confidence":0.9980469}
+{"text":"Sometimes I wear it, on the lapel of my jacket. You've got it on your wrist too.","speaker":0,"speakerLabel":"Speaker 0","timestamp":103.27,"duration":4.0699997,"confidence":0.9980469}
+{"text":"You press the button. You hit the haptic. Red light goes on.","speaker":0,"speakerLabel":"Speaker 0","timestamp":107.34,"duration":3.5600052,"confidence":1}
+{"text":"Now I'm recording. Anything I do, I can be like, oh,","speaker":0,"speakerLabel":"Speaker 0","timestamp":110.9,"duration":3.0199966,"confidence":0.9946289}
+{"text":"we're hiring six associates in training to start out our venture firm.","speaker":0,"speakerLabel":"Speaker 0","timestamp":113.92,"duration":4.970001,"confidence":1}
+{"text":"This is a true story. And I know I have to catch up with","speaker":0,"speakerLabel":"Speaker 0","timestamp":118.89,"duration":4.6500015,"confidence":1}
+{"text":"Jackie, who's doing the hiring process, and we have to talk about","speaker":0,"speakerLabel":"Speaker 0","timestamp":123.54,"duration":3.5,"confidence":1}
+{"text":"how we're going to assign all that. So I can just say, hey.","speaker":0,"speakerLabel":"Speaker 0","timestamp":127.04,"duration":3.5600052,"confidence":0.99902344}
+{"text":"Make sure we put on my calendar that I gotta meet with Jackie. Go over the six new hires for the associate in training program, and how we're gonna","speaker":0,"speakerLabel":"Speaker 0","timestamp":130.6,"duration":9.0099945,"confidence":0.9980469}
+{"text":"them across our, you know, eight different business units.","speaker":0,"speakerLabel":"Speaker 0","timestamp":139.61,"duration":4.1900024,"confidence":1}
+{"text":"And let's put that on my calendar, and let's make","speaker":0,"speakerLabel":"Speaker 0","timestamp":143.8,"duration":3.619995,"confidence":1}
+{"text":"training manuals for it. Now, you know, I gave it some basic instructions, all those notes.","speaker":0,"speakerLabel":"Speaker 0","timestamp":147.42,"duration":4.1600037,"confidence":0.9980469}
+{"text":"When I sync, which I can do either through my phone or by just putting it into this little charge pad,","speaker":0,"speakerLabel":"Speaker 0","timestamp":151.58,"duration":4.7599945,"confidence":0.9980469}
+{"text":"It's synced, and it makes multiple versions of that conversation. A mind map","speaker":0,"speakerLabel":"Speaker 0","timestamp":156.34,"duration":4.699997,"confidence":0.9980469}
+{"text":"if it was a long one, like a rambling podcast episode, it'll make you notes.","speaker":0,"speakerLabel":"Speaker 0","timestamp":161.04,"duration":4.550003,"confidence":0.9980469}
+{"text":"It'll make you bullet points, action items, and, of course,","speaker":0,"speakerLabel":"Speaker 0","timestamp":165.59,"duration":4.9400024,"confidence":0.9995117}
+{"text":"just a perfect transcript. So you get all that out of the box. Super easy.","speaker":0,"speakerLabel":"Speaker 0","timestamp":170.53,"duration":4.6399994,"confidence":0.9926758}
+{"text":"One click. Yes. So you need a Plaid note pen","speaker":0,"speakerLabel":"Speaker 0","timestamp":175.17,"duration":3.4400024,"confidence":0.9995117}
+{"text":"s if you wanna get one, plaud.ai/twist Use the code twist. Save 10%. And while you were talking, Jason, I had an","speaker":2,"speakerLabel":"Speaker 2","timestamp":178.61,"duration":7.2100067,"confidence":0.9980469}
+{"text":"an idea. I was thinking to myself, I'm going deeper on Codex.","speaker":2,"speakerLabel":"Speaker 2","timestamp":185.82,"duration":3.2899933,"confidence":1}
+{"text":"From OpenAI. Picked that as my current tool to play with and just really figure out","speaker":2,"speakerLabel":"Speaker 2","timestamp":189.11,"duration":3.7100067,"confidence":0.99902344}
+{"text":"to the studs. And I was just thinking, why can't I bring my plot","speaker":2,"speakerLabel":"Speaker 2","timestamp":192.82,"duration":3.4099884,"confidence":1}
+{"text":"into Codex? I don't wanna actually do the importing myself work myself.","speaker":2,"speakerLabel":"Speaker 2","timestamp":196.23,"duration":3.680008,"confidence":0.9970703}
+{"text":"And it turns out they have an MCP server, so you can just do that. So Interesting.","speaker":2,"speakerLabel":"Speaker 2","timestamp":199.91,"duration":3.7099915,"confidence":0.9995117}
+{"text":"Yeah. I've been thinking about that","speaker":3,"speakerLabel":"Speaker 3","timestamp":203.62,"duration":3.0800018,"confidence":1}
+{"text":"At some point, I'm gonna connect, like, either OpenCloud or what's the","speaker":0,"speakerLabel":"Speaker 0","timestamp":206.7,"duration":4.6100006,"confidence":0.9926758}
+{"text":"French one that everybody's talking about now? Le le chat?","speaker":0,"speakerLabel":"Speaker 0","timestamp":211.31,"duration":3.4100037,"confidence":0.9790039}
+{"text":"No. Oh, Hermes agent. Hermes agent.","speaker":2,"speakerLabel":"Speaker 2","timestamp":214.72,"duration":3.1399994,"confidence":0.9880371}
+{"text":"So my next goal","speaker":0,"speakerLabel":"Speaker 0","timestamp":217.86,"duration":3.0200043,"confidence":0.99902344}
+{"text":"is to connect those two. So then I would theoretically","speaker":0,"speakerLabel":"Speaker 0","timestamp":220.88,"duration":4.7599945,"confidence":1}
+{"text":"be putting all this into my Hermes agent or maybe an Obsidian locker. Something like that. But, yes, Lay's chat is, an even better","speaker":0,"speakerLabel":"Speaker 0","timestamp":225.64,"duration":8.5,"confidence":0.9875488}
+{"text":"than Hermes. Well, LeChat is the is the offer","speaker":0,"speakerLabel":"Speaker 0","timestamp":234.14,"duration":4.5200043,"confidence":0.984375}
+{"text":"the chat GPT from the straw, and I was just thinking French AI talk to it. Le Chat.","speaker":2,"speakerLabel":"Speaker 2","timestamp":238.66,"duration":4.970001,"confidence":0.9760742}
+{"text":"Okay. Go, Mistral.","speaker":0,"speakerLabel":"Speaker 0","timestamp":243.63,"duration":1.7200012,"confidence":0.81062824}
+{"text":"Alright. So we're gonna bring, Ahmad Akhund. He's the, CEO and founder of Mercury Bank.","speaker":3,"speakerLabel":"Speaker 3","timestamp":245.35,"duration":4.970001,"confidence":0.9970703}
+{"text":"Jason, we all know Mercury. It is the, I think, the leading name in where","speaker":2,"speakerLabel":"Speaker 2","timestamp":250.32,"duration":4.369995,"confidence":0.9995117}
+{"text":"startups do their banking. It has a technology first focus. It's becoming","speaker":2,"speakerLabel":"Speaker 2","timestamp":254.69,"duration":3.619995,"confidence":0.99902344}
+{"text":"a real bank. And this morning, Ahmad, you announced that you raised","speaker":2,"speakerLabel":"Speaker 2","timestamp":258.31,"duration":3.4400024,"confidence":0.99902344}
+{"text":"$200,000,000 at a $5,200,000,000 valuation","speaker":2,"speakerLabel":"Speaker 2","timestamp":261.75,"duration":3.980011,"confidence":0.9980469}
+{"text":"We love to talk to people right after the news. Welcome to the show. For having","speaker":2,"speakerLabel":"Speaker 2","timestamp":265.73,"duration":3.019989,"confidence":0.99902344}
+{"text":"Excited to be here. How long have you been running Mercury?","speaker":1,"speakerLabel":"Speaker 1","timestamp":268.75,"duration":3.019989,"confidence":1}
+{"text":"And how many customers are there now? Because","speaker":0,"speakerLabel":"Speaker 0","timestamp":271.77,"duration":3.350006,"confidence":1}
+{"text":"you know, I I became aware of you guys since you targeted startups as your initial","speaker":0,"speakerLabel":"Speaker 0","timestamp":275.12,"duration":4.970001,"confidence":0.9980469}
+{"text":"sort of ideal customer profile there and that initial customer profile.","speaker":0,"speakerLabel":"Speaker 0","timestamp":280.09,"duration":4.0400085,"confidence":0.99902344}
+{"text":"But it's I know it's spread to other categories, larger and","speaker":0,"speakerLabel":"Speaker 0","timestamp":284.13,"duration":4.0400085,"confidence":0.9980469}
+{"text":"enterprises, etcetera. But when did you start this, and and how many customers now?","speaker":0,"speakerLabel":"Speaker 0","timestamp":288.17,"duration":3.9499817,"confidence":0.99902344}
+{"text":"So we started as in we launched in April 2019. I","speaker":4,"speakerLabel":"Speaker 4","timestamp":292.12,"duration":3.6799927,"confidence":0.9611206}
+{"text":"started the company end of two thousand seventeen.","speaker":4,"speakerLabel":"Speaker 4","timestamp":295.8,"duration":3.0200195,"confidence":1}
+{"text":"But I actually had the idea in 2013 because I've been an entrepreneur since 2006.","speaker":4,"speakerLabel":"Speaker 4","timestamp":298.82,"duration":4.7299805,"confidence":0.9895833}
+{"text":"And I just couldn't believe how annoying banks were for entrepreneurs.","speaker":4,"speakerLabel":"Speaker 4","timestamp":303.55,"duration":4.4000244,"confidence":0.99902344}
+{"text":"And every year, I was like, oh, someone's gonna build this idea. And then","speaker":4,"speakerLabel":"Speaker 4","timestamp":307.95,"duration":3.019989,"confidence":0.99609375}
+{"text":"you know, no one had. So in 2017, we kinda we did it.","speaker":4,"speakerLabel":"Speaker 4","timestamp":310.97,"duration":3.7399902,"confidence":0.99902344}
+{"text":"Yeah. Early on, we were very startup focused. Now as","speaker":4,"speakerLabel":"Speaker 4","timestamp":314.71,"duration":3.3200073,"confidence":0.99902344}
+{"text":"tech still makes up about 25% of our customers, but we","speaker":4,"speakerLabel":"Speaker 4","timestamp":318.03,"duration":3.0799866,"confidence":0.99902344}
+{"text":"we have a lot of other kinda digital first businesses, so ecommerce,","speaker":4,"speakerLabel":"Speaker 4","timestamp":321.11,"duration":3.5300293,"confidence":0.9951172}
+{"text":"professional services, things like that. About three hundred three hundred thousand businesses altogether. That's","speaker":4,"speakerLabel":"Speaker 4","timestamp":324.64,"duration":4.25,"confidence":0.9975586}
+{"text":"a large number of businesses. Revenue now, I understand.","speaker":0,"speakerLabel":"Speaker 0","timestamp":328.89,"duration":4.519989,"confidence":0.99902344}
+{"text":"650,000,000 a year annualized run rate, something in that range.","speaker":0,"speakerLabel":"Speaker 0","timestamp":333.41,"duration":3.619995,"confidence":0.99902344}
+{"text":"Yeah. It's a bit high now. That's what we reported, Kenna, towards the end of last year.","speaker":4,"speakerLabel":"Speaker 4","timestamp":337.03,"duration":3.8600159,"confidence":0.9995117}
+{"text":"And where does that money come from? How do you make money? We have, like, five or six different revenue sources.","speaker":0,"speakerLabel":"Speaker 0","timestamp":340.89,"duration":4.789978,"confidence":1}
+{"text":"You know, we give both corporate credit cards and","speaker":4,"speakerLabel":"Speaker 4","timestamp":345.68,"duration":3.0200195,"confidence":0.9980469}
+{"text":"debit cards to our customers, so we make some interchange on that. When we host people's","speaker":4,"speakerLabel":"Speaker 4","timestamp":348.7,"duration":4.4299927,"confidence":1}
+{"text":"revenue. Currently, we're not a bank. We just","speaker":4,"speakerLabel":"Speaker 4","timestamp":353.13,"duration":3.019989,"confidence":0.9970703}
+{"text":"applied for a banking charter that we got conditional approval for, but","speaker":4,"speakerLabel":"Speaker 4","timestamp":356.15,"duration":3.0200195,"confidence":0.99121094}
+{"text":"right now, we work with partner banks, and, you know, we get kind of ref","speaker":4,"speakerLabel":"Speaker 4","timestamp":359.17,"duration":3.3199768,"confidence":0.9707031}
+{"text":"share on the deposits they host for us.","speaker":4,"speakerLabel":"Speaker 4","timestamp":362.49,"duration":3.0200195,"confidence":0.9980469}
+{"text":"Then we also have FX and a few few other kind","speaker":4,"speakerLabel":"Speaker 4","timestamp":365.51,"duration":3.019989,"confidence":0.9819336}
+{"text":"fees. We try to make it, like, very simple and transparent, so most most of the things you do on Mercury are free.","speaker":4,"speakerLabel":"Speaker 4","timestamp":368.53,"duration":4.700012,"confidence":0.9980469}
+{"text":"I'm curious why you didn't update the revenue number, Ahmaud, because I was going back","speaker":2,"speakerLabel":"Speaker 2","timestamp":373.23,"duration":3.769989,"confidence":1}
+{"text":"through your last announcements, and you announced the $650,000,000 run rate","speaker":2,"speakerLabel":"Speaker 2","timestamp":377,"duration":3.9200134,"confidence":0.9951172}
+{"text":"milestone, I think in, like, November or maybe it was late q three of two thousand twenty five.","speaker":2,"speakerLabel":"Speaker 2","timestamp":380.92,"duration":4.789978,"confidence":0.99316406}
+{"text":"It's May. It's nearly June. We just raised a big round. Well,","speaker":2,"speakerLabel":"Speaker 2","timestamp":385.71,"duration":3.9500122,"confidence":0.9941406}
+{"text":"I feel like this is the moment to flex. So so allay my concerns that you","speaker":4,"speakerLabel":"Speaker 4","timestamp":389.66,"duration":3.8899841,"confidence":0.9970703}
+{"text":"flatlined and the business hasn't grown in in seven months. The VCs wouldn't have given me the money if I if I flat","speaker":2,"speakerLabel":"Speaker 2","timestamp":393.55,"duration":4.76001,"confidence":0.9970703}
+{"text":"lined, Alex. Right? That's what I was thinking. Yeah.","speaker":4,"speakerLabel":"Speaker 4","timestamp":398.31,"duration":3.380005,"confidence":0.9946289}
+{"text":"Comm strategy, it's kinda boring, but I think they wanna have, like,","speaker":4,"speakerLabel":"Speaker 4","timestamp":401.69,"duration":3.380005,"confidence":0.9904785}
+{"text":"like, another news moment later in the year when we Got it. Oh,","speaker":4,"speakerLabel":"Speaker 4","timestamp":405.07,"duration":3.289978,"confidence":0.99902344}
+{"text":"okay. Okay. Very good. You get, like, another media hit when you hit","speaker":3,"speakerLabel":"Speaker 3","timestamp":408.36,"duration":3.9500122,"confidence":0.9848633}
+{"text":"800, 900, and eventually a billion.","speaker":0,"speakerLabel":"Speaker 0","timestamp":412.31,"duration":3.2600098,"confidence":0.88183594}
+{"text":"And I guess that puts you in an interesting position.","speaker":0,"speakerLabel":"Speaker 0","timestamp":415.57,"duration":3.8299866,"confidence":1}
+{"text":"You're still,","speaker":0,"speakerLabel":"Speaker 0","timestamp":419.4,"duration":3.380005,"confidence":0.80810547}
+{"text":"right below what people say is the benchmark to go public, which is","speaker":0,"speakerLabel":"Speaker 0","timestamp":422.78,"duration":3.8600159,"confidence":1}
+{"text":"$1,000,000,000. But you're you're kinda","speaker":0,"speakerLabel":"Speaker 0","timestamp":426.64,"duration":3.4099731,"confidence":0.9980469}
+{"text":"consistently getting closer to that. So how do you think about","speaker":0,"speakerLabel":"Speaker 0","timestamp":430.05,"duration":3.5299988,"confidence":1}
+{"text":"how you want to run this business? What do your investors wanna do? What do you wanna do?","speaker":0,"speakerLabel":"Speaker 0","timestamp":433.58,"duration":4.700012,"confidence":0.99902344}
+{"text":"Is it time to start considering going public? Obviously, you","speaker":0,"speakerLabel":"Speaker 0","timestamp":438.28,"duration":3.649994,"confidence":1}
+{"text":"probably were offered during the SPAC crazes to flip the company into a SPAC.","speaker":0,"speakerLabel":"Speaker 0","timestamp":441.93,"duration":4.220001,"confidence":0.9980469}
+{"text":"And and, you know, get public really easily. But talk about how you think about Yeah. The public market.","speaker":0,"speakerLabel":"Speaker 0","timestamp":446.15,"duration":4.4599915,"confidence":1}
+{"text":"Markets now. You know, I think of ourselves like still a pretty young company.","speaker":0,"speakerLabel":"Speaker 0","timestamp":450.61,"duration":3.8900146,"confidence":0.9980469}
+{"text":"Right? 2019 launch, and so that's, like, seven years old.","speaker":4,"speakerLabel":"Speaker 4","timestamp":454.5,"duration":4.970001,"confidence":0.9951172}
+{"text":"I have no rush. I I really wanna build this for the long term, like,","speaker":4,"speakerLabel":"Speaker 4","timestamp":459.47,"duration":3.2000122,"confidence":0.99902344}
+{"text":"yeah, we never wanna sell the company. I think that's yeah. I think the potential for what Mercury is doing","speaker":4,"speakerLabel":"Speaker 4","timestamp":462.67,"duration":4.970001,"confidence":0.99902344}
+{"text":"is is unlimited. So at some point, we wanna be public, and I think it'll be nice for our","speaker":4,"speakerLabel":"Speaker 4","timestamp":467.64,"duration":4.549988,"confidence":0.99902344}
+{"text":"customers especially to own a part of Mercury. We actually did actually a","speaker":4,"speakerLabel":"Speaker 4","timestamp":472.19,"duration":3.919983,"confidence":0.9951172}
+{"text":"fund a kinda crowdfunding campaign in 2021. So it's","speaker":4,"speakerLabel":"Speaker 4","timestamp":476.11,"duration":4.1900024,"confidence":0.85976565}
+{"text":"we had about 3,000 customers actually own a piece of Mercury, which is nice that they get","speaker":4,"speakerLabel":"Speaker 4","timestamp":480.3,"duration":4.0400085,"confidence":0.9970703}
+{"text":"Really? Yeah. And they get a nice And these are","speaker":1,"speakerLabel":"Speaker 1","timestamp":484.34,"duration":3.2900085,"confidence":0.99902344}
+{"text":"non these could be nonaccredited. Yeah. That was, like, full fundraising. Reg CF fundraiser. That was completely Mhmm. Nonaccredited.","speaker":0,"speakerLabel":"Speaker 0","timestamp":487.63,"duration":8.470001,"confidence":0.95874023}
+{"text":"So I like customers owning Mercury. So at some point, we'll do it. Right now, we're very focused on kinda getting this","speaker":4,"speakerLabel":"Speaker 4","timestamp":496.1,"duration":4.8200073,"confidence":0.9980469}
+{"text":"bank charter live and kinda get through that. I also think, like,","speaker":4,"speakerLabel":"Speaker 4","timestamp":500.92,"duration":3.5899963,"confidence":0.9863281}
+{"text":"probably wanna be in, like, a $10,000,000,000 kinda market gap before you go public, so that's my kinda Sure.","speaker":4,"speakerLabel":"Speaker 4","timestamp":504.51,"duration":4.789978,"confidence":0.9980469}
+{"text":"You know, get the bank charter live, get to that kind of scale. But","speaker":4,"speakerLabel":"Speaker 4","timestamp":509.3,"duration":3.5,"confidence":0.99609375}
+{"text":"definitely in the horizon. Talk to me about the the process of getting a big","speaker":4,"speakerLabel":"Speaker 4","timestamp":512.8,"duration":3.3200073,"confidence":0.99902344}
+{"text":"charter. I know you've applied for one, and you've gotten, like, conditional approval. Now I don't","speaker":2,"speakerLabel":"Speaker 2","timestamp":516.12,"duration":3.919983,"confidence":1}
+{"text":"spend a lot of time reading the deep details of banking","speaker":2,"speakerLabel":"Speaker 2","timestamp":520.04,"duration":3.2600098,"confidence":1}
+{"text":"application regulations, Amad. I know you do. Yeah. So, where are you in this process? When does it","speaker":2,"speakerLabel":"Speaker 2","timestamp":523.3,"duration":4.9700317,"confidence":0.9995117}
+{"text":"complete? When are you, safe in your status as a bank?","speaker":2,"speakerLabel":"Speaker 2","timestamp":528.27,"duration":3.919983,"confidence":0.99902344}
+{"text":"Yeah. It's a multiyear process, especially when you're a pretty fail","speaker":4,"speakerLabel":"Speaker 4","timestamp":532.19,"duration":3.6500244,"confidence":0.99194336}
+{"text":"scaled up fintech. You know, we have to update all of our","speaker":4,"speakerLabel":"Speaker 4","timestamp":535.84,"duration":3.2299805,"confidence":0.99902344}
+{"text":"processes and procedures and controls and all these things to be at the level where we","speaker":4,"speakerLabel":"Speaker 4","timestamp":539.07,"duration":4.0700073,"confidence":0.99902344}
+{"text":"can have the bank charter, and we're also hiring bunch of people both last year and this year to","speaker":4,"speakerLabel":"Speaker 4","timestamp":543.14,"duration":4.9699707,"confidence":0.99902344}
+{"text":"be in a position to launch. So, yeah, it's","speaker":4,"speakerLabel":"Speaker 4","timestamp":548.11,"duration":3.2600098,"confidence":0.9975586}
+{"text":"like conditional approval and then you kinda go through the","speaker":4,"speakerLabel":"Speaker 4","timestamp":551.37,"duration":3.0200195,"confidence":0.9980469}
+{"text":"setup process, and you eventually open the bank doors. Okay. So you've identified a real problem.","speaker":4,"speakerLabel":"Speaker 4","timestamp":554.39,"duration":4.8499756,"confidence":0.9980469}
+{"text":"And you put together a solid solution and a business model that you believe in","speaker":0,"speakerLabel":"Speaker 0","timestamp":559.24,"duration":4.130005,"confidence":1}
+{"text":"So you're all set to launch your new company. Right? Not so fast.","speaker":0,"speakerLabel":"Speaker 0","timestamp":563.37,"duration":3.7399902,"confidence":0.99902344}
+{"text":"If you want investors and potential customers to take your new business","speaker":0,"speakerLabel":"Speaker 0","timestamp":567.11,"duration":4.369995,"confidence":1}
+{"text":"you need to consider forming a Delaware c corp, and that's","speaker":0,"speakerLabel":"Speaker 0","timestamp":571.48,"duration":3.290039,"confidence":0.99902344}
+{"text":"where Northwest registered agent comes in. They're gonna give your new company a real identity.","speaker":0,"speakerLabel":"Speaker 0","timestamp":574.77,"duration":4.339966,"confidence":0.9980469}
+{"text":"That means an address for your public filings, a domain, a custom website,","speaker":0,"speakerLabel":"Speaker 0","timestamp":579.11,"duration":3.920044,"confidence":1}
+{"text":"a business email, and, of course, a phone number. And that's gonna take just ten minutes and 10 clicks.","speaker":0,"speakerLabel":"Speaker 0","timestamp":583.03,"duration":4.9699707,"confidence":0.9995117}
+{"text":"They don't charge hidden fees. Customer service is available around the clock.","speaker":0,"speakerLabel":"Speaker 0","timestamp":588,"duration":3.619995,"confidence":0.9980469}
+{"text":"They're not overwhelming your inbox with spam, and they make it easy","speaker":0,"speakerLabel":"Speaker 0","timestamp":591.62,"duration":3.9799805,"confidence":1}
+{"text":"to cancel at any time. So get all the advantages","speaker":0,"speakerLabel":"Speaker 0","timestamp":595.6,"duration":3.8600464,"confidence":0.9980469}
+{"text":"of a Delaware c corp independent regardless of where in The US you're operating from. Visit","speaker":0,"speakerLabel":"Speaker 0","timestamp":599.46,"duration":4.9699707,"confidence":0.99902344}
+{"text":"northwestregisteredagent.com/twist for more details, and the links are in the show notes. So what","speaker":0,"speakerLabel":"Speaker 0","timestamp":604.43,"duration":6.549988,"confidence":1}
+{"text":"this bring to Mercury? Because we've seen a lot of neobanks build and grow without","speaker":2,"speakerLabel":"Speaker 2","timestamp":610.98,"duration":4.2200317,"confidence":1}
+{"text":"having a bank inside their own house. Right? They've used third party banks and so forth. And the model,","speaker":2,"speakerLabel":"Speaker 2","timestamp":615.2,"duration":4.8499756,"confidence":0.99902344}
+{"text":"worked pretty well, Amad. It seemed to abstract a lot of the complexity and regulatory overhead.","speaker":2,"speakerLabel":"Speaker 2","timestamp":620.05,"duration":4.4299927,"confidence":0.99609375}
+{"text":"You're going for it. So I I presume there's a lot of benefits to doing","speaker":2,"speakerLabel":"Speaker 2","timestamp":624.48,"duration":3.830017,"confidence":0.9995117}
+{"text":"this. What are those, and what would that do to the the quality of your business?","speaker":2,"speakerLabel":"Speaker 2","timestamp":628.31,"duration":3.5900269,"confidence":0.99902344}
+{"text":"You know, when we launched, we were only nine people, and, frankly, it was just completely impossible","speaker":4,"speakerLabel":"Speaker 4","timestamp":631.9,"duration":3.709961,"confidence":1}
+{"text":"to launch with nine people without having bank partners that supported us and really","speaker":4,"speakerLabel":"Speaker 4","timestamp":635.61,"duration":4.7300415,"confidence":1}
+{"text":"were the, you know, were the reason we were able to go live.","speaker":4,"speakerLabel":"Speaker 4","timestamp":640.34,"duration":3.3199463,"confidence":0.9980469}
+{"text":"At the scale we are, we are much bigger than our partner banks at this point.","speaker":4,"speakerLabel":"Speaker 4","timestamp":643.66,"duration":4.2800293,"confidence":0.9980469}
+{"text":"And at some point, you're not like","speaker":4,"speakerLabel":"Speaker 4","timestamp":647.94,"duration":3.8900146,"confidence":0.9951172}
+{"text":"you're basically regulated entity. You're just regulated by a proxy.","speaker":4,"speakerLabel":"Speaker 4","timestamp":651.83,"duration":3.5299683,"confidence":0.8925781}
+{"text":"Yeah. You know, for us, it's much more important to have that direct relationship, and I think we will actually","speaker":4,"speakerLabel":"Speaker 4","timestamp":655.36,"duration":4.9700317,"confidence":1}
+{"text":"end up being easier. Not easy, but, like,","speaker":4,"speakerLabel":"Speaker 4","timestamp":660.33,"duration":3.7699585,"confidence":0.9736328}
+{"text":"think we'll be able to deliver a better customer experience, which, yeah, at the end of the day is what we care about.","speaker":4,"speakerLabel":"Speaker 4","timestamp":664.1,"duration":4.580017,"confidence":0.9951172}
+{"text":"Yeah, they'll be You have more control. Right? If you if you are a bank,","speaker":4,"speakerLabel":"Speaker 4","timestamp":668.68,"duration":3.4100342,"confidence":0.95703125}
+{"text":"you don't have to ask the bank you're partnered with, hey. Can we do this and that?","speaker":0,"speakerLabel":"Speaker 0","timestamp":672.09,"duration":4.2799683,"confidence":1}
+{"text":"And get their buy in? You can just go straight and do it. Yeah. We'll be focused on our priorities, and we can","speaker":0,"speakerLabel":"Speaker 0","timestamp":676.37,"duration":4.4299927,"confidence":0.99609375}
+{"text":"execute against them. Yeah. It's so funny. This was like do you watch the TV show industry?","speaker":4,"speakerLabel":"Speaker 4","timestamp":680.8,"duration":4.8500366,"confidence":0.9980469}
+{"text":"I No. I haven't. Oh, it's an incredible show on HBO. It's","speaker":4,"speakerLabel":"Speaker 4","timestamp":685.65,"duration":3.2599487,"confidence":0.9951172}
+{"text":"it's, like, really about, like, banking and Oh, really? Actually, what? This year, in this you","speaker":0,"speakerLabel":"Speaker 0","timestamp":688.91,"duration":4.4900513,"confidence":0.95214844}
+{"text":"season three, and and it takes place in The UK. And this year,","speaker":0,"speakerLabel":"Speaker 0","timestamp":693.4,"duration":4.3999634,"confidence":0.9970703}
+{"text":"the entire storyline was about a","speaker":0,"speakerLabel":"Speaker 0","timestamp":697.8,"duration":4.9400024,"confidence":0.99902344}
+{"text":"bank charter and somebody trying to get one for, like, a green energy company and trying and it, like, all","speaker":0,"speakerLabel":"Speaker 0","timestamp":702.74,"duration":7.660034,"confidence":0.99902344}
+{"text":"resulted in or maybe it was season four.","speaker":0,"speakerLabel":"Speaker 0","timestamp":710.4,"duration":3.1999512,"confidence":0.9863281}
+{"text":"It all resulted in the the hand wringing of just how important it is there there's","speaker":0,"speakerLabel":"Speaker 0","timestamp":713.6,"duration":4.9700317,"confidence":0.99902344}
+{"text":"It's like the trailer. It the government, whether it's The UK or United States,","speaker":0,"speakerLabel":"Speaker 0","timestamp":718.57,"duration":4.369995,"confidence":0.9926758}
+{"text":"they're very judicious about bank charters because","speaker":0,"speakerLabel":"Speaker 0","timestamp":722.94,"duration":4.9699707,"confidence":0.9980469}
+{"text":"banks are moving money. Money, can be used for nefarious","speaker":0,"speakerLabel":"Speaker 0","timestamp":727.91,"duration":4.9400024,"confidence":0.99902344}
+{"text":"things around the world, human trafficking,","speaker":0,"speakerLabel":"Speaker 0","timestamp":732.85,"duration":3.0200195,"confidence":1}
+{"text":"terrorism. This is all the bad things that can happen.","speaker":0,"speakerLabel":"Speaker 0","timestamp":735.87,"duration":3.1400146,"confidence":0.9970703}
+{"text":"And then we have seen that","speaker":0,"speakerLabel":"Speaker 0","timestamp":739.01,"duration":3.0999756,"confidence":0.99902344}
+{"text":"allegedly, people claim things like Tether have become and and stablecoins outside The US have become the place where","speaker":0,"speakerLabel":"Speaker 0","timestamp":742.11,"duration":8.920044,"confidence":0.99316406}
+{"text":"people do that activity, and we want","speaker":0,"speakerLabel":"Speaker 0","timestamp":751.03,"duration":3.4399414,"confidence":0.99902344}
+{"text":"those things to maybe come onshore, so and and be more regulated, know your customer.","speaker":0,"speakerLabel":"Speaker 0","timestamp":754.47,"duration":4.9700317,"confidence":0.9873047}
+{"text":"So you're trying to do all these things right. How do you think about","speaker":0,"speakerLabel":"Speaker 0","timestamp":759.44,"duration":3.9699707,"confidence":1}
+{"text":"stablecoins? And will they become the default rails","speaker":0,"speakerLabel":"Speaker 0","timestamp":763.41,"duration":4.4900513,"confidence":1}
+{"text":"for us doing payments between companies? And then what does that do for the banking","speaker":0,"speakerLabel":"Speaker 0","timestamp":767.9,"duration":3.9499512,"confidence":1}
+{"text":"Do you have to provide that? You don't make any money on that, or do you make money on it?","speaker":0,"speakerLabel":"Speaker 0","timestamp":771.85,"duration":4.4300537,"confidence":1}
+{"text":"Welcome to this ten minutes. 1% is 50,000,000?","speaker":0,"speakerLabel":"Speaker 0","timestamp":0,"duration":4.04,"confidence":0.91748047}
+{"text":"I can get my 10 bps now. I should've got it earlier, but I get my 10 bps now. It just","speaker":0,"speakerLabel":"Speaker 0","timestamp":4.04,"duration":4.2799997,"confidence":0.9790039}
+{"text":"cost me a 100 more. Listen. Great job. Continued success.","speaker":0,"speakerLabel":"Speaker 0","timestamp":8.32,"duration":3.83,"confidence":0.99121094}
+{"text":"Appreciate you supporting this podcast at Independent Media and and","speaker":0,"speakerLabel":"Speaker 0","timestamp":12.15,"duration":4.040001,"confidence":0.93359375}
+{"text":"Banks. You're my bank. I love using you guys. Before you go, though,","speaker":0,"speakerLabel":"Speaker 0","timestamp":16.19,"duration":3.9799995,"confidence":0.99902344}
+{"text":"how do you think about AI as the CEO running the business?","speaker":0,"speakerLabel":"Speaker 0","timestamp":20.17,"duration":4.129999,"confidence":0.99902344}
+{"text":"And then how do you think about AI vis a vis agents?","speaker":0,"speakerLabel":"Speaker 0","timestamp":24.3,"duration":3.5600014,"confidence":0.99902344}
+{"text":"Wanting to do transactions now? There are some new protocols. I know Coinbase has","speaker":0,"speakerLabel":"Speaker 0","timestamp":27.86,"duration":4.369999,"confidence":0.99902344}
+{"text":"pioneered some of them. I think you might have been part of this new standard that's coming out.","speaker":0,"speakerLabel":"Speaker 0","timestamp":32.23,"duration":3.7999992,"confidence":1}
+{"text":"But people are gonna wanna use agents. Scary.","speaker":0,"speakerLabel":"Speaker 0","timestamp":36.03,"duration":3.5900002,"confidence":0.9946289}
+{"text":"Or just obvious? Like, how do you think about agents touching money? You know, I'm a big, like, sci fi guy. I love reading and","speaker":0,"speakerLabel":"Speaker 0","timestamp":39.62,"duration":7.66,"confidence":0.99853516}
+{"text":"watching sci fi. So I always think, what's the future? Right? And I just feel like in ten years from now, like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":47.28,"duration":4.4300003,"confidence":0.9970703}
+{"text":"everyone's gonna have, like, a personal agent, and it's just doing stuff for them. So, like, I wanna","speaker":1,"speakerLabel":"Speaker 1","timestamp":51.71,"duration":4.34,"confidence":0.99902344}
+{"text":"I want Mercury to be an enabler for that. So, you know, we launched a CLI, and we already have an MC","speaker":1,"speakerLabel":"Speaker 1","timestamp":56.05,"duration":4.3100014,"confidence":0.99609375}
+{"text":"So lots of people connecting their Mercury into co work and Claude Code and ChatGPT and, like, you know, their workflows, and we wanna be wherever people are.","speaker":1,"speakerLabel":"Speaker 1","timestamp":60.36,"duration":8.019997,"confidence":0.9855957}
+{"text":"Want to use Mercury. Yeah. Eigentic payments","speaker":1,"speakerLabel":"Speaker 1","timestamp":68.38,"duration":3.4100037,"confidence":0.9741211}
+{"text":"people already using Mercury kind of virtual cards to, you know,","speaker":1,"speakerLabel":"Speaker 1","timestamp":71.79,"duration":3.0199966,"confidence":0.99609375}
+{"text":"and, like, let let your agent go go do things. So we're gonna enable more of that.","speaker":1,"speakerLabel":"Speaker 1","timestamp":74.81,"duration":4.4000015,"confidence":0.9980469}
+{"text":"And then, you know, not everyone is, like, bought into this future yet, and","speaker":1,"speakerLabel":"Speaker 1","timestamp":79.21,"duration":4.5200043,"confidence":0.9921875}
+{"text":"we have we're also introducing features on the Mercury app and Mercury website, so you can","speaker":1,"speakerLabel":"Speaker 1","timestamp":83.73,"duration":4.909996,"confidence":0.99609375}
+{"text":"we launched Mercury Insights, you can kinda ask questions from your transactions and they're like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":88.64,"duration":4.4000015,"confidence":0.99609375}
+{"text":"summarize things like, hey. Your AWS bill went up by 30%. Are you sure about that? That kind of thing.","speaker":1,"speakerLabel":"Speaker 1","timestamp":93.04,"duration":4.6399994,"confidence":0.99609375}
+{"text":"And then later later this summer, we're launching Mercury Command where you can do","speaker":1,"speakerLabel":"Speaker 1","timestamp":97.68,"duration":4.010002,"confidence":0.98535156}
+{"text":"kinda complex workflows like you're like, hey. Pay my landlord 5 k, and it kinda sets it all up for you, and you just click","speaker":1,"speakerLabel":"Speaker 1","timestamp":101.69,"duration":4.939995,"confidence":0.99609375}
+{"text":"approve kinda thing. Yeah. That's gonna be a really cool future when","speaker":1,"speakerLabel":"Speaker 1","timestamp":106.63,"duration":4.760002,"confidence":0.99902344}
+{"text":"you can just ask questions Yep. About what's going on with your bank as opposed to now","speaker":0,"speakerLabel":"Speaker 0","timestamp":111.39,"duration":4.970001,"confidence":1}
+{"text":"where banking is just, you know, really hard to get a handle on","speaker":0,"speakerLabel":"Speaker 0","timestamp":116.36,"duration":4.0999985,"confidence":1}
+{"text":"what's going on with your money. This the easier it can be and just","speaker":0,"speakerLabel":"Speaker 0","timestamp":120.46,"duration":3.709999,"confidence":1}
+{"text":"my whoop makes it so I don't know if you're like a fan of whoop. Whoop on it. You got your whoop. Yeah.","speaker":0,"speakerLabel":"Speaker 0","timestamp":124.17,"duration":4.970001,"confidence":0.9770508}
+{"text":"Like, I don't know if you've been watching your a have you started using the AI Yeah. Jennifer, I can ask","speaker":0,"speakerLabel":"Speaker 0","timestamp":129.14,"duration":4.3099976,"confidence":0.99316406}
+{"text":"a few questions. But, you know, we actually do It's really neat. We actually do a lot more than banking","speaker":1,"speakerLabel":"Speaker 1","timestamp":133.45,"duration":3.9199982,"confidence":0.99902344}
+{"text":"So we started in banking, but we have invoicing, corporate credit card, bill pay. We just","speaker":1,"speakerLabel":"Speaker 1","timestamp":137.37,"duration":3.980011,"confidence":0.98095703}
+{"text":"acquired a payroll company. So actually, like, the AI gets gets even more powerful when you can, like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":141.35,"duration":4.25,"confidence":0.9951172}
+{"text":"do Oh. You can More data. Hire it altogether, and you can be like, hey. I just hired an employee, set","speaker":1,"speakerLabel":"Speaker 1","timestamp":145.6,"duration":4.819992,"confidence":0.9921875}
+{"text":"up payroll, issue them a card, set them on expenses, and, like, it just does all of that in, a","speaker":1,"speakerLabel":"Speaker 1","timestamp":150.42,"duration":4.7900085,"confidence":0.9980469}
+{"text":"of yeah. You just say it and it does it does it in a couple. So now you're going up against","speaker":1,"speakerLabel":"Speaker 1","timestamp":155.21,"duration":4.1299896,"confidence":0.97802734}
+{"text":"like, the expensifies, the ripples Yeah. The PEOs,","speaker":0,"speakerLabel":"Speaker 0","timestamp":159.34,"duration":3.5299988,"confidence":0.9973958}
+{"text":"you know, all those sorts. Like, you don't wanna sign up to all this stuff. Like, you just wanna","speaker":0,"speakerLabel":"Speaker 0","timestamp":162.87,"duration":3.8899994,"confidence":0.9951172}
+{"text":"yeah. Banking is where your money is. It's where your finance team is. Like, let's","speaker":1,"speakerLabel":"Speaker 1","timestamp":166.76,"duration":3.6500092,"confidence":0.9970703}
+{"text":"do everything in one place. That's my my thinking. Yeah. And if you get to","speaker":1,"speakerLabel":"Speaker 1","timestamp":170.41,"duration":3.3499908,"confidence":0.9941406}
+{"text":"remember Jerry Yang in the Yahoo days Yep. Told me at some point, I was interviewing him,","speaker":0,"speakerLabel":"Speaker 0","timestamp":173.76,"duration":4.730011,"confidence":0.9902344}
+{"text":"for my old magazine, Silicon Valley reporter, to really date this conversation.","speaker":0,"speakerLabel":"Speaker 0","timestamp":178.49,"duration":3.6799927,"confidence":0.9921875}
+{"text":"I said, hey. What's, like, what's the focus now at Yahoo? And he said, the focus is 2.4.","speaker":0,"speakerLabel":"Speaker 0","timestamp":182.17,"duration":4.970001,"confidence":0.99853516}
+{"text":"And I was like, what does it mean? He's like, if we can get you to use 2.4 services from Yahoo, you'll never leave. Mhmm. I'm like, don't I still don't understand. He's like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":187.14,"duration":8.380005,"confidence":0.9980469}
+{"text":"okay. Do you have a Yahoo mail account? I was like, yes. He's like, okay. Do you use Yahoo Finance Yahoo Sports? I was like, yeah. I put the Knicks in there. I get my schedule. And and, yeah, I have some stocks and, you know, he goes,","speaker":0,"speakerLabel":"Speaker 0","timestamp":195.52,"duration":8.830002,"confidence":0.99609375}
+{"text":"okay. So you're three. Yeah. You're never gonna leave. And?","speaker":0,"speakerLabel":"Speaker 0","timestamp":204.35,"duration":4.279999,"confidence":0.98828125}
+{"text":"To this day, I have Yahoo email account","speaker":0,"speakerLabel":"Speaker 0","timestamp":208.63,"duration":3.3499908,"confidence":0.99902344}
+{"text":"Oh, you do? Have Yahoo Finance. I thought the story will end with, like, but it didn't work.","speaker":0,"speakerLabel":"Speaker 0","timestamp":211.98,"duration":3.7100067,"confidence":0.9790039}
+{"text":"No. Joe, well, no. I I mean, I still look at Yahoo Finance,","speaker":1,"speakerLabel":"Speaker 1","timestamp":215.69,"duration":3.2299957,"confidence":0.9855957}
+{"text":"just out of, like, a creature of habit, and the web page is a bit of a mess. Like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":218.92,"duration":4.3399963,"confidence":0.9951172}
+{"text":"it I mean, it it needs to be really overhauled and cleaned up, but it's","speaker":0,"speakerLabel":"Speaker 0","timestamp":223.26,"duration":3.5600128,"confidence":0.99902344}
+{"text":"it's kind of like this archaic Yeah. Yeah. But I think the problem there was,","speaker":0,"speakerLabel":"Speaker 0","timestamp":226.82,"duration":4.0099945,"confidence":0.99121094}
+{"text":"it's not like these were interconnected services. You know? It's with with","speaker":1,"speakerLabel":"Speaker 1","timestamp":230.83,"duration":3.0800018,"confidence":0.9970703}
+{"text":"core, like, money movement and all of this stuff is just so closely connected that you can really","speaker":1,"speakerLabel":"Speaker 1","timestamp":233.91,"duration":4.4599915,"confidence":0.99902344}
+{"text":"like, by doing, like, you know, we also have tracked this, like, we're, like, are you using three products or more, which is, like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":238.37,"duration":4.970001,"confidence":0.9560547}
+{"text":"think 15, 20% of our customers use three products as well.","speaker":1,"speakerLabel":"Speaker 1","timestamp":243.34,"duration":3.0200043,"confidence":0.9970703}
+{"text":"But, yeah, if you're using them all and they work really well because, like, you know, we we","speaker":1,"speakerLabel":"Speaker 1","timestamp":246.36,"duration":3.9799957,"confidence":0.99560547}
+{"text":"if everything's a blue box, right, like, every money movement that you do is, like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":250.34,"duration":3.7400055,"confidence":0.99902344}
+{"text":"all within Mercury, it gets even more powerful. That's that's, like, another value.","speaker":1,"speakerLabel":"Speaker 1","timestamp":254.08,"duration":4.580002,"confidence":0.9807129}
+{"text":"It is definitely the case with, I think, Robinhood as well.","speaker":0,"speakerLabel":"Speaker 0","timestamp":258.66,"duration":4.9100037,"confidence":0.9975586}
+{"text":"You know? Any of the or Uber, I think, is also having this.","speaker":0,"speakerLabel":"Speaker 0","timestamp":263.57,"duration":3.7999878,"confidence":0.9951172}
+{"text":"They they found that people who use Eats shopping if you think about Eats,","speaker":0,"speakerLabel":"Speaker 0","timestamp":267.37,"duration":4.76001,"confidence":0.99902344}
+{"text":"shopping, and Driving. Uber,","speaker":0,"speakerLabel":"Speaker 0","timestamp":272.13,"duration":3.5299988,"confidence":0.9851074}
+{"text":"transportation has three separate products. The people who use two of those","speaker":0,"speakerLabel":"Speaker 0","timestamp":275.66,"duration":4.519989,"confidence":0.99902344}
+{"text":"three or three of those three are, like, 10 times more active on the platform.","speaker":0,"speakerLabel":"Speaker 0","timestamp":280.18,"duration":4.700012,"confidence":1}
+{"text":"So it's also a catalyst. Once you make that connection,","speaker":0,"speakerLabel":"Speaker 0","timestamp":284.88,"duration":4.519989,"confidence":1}
+{"text":"they're in the app more, so they use it more. It makes sense. Right? So","speaker":0,"speakerLabel":"Speaker 0","timestamp":289.4,"duration":3.4400024,"confidence":1}
+{"text":"if you if you use the expensing in Mercury or","speaker":0,"speakerLabel":"Speaker 0","timestamp":292.84,"duration":3.019989,"confidence":0.99902344}
+{"text":"the invoicing in Mercury, you're in the interface. You see the next product. You click on it.","speaker":0,"speakerLabel":"Speaker 0","timestamp":295.86,"duration":4.970001,"confidence":0.99902344}
+{"text":"And your acquisition cost for that person is $0.","speaker":0,"speakerLabel":"Speaker 0","timestamp":300.83,"duration":4.6700134,"confidence":0.99902344}
+{"text":"Really great really great observation and, like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":305.5,"duration":4.220001,"confidence":0.9663086}
+{"text":"important one for founders maybe in later years, first couple years,","speaker":0,"speakerLabel":"Speaker 0","timestamp":309.72,"duration":3.649994,"confidence":0.99609375}
+{"text":"gotta stay focused on maybe Well, I was thinking, like, now that software development","speaker":0,"speakerLabel":"Speaker 0","timestamp":313.37,"duration":4.970001,"confidence":0.9838867}
+{"text":"especially with new features, got a lot easier. Maybe multiproduct becomes, like, not","speaker":1,"speakerLabel":"Speaker 1","timestamp":318.34,"duration":4.3399963,"confidence":0.9902344}
+{"text":"yeah. Maybe it's earlier on because You can get a lot more a lot faster. Yeah.","speaker":1,"speakerLabel":"Speaker 1","timestamp":322.68,"duration":4.970001,"confidence":0.9736328}
+{"text":"Iman, can I ask you one question before we let you go, which is you raised less money","speaker":2,"speakerLabel":"Speaker 2","timestamp":327.65,"duration":3.8900146,"confidence":0.99902344}
+{"text":"this round than your preceding round by a $100,000,000?","speaker":2,"speakerLabel":"Speaker 2","timestamp":331.54,"duration":3.4100037,"confidence":0.9941406}
+{"text":"And I could read that so many different ways. You're just burning less capital, etcetera. But I'm I'm curious why less","speaker":2,"speakerLabel":"Speaker 2","timestamp":334.95,"duration":4.970001,"confidence":0.99902344}
+{"text":"Yeah. As your valuation went up. So we've been profitable for four years, so this was much more","speaker":2,"speakerLabel":"Speaker 2","timestamp":339.92,"duration":4.7299805,"confidence":0.99902344}
+{"text":"kinda raising money, not for the money's sake,","speaker":1,"speakerLabel":"Speaker 1","timestamp":344.65,"duration":3.8600159,"confidence":0.9951172}
+{"text":"The bank is fully capitalized, etcetera. We've have way more money than we've ever raised in the bank","speaker":1,"speakerLabel":"Speaker 1","timestamp":348.51,"duration":4.970001,"confidence":0.9941406}
+{"text":"as well. So we're really doing it because, like, you know,","speaker":1,"speakerLabel":"Speaker 1","timestamp":353.48,"duration":3.0499878,"confidence":0.9921875}
+{"text":"creates a marketing moment. I gotta be on this podcast and feel the things.","speaker":1,"speakerLabel":"Speaker 1","timestamp":356.53,"duration":3.9200134,"confidence":0.98535156}
+{"text":"It's good for acquisitions and hiring. And, yeah,","speaker":1,"speakerLabel":"Speaker 1","timestamp":360.45,"duration":4.0099792,"confidence":0.9951172}
+{"text":"It's That's what I was curious. Is is the money earmarked for acquisitions?","speaker":1,"speakerLabel":"Speaker 1","timestamp":364.46,"duration":3.1400146,"confidence":0.9970703}
+{"text":"Because you guys have been talking about profitability for years now.","speaker":2,"speakerLabel":"Speaker 2","timestamp":367.6,"duration":3.0499878,"confidence":0.99902344}
+{"text":"Both, by the way, both non GAAP and GAAP to your credit. Yeah. So","speaker":2,"speakerLabel":"Speaker 2","timestamp":370.65,"duration":3.7400208,"confidence":0.99609375}
+{"text":"how many startups are you gonna buy over over what time? A big strategy. I mean, we'll do it,","speaker":2,"speakerLabel":"Speaker 2","timestamp":374.39,"duration":4.909973,"confidence":0.9941406}
+{"text":"do it carefully. We've done two so far. Which two did you do, how did it go? So we just acquired","speaker":1,"speakerLabel":"Speaker 1","timestamp":379.3,"duration":4.3099976,"confidence":0.99902344}
+{"text":"Central, which is a payroll company. Yeah. It's still we're running it independently right","speaker":1,"speakerLabel":"Speaker 1","timestamp":383.61,"duration":4.6700134,"confidence":0.9980469}
+{"text":"and we're slowly kinda integrating it. So it'll be like Mercury payroll later this year.","speaker":1,"speakerLabel":"Speaker 1","timestamp":388.28,"duration":4.25,"confidence":0.9423828}
+{"text":"And then we made another kinda acquisition called Teal, which is in the","speaker":1,"speakerLabel":"Speaker 1","timestamp":392.53,"duration":4.9400024,"confidence":0.99609375}
+{"text":"book space. You really think about so far, like, you know,","speaker":1,"speakerLabel":"Speaker 1","timestamp":397.47,"duration":4.100006,"confidence":0.9453125}
+{"text":"how do we get like one or two years of like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":401.57,"duration":3.019989,"confidence":0.99902344}
+{"text":"case of payroll, probably three years of kind of progress in, like, a category that, like, is interesting","speaker":1,"speakerLabel":"Speaker 1","timestamp":404.59,"duration":4.220001,"confidence":0.9980469}
+{"text":"for us to do. Ah, there it is. Teal, a seed stage accounting startup founded by Ian Crosby and Adam Saint. I think I know them. Yeah. They were the bench founders.","speaker":1,"speakerLabel":"Speaker 1","timestamp":408.81,"duration":8.679993,"confidence":0.98828125}
+{"text":"Yes. Yes. It it is oh, wow. So are you gonna have, like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":417.49,"duration":3.7700195,"confidence":0.99609375}
+{"text":"accounting service for your customers? Is that the vision? Nothing announced yet.","speaker":0,"speakerLabel":"Speaker 0","timestamp":421.26,"duration":3.9799805,"confidence":0.99902344}
+{"text":"Nothing announced yet. Well, I mean, it is interesting. A lot of people are using","speaker":1,"speakerLabel":"Speaker 1","timestamp":425.24,"duration":4.460022,"confidence":0.99902344}
+{"text":"probably Mercury or your contemporaries, and then they have an outsourced","speaker":0,"speakerLabel":"Speaker 0","timestamp":429.7,"duration":4.6999817,"confidence":0.99609375}
+{"text":"you know, virtual accounting company, which","speaker":0,"speakerLabel":"Speaker 0","timestamp":434.4,"duration":4.130005,"confidence":0.9946289}
+{"text":"they typically charge, I think, 3,000 a month. Most artists pay $2.03, 4,000 a month","speaker":0,"speakerLabel":"Speaker 0","timestamp":438.53,"duration":4.399994,"confidence":0.9923096}
+{"text":"for these. I'm talking about, like, seed stage series a. And it's just a much better way to do your accounting.","speaker":0,"speakerLabel":"Speaker 0","timestamp":442.93,"duration":4.9100037,"confidence":0.9970703}
+{"text":"Spend $30.40, 50 k instead of having to hire","speaker":0,"speakerLabel":"Speaker 0","timestamp":447.84,"duration":3.9899902,"confidence":0.99902344}
+{"text":"an accounting firm. Some of the accounting firms, I think, are probably in a similar thing, but","speaker":0,"speakerLabel":"Speaker 0","timestamp":451.83,"duration":3.560028,"confidence":0.98828125}
+{"text":"yeah, pilot, I guess, is the other big one. Yeah. And","speaker":0,"speakerLabel":"Speaker 0","timestamp":455.39,"duration":3.1099854,"confidence":0.99902344}
+{"text":"yeah, because Mercury has all of these kind of core transactions, we already order categorized","speaker":1,"speakerLabel":"Speaker 1","timestamp":458.5,"duration":3.8599854,"confidence":0.99121094}
+{"text":"for you. We already push all of that data to QuickBooks and, you know, a lot of the things that you might think of as a book","speaker":1,"speakerLabel":"Speaker 1","timestamp":462.36,"duration":4.970001,"confidence":0.9970703}
+{"text":"you can kinda do automatically and programmatically if you have all that kinda","speaker":1,"speakerLabel":"Speaker 1","timestamp":467.33,"duration":4.0700073,"confidence":0.9980469}
+{"text":"core data within within a service. So","speaker":1,"speakerLabel":"Speaker 1","timestamp":471.4,"duration":3.0200195,"confidence":0.9316406}
+{"text":"yeah, we're already doing a bunch to make that, like, much simpler for bookkeepers.","speaker":1,"speakerLabel":"Speaker 1","timestamp":474.42,"duration":4.279999,"confidence":0.99902344}
+{"text":"Continued success. And, yeah, I'll I'll I'll DM you about","speaker":0,"speakerLabel":"Speaker 0","timestamp":478.7,"duration":4.6099854,"confidence":0.9719238}
+{"text":"I can get in on an SPV here and get some of my investors together and","speaker":0,"speakerLabel":"Speaker 0","timestamp":483.31,"duration":3.1700134,"confidence":0.9941406}
+{"text":"get on that cap table. Yum. Yum. Yeah. If I smell a 10 x from here,","speaker":0,"speakerLabel":"Speaker 0","timestamp":486.48,"duration":3.8599854,"confidence":0.96972656}
+{"text":"Great job, and thanks for supporting Founders. And thanks for supporting this podcast. Yeah. Don't don't know if","speaker":0,"speakerLabel":"Speaker 0","timestamp":490.34,"duration":4.6700134,"confidence":0.99609375}
+{"text":"you're a current advertiser or not, but I know in the past, I've read some Mercury ads and","speaker":0,"speakerLabel":"Speaker 0","timestamp":495.01,"duration":3.5599976,"confidence":0.9951172}
+{"text":"I use it. It's a great product. Yeah. Thanks for having me. Highly recommend.","speaker":0,"speakerLabel":"Speaker 0","timestamp":498.57,"duration":3.5299988,"confidence":0.99902344}
+{"text":"Alright. Well done. When you're a founder and you're moving fast and you wanna close a big deal, a traditional bank","speaker":0,"speakerLabel":"Speaker 0","timestamp":502.1,"duration":4.970001,"confidence":0.99902344}
+{"text":"can kill your momentum. Long approval processes, clunky, outdated","speaker":0,"speakerLabel":"Speaker 0","timestamp":507.07,"duration":4.789978,"confidence":1}
+{"text":"systems, not intuitive. I mean, some of these systems look like they","speaker":0,"speakerLabel":"Speaker 0","timestamp":511.86,"duration":3.4400024,"confidence":0.99902344}
+{"text":"made in the nineteen seventies and have never been updated. Not all banks","speaker":0,"speakerLabel":"Speaker 0","timestamp":515.3,"duration":3.5599976,"confidence":1}
+{"text":"are designed to work for startups. We all know that, and that's exactly why grass","speaker":0,"speakerLabel":"Speaker 0","timestamp":518.86,"duration":4.160034,"confidence":1}
+{"text":"was created. Grasshopper is a real federally chartered bank, but","speaker":0,"speakerLabel":"Speaker 0","timestamp":523.02,"duration":4.549988,"confidence":1}
+{"text":"with the kind of financial tech stack that you'd build for yourself.","speaker":0,"speakerLabel":"Speaker 0","timestamp":527.57,"duration":3.2000122,"confidence":0.9902344}
+{"text":"They're going to open your new account in just minutes, not days. That's a key pain point. An integration","speaker":0,"speakerLabel":"Speaker 0","timestamp":530.77,"duration":4.9699707,"confidence":0.99902344}
+{"text":"friendly platform with real time transfers and AI tools that","speaker":0,"speakerLabel":"Speaker 0","timestamp":535.74,"duration":3.2000122,"confidence":0.99902344}
+{"text":"are gonna save you even more time, all without straining your budget.","speaker":0,"speakerLabel":"Speaker 0","timestamp":538.94,"duration":3.2600098,"confidence":0.99902344}
+{"text":"On a bunch of unnecessary fees. That's where they get you. And because you're a valued","speaker":0,"speakerLabel":"Speaker 0","timestamp":542.2,"duration":4.369995,"confidence":0.99902344}
+{"text":"Twist listener, Grasshopper will drop a $500 cash bonus into your account when you use the promo code Twist, t w I s t. Start","speaker":0,"speakerLabel":"Speaker 0","timestamp":546.57,"duration":8.200012,"confidence":0.9980469}
+{"text":"building without the slowdown at grasshopper.bank/twist.","speaker":0,"speakerLabel":"Speaker 0","timestamp":554.77,"duration":3.9499512,"confidence":1}
+{"text":"Terms and conditions apply. Grasshopper is a federally chartered bank member","speaker":0,"speakerLabel":"Speaker 0","timestamp":558.72,"duration":3.9800415,"confidence":0.99902344}
+{"text":"FDIC. You make a point there, Jason. I'm a Mercury customer as well for my little my little company.","speaker":0,"speakerLabel":"Speaker 0","timestamp":562.7,"duration":4.9699707,"confidence":0.9526367}
+{"text":"And you know what I would love is some handholding. Because if you're filing your federal, you know, LLC","speaker":2,"speakerLabel":"Speaker 2","timestamp":567.67,"duration":4.7300415,"confidence":0.9980469}
+{"text":"for the first time, it'd be great to have someone you could call and ask three dumb questions to.","speaker":2,"speakerLabel":"Speaker 2","timestamp":572.4,"duration":4.48999,"confidence":0.9995117}
+{"text":"This is, I think,","speaker":0,"speakerLabel":"Speaker 0","timestamp":576.89,"duration":2.209961,"confidence":1}
+{"text":"the full stack is more achievable. The most","speaker":0,"speakerLabel":"Speaker 0","timestamp":579.1,"duration":3.5,"confidence":0.99902344}
+{"text":"interesting part of that was when he said, yeah. Maybe it's","speaker":0,"speakerLabel":"Speaker 0","timestamp":582.6,"duration":3.3200073,"confidence":1}
+{"text":"easier now because software development is so much faster to maybe add those next","speaker":0,"speakerLabel":"Speaker 0","timestamp":585.92,"duration":4.3099976,"confidence":0.99609375}
+{"text":"incremental products. Think he's right. It's just a matter of the distraction,","speaker":0,"speakerLabel":"Speaker 0","timestamp":590.23,"duration":4.9700317,"confidence":0.99902344}
+{"text":"customer service. Maybe it's easier, but you still need to think about it.","speaker":0,"speakerLabel":"Speaker 0","timestamp":595.2,"duration":3.5899658,"confidence":0.99902344}
+{"text":"And then founders need to be able to keep multiple business units in their head.","speaker":0,"speakerLabel":"Speaker 0","timestamp":598.79,"duration":4.340027,"confidence":1}
+{"text":"Yes. At the same time and then have the enthusiasm and energy","speaker":0,"speakerLabel":"Speaker 0","timestamp":603.13,"duration":4.48999,"confidence":1}
+{"text":"to keep growing them. So that is now becoming the","speaker":0,"speakerLabel":"Speaker 0","timestamp":607.62,"duration":3.919983,"confidence":1}
+{"text":"finite resources. Is the founding team or the founders or the founder their enthusiasm and energy, creative side","speaker":0,"speakerLabel":"Speaker 0","timestamp":611.54,"duration":8.320007,"confidence":0.99316406}
+{"text":"cycles to push something forward as opposed to the blocker being, can I get three more developers?","speaker":0,"speakerLabel":"Speaker 0","timestamp":619.86,"duration":4.4299927,"confidence":0.99902344}
+{"text":"Or, you know, in the case of these larger companies, you know, maybe a team of, like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":624.29,"duration":3.619995,"confidence":0.99902344}
+{"text":"15 or 20 or 30 of them to allocate","speaker":0,"speakerLabel":"Speaker 0","timestamp":627.91,"duration":3.3500366,"confidence":1}
+{"text":"to a new product line, and they get the new product line to a revenue level.","speaker":0,"speakerLabel":"Speaker 0","timestamp":631.26,"duration":4.0999756,"confidence":1}
+{"text":"That actually impacts our bottom line. And that's why companies like","speaker":0,"speakerLabel":"Speaker 0","timestamp":635.36,"duration":3.5,"confidence":1}
+{"text":"Meta, Microsoft, and Google don't go after very","speaker":0,"speakerLabel":"Speaker 0","timestamp":638.86,"duration":3.4100342,"confidence":0.99902344}
+{"text":"small niche products too often because even if they put","speaker":0,"speakerLabel":"Speaker 0","timestamp":642.27,"duration":3.4699707,"confidence":0.9980469}
+{"text":"The government, whether it's The UK or United States, they're very","speaker":0,"speakerLabel":"Speaker 0","timestamp":720,"duration":4.16,"confidence":0.99853516}
+{"text":"judicious about bank charters because","speaker":0,"speakerLabel":"Speaker 0","timestamp":724.16,"duration":3.71,"confidence":0.9921875}
+{"text":"banks are moving money. Money, can be used for nefarious","speaker":0,"speakerLabel":"Speaker 0","timestamp":727.87,"duration":4.9700003,"confidence":0.99902344}
+{"text":"things around the world, human trafficking,","speaker":0,"speakerLabel":"Speaker 0","timestamp":732.84,"duration":3.0199995,"confidence":1}
+{"text":"terrorism. This is all the bad things that can happen.","speaker":0,"speakerLabel":"Speaker 0","timestamp":735.86,"duration":3.1999998,"confidence":0.99609375}
+{"text":"And then we have seen that","speaker":0,"speakerLabel":"Speaker 0","timestamp":739.06,"duration":3.040001,"confidence":0.99902344}
+{"text":"allegedly, people claim things like Tether have become and and stablecoins outside The US have become the place where","speaker":0,"speakerLabel":"Speaker 0","timestamp":742.1,"duration":8.98,"confidence":0.99609375}
+{"text":"people do that activity, and we want those things","speaker":0,"speakerLabel":"Speaker 0","timestamp":751.08,"duration":3.9499989,"confidence":1}
+{"text":"to maybe come onshore, so and and be more regulated, know your customer.","speaker":0,"speakerLabel":"Speaker 0","timestamp":755.03,"duration":4.4900017,"confidence":0.9921875}
+{"text":"So you're trying to do all these things right. How do you think about","speaker":0,"speakerLabel":"Speaker 0","timestamp":759.52,"duration":3.8999977,"confidence":1}
+{"text":"stablecoins? And will they become the","speaker":0,"speakerLabel":"Speaker 0","timestamp":763.42,"duration":3.710003,"confidence":1}
+{"text":"for us doing payments between companies? And then what does that do for the bank","speaker":0,"speakerLabel":"Speaker 0","timestamp":767.13,"duration":4.34,"confidence":1}
+{"text":"industry yourself? Do you have to provide that? You don't make any money on that, or do you make money on","speaker":0,"speakerLabel":"Speaker 0","timestamp":771.47,"duration":4.7299995,"confidence":1}
+{"text":"How do you think about all that? Yeah. I think stablecoins have a place.","speaker":0,"speakerLabel":"Speaker 0","timestamp":776.2,"duration":4.6100006,"confidence":1}
+{"text":"I think if you yeah. If Jason is wants to send money to a business or","speaker":1,"speakerLabel":"Speaker 1","timestamp":780.81,"duration":4.8500023,"confidence":0.9980469}
+{"text":"yeah, there's Zelle and, like, other kinda local rails are, like, pretty","speaker":1,"speakerLabel":"Speaker 1","timestamp":785.66,"duration":4.0099945,"confidence":0.9951172}
+{"text":"simple, and most people have access to them in The US.","speaker":1,"speakerLabel":"Speaker 1","timestamp":789.67,"duration":3.590004,"confidence":1}
+{"text":"I think where stablecoins work really well is globally.","speaker":1,"speakerLabel":"Speaker 1","timestamp":793.26,"duration":3.3199997,"confidence":0.9951172}
+{"text":"There's lots of people that want access to US dollars and and having a","speaker":1,"speakerLabel":"Speaker 1","timestamp":796.58,"duration":3.7399979,"confidence":0.99902344}
+{"text":"stable currency. So having the stablecoin accounts is powerful.","speaker":1,"speakerLabel":"Speaker 1","timestamp":800.3199999999999,"duration":3.590004,"confidence":0.9716797}
+{"text":"Being able to send money internationally is still a bit of a pain.","speaker":1,"speakerLabel":"Speaker 1","timestamp":803.91,"duration":3.0199966,"confidence":0.99902344}
+{"text":"So I think there's some really powerful use cases.","speaker":1,"speakerLabel":"Speaker 1","timestamp":806.9300000000001,"duration":3.3499985,"confidence":0.98999023}
+{"text":"And, you know, we will probably have allow you to kinda send and receive stablecoins soon. So, yeah, I think it's interesting. I don't think it replaces the","speaker":1,"speakerLabel":"Speaker 1","timestamp":810.28,"duration":9.160004,"confidence":1}
+{"text":"I think it augments it, and and there'll be lots of people that get, like, a","speaker":1,"speakerLabel":"Speaker 1","timestamp":819.44,"duration":3.6800003,"confidence":0.9980469}
+{"text":"win. So you're not gonna go buy a stable corn startup as we've seen","speaker":1,"speakerLabel":"Speaker 1","timestamp":823.12,"duration":3.4399948,"confidence":0.9951172}
+{"text":"Stripe and other companies do, sounds like? No. Not in the current plan.","speaker":2,"speakerLabel":"Speaker 2","timestamp":826.56,"duration":3.9900055,"confidence":0.99658203}
+{"text":"Okay. But you could launch one. Right? I'm sure these companies are all pitching you on being the rails","speaker":0,"speakerLabel":"Speaker 0","timestamp":830.55,"duration":4.5499954,"confidence":0.99902344}
+{"text":"to have a Mercury stablecoin. Yeah. I I","speaker":0,"speakerLabel":"Speaker 0","timestamp":835.1,"duration":3.290001,"confidence":0.9970703}
+{"text":"comes back to customer value. I I think USDC is, like, pretty good, and that's got a big netbook","speaker":1,"speakerLabel":"Speaker 1","timestamp":838.39,"duration":4.970001,"confidence":0.9970703}
+{"text":"effect because people have it. So, yeah, we don't have, like, a plan to launch our own stable coin.","speaker":1,"speakerLabel":"Speaker 1","timestamp":843.36,"duration":4.4300003,"confidence":0.9863281}
+{"text":"If we I guess if we come up with, like, a reason customers really want that, then we'll we might do it.","speaker":1,"speakerLabel":"Speaker 1","timestamp":847.79,"duration":3.9500046,"confidence":0.9951172}
+{"text":"Tell me about the journey from small companies","speaker":0,"speakerLabel":"Speaker 0","timestamp":851.74,"duration":3.199997,"confidence":1}
+{"text":"and using them, you know, going back to your more, like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":854.94,"duration":3.649994,"confidence":0.9980469}
+{"text":"early entrepreneurial days and trying to find product market fit. A lot of young","speaker":0,"speakerLabel":"Speaker 0","timestamp":858.59,"duration":3.8899994,"confidence":0.99902344}
+{"text":"founders, year zero of their startup. They're not even incorporated. They're building and vibe coding a","speaker":0,"speakerLabel":"Speaker 0","timestamp":862.48,"duration":4.3700104,"confidence":0.96313477}
+{"text":"project while they're working at, you know, some big tech company working at Merck and on the weekends, they're working on their startup. And,","speaker":0,"speakerLabel":"Speaker 0","timestamp":866.85,"duration":8.079987,"confidence":0.9980469}
+{"text":"for those folks, explain to them how you first got","speaker":0,"speakerLabel":"Speaker 0","timestamp":874.9300000000001,"duration":3.8600006,"confidence":1}
+{"text":"product market fit","speaker":0,"speakerLabel":"Speaker 0","timestamp":878.79,"duration":1.730011,"confidence":0.99902344}
+{"text":"with startups, why you chose startups, and then what you learned from that process.","speaker":0,"speakerLabel":"Speaker 0","timestamp":880.52,"duration":4.970001,"confidence":0.99902344}
+{"text":"Yeah. One thing that was nice about Mercury is it's the first startup I've built that's been for myself.","speaker":1,"speakerLabel":"Speaker 1","timestamp":885.49,"duration":4.580002,"confidence":0.99609375}
+{"text":"Which kinda made it easier because I had this very specific vision in mind. I was like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":890.0699999999999,"duration":4.3099976,"confidence":1}
+{"text":"we need wires, which, like, seems obvious, but, actually, we were the first US neo bank with wire support.","speaker":1,"speakerLabel":"Speaker 1","timestamp":894.38,"duration":6.7299957,"confidence":0.99316406}
+{"text":"And, you know, it needs to be really smooth and we need, multi user permission. So we spend a lot of time. We","speaker":1,"speakerLabel":"Speaker 1","timestamp":901.11,"duration":4.970001,"confidence":0.9921875}
+{"text":"a year and a half actually just building it and getting, you know,","speaker":1,"speakerLabel":"Speaker 1","timestamp":906.08,"duration":3.0200043,"confidence":0.9980469}
+{"text":"We went through a couple of bank partners because we were doing new things, and there wasn't that much support for it.","speaker":1,"speakerLabel":"Speaker 1","timestamp":909.1,"duration":4.4599915,"confidence":0.99902344}
+{"text":"But I would say like the day we launched, we had kind of instant","speaker":1,"speakerLabel":"Speaker 1","timestamp":913.56,"duration":3.7100067,"confidence":0.99902344}
+{"text":"kind of product market fit, especially with kind of early stage startups","speaker":1,"speakerLabel":"Speaker 1","timestamp":917.27,"duration":4.7299957,"confidence":0.9970703}
+{"text":"And the reason I chose early stage startups and why","speaker":1,"speakerLabel":"Speaker 1","timestamp":922,"duration":3.7700043,"confidence":0.9951172}
+{"text":"I thought it would work there is, yeah, they tend to be very product","speaker":1,"speakerLabel":"Speaker 1","timestamp":925.77,"duration":3.949997,"confidence":1}
+{"text":"minded. They wanna use the best tools. If you","speaker":1,"speakerLabel":"Speaker 1","timestamp":929.72,"duration":3.050003,"confidence":0.9980469}
+{"text":"you know, do well in one part of them, like, you know, what","speaker":1,"speakerLabel":"Speaker 1","timestamp":932.77,"duration":3.5599976,"confidence":0.99902344}
+{"text":"lot of Y Combinator companies use us more than 50% of each batch uses us.","speaker":1,"speakerLabel":"Speaker 1","timestamp":936.33,"duration":4.0399933,"confidence":0.9951172}
+{"text":"You you tend to become, like, a viral kinda","speaker":1,"speakerLabel":"Speaker 1","timestamp":940.37,"duration":3.2600098,"confidence":0.97314453}
+{"text":"solution to the ecosystem.","speaker":1,"speakerLabel":"Speaker 1","timestamp":943.63,"duration":3.2299957,"confidence":0.99902344}
+{"text":"So you can like quite quickly build distribution even though you start early.","speaker":1,"speakerLabel":"Speaker 1","timestamp":946.86,"duration":3.800003,"confidence":0.9941406}
+{"text":"And then they grow really quickly. So, you know, we","speaker":1,"speakerLabel":"Speaker 1","timestamp":950.66,"duration":3.4400024,"confidence":0.9951172}
+{"text":"we quite quickly had, you know, our first seed funded startups and then series a, and now we have","speaker":1,"speakerLabel":"Speaker 1","timestamp":954.1,"duration":4.669998,"confidence":0.9951172}
+{"text":"yeah, many startups that have raised, like, more than a $100,000,000 using Mercury.","speaker":1,"speakerLabel":"Speaker 1","timestamp":958.77,"duration":4.220001,"confidence":0.9873047}
+{"text":"So you can start with, like, a very small set where you can, like, solve their needs and","speaker":1,"speakerLabel":"Speaker 1","timestamp":962.99,"duration":3.4700012,"confidence":0.9995117}
+{"text":"yeah, banking is very sticky, so as as as long as we keep delivering","speaker":1,"speakerLabel":"Speaker 1","timestamp":966.46,"duration":3.3499908,"confidence":0.9951172}
+{"text":"you know, features and customer support and things like that, you can kinda grow to, like, pretty big companies.","speaker":1,"speakerLabel":"Speaker 1","timestamp":969.81,"duration":4.3399963,"confidence":0.9970703}
+{"text":"Using Ahmad, whenever I hear someone talk about, like, really quick or instant product market fit, my ears go up.","speaker":1,"speakerLabel":"Speaker 1","timestamp":974.15,"duration":4.970001,"confidence":0.99902344}
+{"text":"Because I'm always curious about how you reach that so quickly.","speaker":2,"speakerLabel":"Speaker 2","timestamp":979.12,"duration":3.0200195,"confidence":1}
+{"text":"And it implies that you had customers very quickly. So talk to me about","speaker":2,"speakerLabel":"Speaker 2","timestamp":982.14,"duration":4.4599915,"confidence":1}
+{"text":"launch, getting those first customers in, and how you felt","speaker":2,"speakerLabel":"Speaker 2","timestamp":986.6,"duration":3.1999817,"confidence":1}
+{"text":"confident in having PMF that early because you didn't have a lot of historical data to compare to at that point.","speaker":2,"speakerLabel":"Speaker 2","timestamp":989.8,"duration":4.970001,"confidence":0.99902344}
+{"text":"You know, I really thought we'll launch, and then, yeah, we'll have that moment, and then everyone will forget","speaker":1,"speakerLabel":"Speaker 1","timestamp":994.77,"duration":4.970001,"confidence":0.99902344}
+{"text":"about us, and then we have to go figure out, like, GTM and, like yeah. That's how every other startup I'd ever done","speaker":1,"speakerLabel":"Speaker 1","timestamp":999.74,"duration":4.970001,"confidence":0.98535156}
+{"text":"was. But, yeah, with Mercury, we really launched and, yeah, it was really posted on","speaker":1,"speakerLabel":"Speaker 1","timestamp":1004.71,"duration":4.880005,"confidence":0.9873047}
+{"text":"x and, like, you know, we had Andreessen Horowitz, which is our seed investors kinda","speaker":1,"speakerLabel":"Speaker 1","timestamp":1009.5899999999999,"duration":3.9200134,"confidence":0.96435547}
+{"text":"post about it and Elad Gil and Justin Kahn. So we we had, like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1013.51,"duration":4.220001,"confidence":0.97998047}
+{"text":"I actually had 60 seed investors. I thought it was good to get, like, the whole","speaker":1,"speakerLabel":"Speaker 1","timestamp":1017.73,"duration":3.289978,"confidence":0.99902344}
+{"text":"like, as much of the ecosystem as I could get to invest. Shame Jason to no invest.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1021.02,"duration":4.01001,"confidence":0.9951172}
+{"text":"Oh, I mean and you guys are buying ads from the beginning. I'm such","speaker":0,"speakerLabel":"Speaker 0","timestamp":1025.03,"duration":3.619995,"confidence":0.99902344}
+{"text":"an idiot. It's a story of my life. Like, you guys were like, oh, we're doing start ups.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1028.65,"duration":3.2900085,"confidence":0.9970703}
+{"text":"And you guys were I think you were one of our you I think we were one of your first podcasts that you Yeah. I think","speaker":0,"speakerLabel":"Speaker 0","timestamp":1031.94,"duration":4.970001,"confidence":0.99902344}
+{"text":"you know, got the word out on. And, you know, it's so dumb. Every time somebody","speaker":0,"speakerLabel":"Speaker 0","timestamp":1036.91,"duration":4.0400085,"confidence":0.99902344}
+{"text":"advertises on this program, I just need to tell them, go invest","speaker":0,"speakerLabel":"Speaker 0","timestamp":1040.95,"duration":3.2599792,"confidence":0.9975586}
+{"text":"a 100 k or 250 k in that startup. Because that's what I did with Eight Sleep. Mhmm.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1044.21,"duration":4.970001,"confidence":0.984375}
+{"text":"And Vanta.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1049.18,"duration":3.5899963,"confidence":0.99316406}
+{"text":"Both of those folks were advertisers on the pod. I had the","speaker":0,"speakerLabel":"Speaker 0","timestamp":1052.77,"duration":3.5599976,"confidence":1}
+{"text":"them on as guests because they were incredible businesses independently.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1056.33,"duration":3.2600098,"confidence":0.9980469}
+{"text":"And then I was just like, can I invest? And man, I miss Mercury, so I miss that","speaker":0,"speakerLabel":"Speaker 0","timestamp":1059.59,"duration":4.610016,"confidence":0.9941406}
+{"text":"You know? Gosh. I probably would have gotten in at 100 or 250,000,000 it would be.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1064.2,"duration":4.970001,"confidence":0.9658203}
+{"text":"A 25 x right now. Ugh. But I think, actually, maybe now is the time","speaker":0,"speakerLabel":"Speaker 0","timestamp":1069.17,"duration":4.549988,"confidence":0.9941406}
+{"text":"for me to invest because I have a late stage syndicate. How do you think about SPV and syndicates and late stage financing now and allowing your employees to","speaker":0,"speakerLabel":"Speaker 0","timestamp":1073.72,"duration":9.519989,"confidence":0.99902344}
+{"text":"maybe get some liquidity or just using that as a vehicle","speaker":0,"speakerLabel":"Speaker 0","timestamp":1083.24,"duration":3.3200073,"confidence":0.99902344}
+{"text":"We we just saw Anthropic say, hey. We're gonna negate all these non","speaker":0,"speakerLabel":"Speaker 0","timestamp":1086.56,"duration":4.399994,"confidence":0.99609375}
+{"text":"cap table SPVs. But, obviously, on the other side of the ledger,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1090.96,"duration":4.1600037,"confidence":0.9995117}
+{"text":"you have folks like Claude SpaceX, Stripe. And previously, when they were a private company, Facebook,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1095.12,"duration":8.410004,"confidence":0.9951172}
+{"text":"doing very orderly secondary transactions,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1103.53,"duration":3.1100159,"confidence":1}
+{"text":"to put primary capital into the company and or","speaker":0,"speakerLabel":"Speaker 0","timestamp":1106.6399999999999,"duration":3.289978,"confidence":1}
+{"text":"let existing employees liquidate. So how do you think about that as","speaker":0,"speakerLabel":"Speaker 0","timestamp":1109.93,"duration":3.710022,"confidence":0.9970703}
+{"text":"the founder and these SPVs? I don't like being draconian about it.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1113.6399999999999,"duration":3.6799927,"confidence":0.9951172}
+{"text":"My thinking is, you know, if investor invested or","speaker":1,"speakerLabel":"Speaker 1","timestamp":1117.32,"duration":3.0499878,"confidence":0.9863281}
+{"text":"employee, you know, invested their stock that, like, they should really","speaker":1,"speakerLabel":"Speaker 1","timestamp":1120.37,"duration":4.1900024,"confidence":0.9970703}
+{"text":"be able to do what they want with it. And, like, you know, if we're a public company again,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1124.56,"duration":3.9500122,"confidence":0.99902344}
+{"text":"like, there would be liquidity. Right? So we try to make it flexible. Obviously,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1128.51,"duration":4.7599792,"confidence":0.99609375}
+{"text":"you know, I don't want a bunch of SPVs kinda I think the issue with both Anthropic and SpaceX SPVs is there's a lot of, like, liars out there. Like, people like","speaker":1,"speakerLabel":"Speaker 1","timestamp":1133.27,"duration":8.589996,"confidence":0.99365234}
+{"text":"taking advantage of people, charging crazy fees. So there is, like, some problems in the industry","speaker":1,"speakerLabel":"Speaker 1","timestamp":1141.8600000000001,"duration":4.970001,"confidence":0.99902344}
+{"text":"which, you know, is not great. In our last year,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1146.83,"duration":3.8600159,"confidence":0.99609375}
+{"text":"with our CVC, we did do an employee tender. So, you know, if there's an opportunity, we'll try to","speaker":1,"speakerLabel":"Speaker 1","timestamp":1150.69,"duration":4.519989,"confidence":0.99902344}
+{"text":"just make it easier. I mean, if you'll you know, if you are an employee and you have","speaker":1,"speakerLabel":"Speaker 1","timestamp":1155.21,"duration":4.1600037,"confidence":0.99902344}
+{"text":"few 100 k, it's actually kinda hard to, like, get access to secondaries. Secondaries","speaker":1,"speakerLabel":"Speaker 1","timestamp":1159.37,"duration":3.2900085,"confidence":0.9970703}
+{"text":"much easier when you have, like, bigger chunks to sell.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1162.66,"duration":3.4100037,"confidence":0.99902344}
+{"text":"We do wanna facilitate it, but in general, we're like pretty flexible about it.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1166.07,"duration":4.4599915,"confidence":0.9892578}
+{"text":"But, yeah, the SPVs are not unfortunately, like, if it's","speaker":1,"speakerLabel":"Speaker 1","timestamp":1170.53,"duration":3.380005,"confidence":0.9941406}
+{"text":"if it's done by the company, it can be, like, much smoother than, like,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1173.91,"duration":3.3200073,"confidence":0.99902344}
+{"text":"people. Adding a new member to your team is a crucial","speaker":1,"speakerLabel":"Speaker 1","timestamp":1177.23,"duration":3.4100037,"confidence":1}
+{"text":"decision. You don't wanna rush into a hiring situation that","speaker":0,"speakerLabel":"Speaker 0","timestamp":1180.6399999999999,"duration":3.4099731,"confidence":0.99902344}
+{"text":"you will regret. But if you're a busy founder, you also don't wanna spend a","speaker":0,"speakerLabel":"Speaker 0","timestamp":1184.05,"duration":3.7400208,"confidence":0.99902344}
+{"text":"ton of time in the trenches looking for that perfect candidate.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1187.79,"duration":3.649994,"confidence":1}
+{"text":"Instead, you need a partner, and you need a trusted partner. And LinkedIn Hiring Pro is that partner. How do I know this? Because I","speaker":0,"speakerLabel":"Speaker 0","timestamp":1191.44,"duration":7.51001,"confidence":1}
+{"text":"LinkedIn Hiring Pro. You want a real world testimony? Alright. Here you go.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1198.95,"duration":4.3099976,"confidence":0.9975586}
+{"text":"Recently hired a new customer success manager. They handle all the advertising accounts here.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1203.26,"duration":4.970001,"confidence":0.99902344}
+{"text":"This Week in Startups, and they ensure that we're keeping all of our wonderful","speaker":0,"speakerLabel":"Speaker 0","timestamp":1208.23,"duration":4.3099976,"confidence":1}
+{"text":"partners happy. LinkedIn helped us connect with an amazing candidate","speaker":0,"speakerLabel":"Speaker 0","timestamp":1212.54,"duration":3.9499817,"confidence":1}
+{"text":"right here in Austin, and he had exactly the combination of experience we were looking for.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1216.49,"duration":4.970001,"confidence":0.99902344}
+{"text":"It's magic. It's alchemy. It's everything.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1221.46,"duration":3.0200195,"confidence":0.99902344}
+{"text":"For me to find a great team member. So hire right","speaker":0,"speakerLabel":"Speaker 0","timestamp":1224.48,"duration":3.2299805,"confidence":0.9970703}
+{"text":"the first time. Get started by posting your job for free","speaker":0,"speakerLabel":"Speaker 0","timestamp":1227.71,"duration":3.0200195,"confidence":1}
+{"text":"at linkedin.com/twist. Terms and conditions apply.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1230.73,"duration":3.230011,"confidence":0.9995117}
+{"text":"That's linkedin.com/twist. So if I wanted to","speaker":0,"speakerLabel":"Speaker 0","timestamp":1233.96,"duration":3.5899658,"confidence":0.99902344}
+{"text":"theoretically put $5,000,000 in for, you know, like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1237.55,"duration":3.619995,"confidence":0.9980469}
+{"text":"primary capital into the company, how would you look at","speaker":0,"speakerLabel":"Speaker 0","timestamp":1241.17,"duration":3.420044,"confidence":1}
+{"text":"you know, me negotiating that with you? Obviously, you just tap topped off a bit with the","speaker":0,"speakerLabel":"Speaker 0","timestamp":1244.5900000000001,"duration":4.039978,"confidence":0.99902344}
+{"text":"100,000,000, but, hey, an extra 5,000,000 is great. Maybe I can tweet once in a while. Hey.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1248.63,"duration":4.159973,"confidence":0.9941406}
+{"text":"Know, I'm an investor. How would you look at that if I wanted to, like, just","speaker":0,"speakerLabel":"Speaker 0","timestamp":1252.79,"duration":4.580017,"confidence":0.99902344}
+{"text":"I don't know. Because people have brought up Mercury. Like, how do we get on that game?","speaker":0,"speakerLabel":"Speaker 0","timestamp":1257.37,"duration":3.4100342,"confidence":0.99902344}
+{"text":"Alright. Jason, you get the best. Let's let's do it. Is it okay if I I'll","speaker":0,"speakerLabel":"Speaker 0","timestamp":1260.78,"duration":4.879944,"confidence":0.9904785}
+{"text":"introduce you. Well, this is actually interesting. Get you on the gap table. How about that?","speaker":1,"speakerLabel":"Speaker 1","timestamp":1265.6599999999999,"duration":3.0200195,"confidence":0.9941406}
+{"text":"Perfect. Okay. Let's put 5,000,000 in and 5,000,000. Deals","speaker":0,"speakerLabel":"Speaker 0","timestamp":1268.6799999999998,"duration":3.0499878,"confidence":0.9194336}
+{"text":"ten bits. Welcome to this ten bits. Our one percent is fifty million? Blah blah blah. I can get my 10 bps now. I should've got it earlier, but I get my 10 bps now. It just","speaker":0,"speakerLabel":"Speaker 0","timestamp":1271.73,"duration":8.73999,"confidence":0.9404297}
+{"text":"cost me a 100 more. Listen. Great job. Continued success.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1280.47,"duration":3.8900146,"confidence":0.9941406}
+{"text":"Appreciate you supporting this podcast and independent media, and","speaker":0,"speakerLabel":"Speaker 0","timestamp":1284.3600000000001,"duration":3.830017,"confidence":0.7788086}
+{"text":"and banks. You're my bank. I love using you guys.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1288.19,"duration":3.2000122,"confidence":0.9995117}
+{"text":"Before you go, though, how do you think about AI as","speaker":0,"speakerLabel":"Speaker 0","timestamp":1291.3899999999999,"duration":3.4699707,"confidence":0.99902344}
+{"text":"the CEO running the business? And then how do you think about AI vis a vis agents wanting to do transactions now? There's some new protocols. I know Coinbase has","speaker":0,"speakerLabel":"Speaker 0","timestamp":1294.8600000000001,"duration":9.609985,"confidence":0.99902344}
+{"text":"pioneered some of them. I think you might have been part of this new standard that's coming out.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1304.47,"duration":3.8000488,"confidence":1}
+{"text":"But people are gonna wanna use agents. Scary.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1308.27,"duration":3.5899658,"confidence":0.9946289}
+{"text":"Or just obvious? Like, how do you think about agents touching money? You know, I'm a big, like, sci fi guy. I love reading and","speaker":0,"speakerLabel":"Speaker 0","timestamp":1311.8600000000001,"duration":7.5700073,"confidence":0.99853516}
+{"text":"watching sci fi. So I always think, like, what's the future? Right? And I just feel like in ten years from now, like, everyone's","speaker":1,"speakerLabel":"Speaker 1","timestamp":1319.4299999999998,"duration":4.9700317,"confidence":0.9980469}
+{"text":"gonna have, like, a personal agent, and it's just doing stuff for them. So, like, I wanna","speaker":1,"speakerLabel":"Speaker 1","timestamp":1324.4,"duration":3.919983,"confidence":0.99902344}
+{"text":"I want Mercury to be an enabler for that. So, you know, we launched a CLI, and we already have an","speaker":1,"speakerLabel":"Speaker 1","timestamp":1328.3200000000002,"duration":4.25,"confidence":0.9970703}
+{"text":"So lots of people connecting their Mercury into Cowork and Cloud Code and chatty","speaker":1,"speakerLabel":"Speaker 1","timestamp":1332.5700000000002,"duration":4.7299805,"confidence":0.9707031}
+{"text":"and, like, you know, their workflows, and we wanna be wherever people want to use Mercury.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1337.3,"duration":4.9400024,"confidence":0.9951172}
+{"text":"Yeah. Eigentic payments, people already using Mercury kind of virtual cards to, you know,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1342.24,"duration":4.700012,"confidence":0.9951172}
+{"text":"give a card and, like, let let your agent go go do things. So we're gonna enable more of that.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1346.94,"duration":4.580017,"confidence":0.99902344}
+{"text":"And then, you know, not everyone is, like, bought into this future yet,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1351.52,"duration":4.1900024,"confidence":0.97875977}
+{"text":"and we we have Yeah. We're also introducing features on the Mercury app and","speaker":1,"speakerLabel":"Speaker 1","timestamp":1355.71,"duration":3.829956,"confidence":0.9980469}
+{"text":"Mercury website so you can we launched Mercury Insights so you can kinda ask","speaker":1,"speakerLabel":"Speaker 1","timestamp":1359.54,"duration":3.920044,"confidence":0.9941406}
+{"text":"questions from your transactions and they'll like summarize things like, hey, your AWS bill went","speaker":1,"speakerLabel":"Speaker 1","timestamp":1363.46,"duration":4.25,"confidence":0.98291016}
+{"text":"by 30%. Are you sure about that? That kind of thing. And then later,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1367.71,"duration":3.5299683,"confidence":0.994751}
+{"text":"later this summer, we're launching Mercury command where you can do kind of complex workflows. Like, you're like, hey.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1371.24,"duration":4.700012,"confidence":0.984375}
+{"text":"Pay my landlord 5 k, and it kinda sets it all up for you, and you just click approve kind of thing.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1375.94,"duration":3.8900146,"confidence":0.9980469}
+{"text":"Yeah. That's gonna be a really cool future when","speaker":1,"speakerLabel":"Speaker 1","timestamp":1379.83,"duration":3.829956,"confidence":0.99902344}
+{"text":"you can just ask questions Yeah. About what's going on with your bank as opposed to now","speaker":0,"speakerLabel":"Speaker 0","timestamp":1383.6599999999999,"duration":4.9700317,"confidence":1}
+{"text":"where banking is just, you know, really hard to get a handle on","speaker":0,"speakerLabel":"Speaker 0","timestamp":1388.63,"duration":4.0700073,"confidence":1}
+{"text":"what's going on with your money. This the easier it can be and just","speaker":0,"speakerLabel":"Speaker 0","timestamp":1392.7,"duration":3.7999878,"confidence":1}
+{"text":"my whoop makes it so I don't know if you're like a fan of whoop. Whoop on it. You got your whoop. Yeah.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1396.5,"duration":4.9699707,"confidence":0.9819336}
+{"text":"I don't know if you've been watching your a have you started using the AI Yeah. Jennifer, I can ask her","speaker":0,"speakerLabel":"Speaker 0","timestamp":1401.47,"duration":4.4000244,"confidence":0.99658203}
+{"text":"questions. But, you know, we actually do It's really neat. We actually do a lot more than banking now, so we","speaker":1,"speakerLabel":"Speaker 1","timestamp":1405.87,"duration":4.160034,"confidence":0.99902344}
+{"text":"started in banking, but we have invoicing, corporate credit card, bill pay. We just acquired a payroll company. So","speaker":1,"speakerLabel":"Speaker 1","timestamp":1410.03,"duration":4.9699707,"confidence":0.9863281}
+{"text":"actually, like, the AI get gets even more powerful when you can, like, do","speaker":1,"speakerLabel":"Speaker 1","timestamp":1415,"duration":3.3499756,"confidence":0.99902344}
+{"text":"Oh. You can More data. Hire it altogether, and you can be like, hey. I just hired an employee, set up payroll,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1418.35,"duration":4.9700317,"confidence":0.9448242}
+{"text":"issue them a card, set them on expenses, and, like, it just does all of that in, like, a couple of","speaker":1,"speakerLabel":"Speaker 1","timestamp":1423.3200000000002,"duration":4.460022,"confidence":0.9980469}
+{"text":"you just say it and it does it does it in a couple. So now you're going up against, like, the expensifiers","speaker":1,"speakerLabel":"Speaker 1","timestamp":1427.78,"duration":4.9699707,"confidence":0.9707031}
+{"text":"the Ripples Yeah. The PEOs, you know, all those I'm just like, you don't wanna sign up to all the stuff. Like, you just wanna yeah. Banking is where your money is. It's where your finance team is. Like, let's just do everything in one place. That's my my thinking. Yeah. And if you get to I remember","speaker":0,"speakerLabel":"Speaker 0","timestamp":1432.75,"duration":13.830017,"confidence":0.9970703}
+{"text":"Jerry Yang in the Yahoo days Yep. Told me at some point, I was interviewing him,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1446.58,"duration":4.130005,"confidence":0.99316406}
+{"text":"for my old magazine, Silicon Valley reporter, to really date this conversation.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1450.71,"duration":3.5899658,"confidence":0.99316406}
+{"text":"And I said, hey. What's, like, what's the focus now at Yahoo? And he said, the focus is 2.4.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1454.3,"duration":4.9700317,"confidence":0.99902344}
+{"text":"And I was like, what does it mean? He's like, if we can get you to use","speaker":0,"speakerLabel":"Speaker 0","timestamp":1459.27,"duration":3.1999512,"confidence":0.99902344}
+{"text":"2.4 services from Yahoo, you'll never leave.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1462.47,"duration":3.5600586,"confidence":0.99902344}
+{"text":"Like, I don't I still don't understand. He's like, okay. Do you have a Yahoo mail account? Was like, yes.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1466.03,"duration":3.619995,"confidence":0.9926758}
+{"text":"He's like, okay. Do you use Yahoo Finance or Yahoo Sports? I was like, yeah. I put the Knicks in there. I get","speaker":0,"speakerLabel":"Speaker 0","timestamp":1469.65,"duration":4.5199585,"confidence":0.9941406}
+{"text":"schedule, and and, yeah, I have some socks and, you know, he goes, okay. So you're three. Yeah.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1474.17,"duration":4.1000366,"confidence":0.95581055}
+{"text":"You're never gonna leave. And to this day,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1478.27,"duration":3.7999878,"confidence":0.9921875}
+{"text":"Your virtual assistant. Right? $3,000 a month. You got an assistant.","speaker":0,"speakerLabel":"Speaker 0","timestamp":720,"duration":3.35,"confidence":0.99658203}
+{"text":"They work on whatever time zone you're on. I travel a lot. Right? And so I have to book","speaker":0,"speakerLabel":"Speaker 0","timestamp":723.35,"duration":4.46,"confidence":1}
+{"text":"a lot of travel. So I made a travel playbook for myself.","speaker":0,"speakerLabel":"Speaker 0","timestamp":727.81,"duration":4.97,"confidence":1}
+{"text":"What I do now is whenever there is a potential travel,","speaker":0,"speakerLabel":"Speaker 0","timestamp":732.78,"duration":4.4299994,"confidence":1}
+{"text":"I have instructed them, these are the airlines in which order I like to fly.","speaker":0,"speakerLabel":"Speaker 0","timestamp":737.21,"duration":4.76,"confidence":0.99902344}
+{"text":"This is the pricing. If something is within 20%, there's no reason","speaker":0,"speakerLabel":"Speaker 0","timestamp":741.97,"duration":4.16,"confidence":1}
+{"text":"for me not to take my preferred carrier, which happens to be United right now.","speaker":0,"speakerLabel":"Speaker 0","timestamp":746.13,"duration":3.4100018,"confidence":1}
+{"text":"They're they're, like, the, best out of, Austin.","speaker":0,"speakerLabel":"Speaker 0","timestamp":749.54,"duration":2.9099998,"confidence":0.99609375}
+{"text":"Then, I have the hotels I like and the type of hotels I","speaker":0,"speakerLabel":"Speaker 0","timestamp":752.45,"duration":4.6399994,"confidence":0.99902344}
+{"text":"Now I like hotels that are funky, interesting, hip,","speaker":0,"speakerLabel":"Speaker 0","timestamp":757.09,"duration":4.040001,"confidence":0.9980469}
+{"text":"designer,","speaker":0,"speakerLabel":"Speaker 0","timestamp":761.13,"duration":1.579998,"confidence":0.79003906}
+{"text":"I like them in a certain,","speaker":0,"speakerLabel":"Speaker 0","timestamp":762.71,"duration":3.1399994,"confidence":0.99902344}
+{"text":"price range. And so I told them, hey. Use Monocle use Claude or OpenAI, whatever you want.","speaker":0,"speakerLabel":"Speaker 0","timestamp":765.85,"duration":8.880001,"confidence":0.9655762}
+{"text":"To search through content as travel leisure,","speaker":0,"speakerLabel":"Speaker 0","timestamp":774.73,"duration":3.7700005,"confidence":0.9902344}
+{"text":"Eater, Monaco Magazine,","speaker":0,"speakerLabel":"Speaker 0","timestamp":778.5,"duration":3.9799995,"confidence":0.90527344}
+{"text":"The New York Times, Travel. I gave them, these are the places to look for stuff.","speaker":0,"speakerLabel":"Speaker 0","timestamp":782.48,"duration":4.1000023,"confidence":0.99902344}
+{"text":"So then go rank them, give me my options,","speaker":0,"speakerLabel":"Speaker 0","timestamp":786.58,"duration":3.3799973,"confidence":1}
+{"text":"call them on the phone, get the best price, then tell me what the price","speaker":0,"speakerLabel":"Speaker 0","timestamp":789.96,"duration":4.3099976,"confidence":1}
+{"text":"are. Then when I tell you, call them up and say, hey. We're coming to","speaker":0,"speakerLabel":"Speaker 0","timestamp":794.27,"duration":3.6500015,"confidence":0.99609375}
+{"text":"Singapore. We'd like to stay here. We're gonna be here for five days. I'm booking.","speaker":0,"speakerLabel":"Speaker 0","timestamp":797.92,"duration":3.9500046,"confidence":0.99853516}
+{"text":"Can you, match the price? We had four options of hotels. We","speaker":0,"speakerLabel":"Speaker 0","timestamp":801.87,"duration":4.2199936,"confidence":0.99902344}
+{"text":"gave to this executive, the executive being me. And I know this sounds","speaker":0,"speakerLabel":"Speaker 0","timestamp":806.09,"duration":3.7400055,"confidence":0.9873047}
+{"text":"Like, why are you trying to save money? Well, we sure are trying to save money. I said, hey. Just,","speaker":0,"speakerLabel":"Speaker 0","timestamp":809.83,"duration":4.0699997,"confidence":0.9980469}
+{"text":"call them on the phone and say, hey. You know, we have a rate of $400 at this","speaker":0,"speakerLabel":"Speaker 0","timestamp":813.9,"duration":3.949997,"confidence":1}
+{"text":"hotel. You're charging 600. Wondering if you could match the 400 price or come a little closer","speaker":0,"speakerLabel":"Speaker 0","timestamp":817.85,"duration":4.790001,"confidence":1}
+{"text":"for a five day stay. Nine times out of 10, they're like, of course. We'll do it for $4.50. We'll do it for 500.","speaker":0,"speakerLabel":"Speaker 0","timestamp":822.64,"duration":4.9100037,"confidence":0.99902344}
+{"text":"And we book it. That saves me the cost","speaker":0,"speakerLabel":"Speaker 0","timestamp":827.55,"duration":4.0699997,"confidence":0.9980469}
+{"text":"of the Athena assistant per year.","speaker":0,"speakerLabel":"Speaker 0","timestamp":831.62,"duration":2.8099976,"confidence":0.99902344}
+{"text":"Let that sink in. If you travel a hundred days,","speaker":0,"speakerLabel":"Speaker 0","timestamp":834.4300000000001,"duration":3.050003,"confidence":0.9995117}
+{"text":"and you save a certain amount of money per day, it adds up.","speaker":0,"speakerLabel":"Speaker 0","timestamp":837.48,"duration":3.8899994,"confidence":1}
+{"text":"The same thing with the travel costs of the flights.","speaker":0,"speakerLabel":"Speaker 0","timestamp":841.37,"duration":2.9399948,"confidence":1}
+{"text":"Finding these different routes. Then when I go to the city,","speaker":0,"speakerLabel":"Speaker 0","timestamp":844.31,"duration":3.7400055,"confidence":1}
+{"text":"like to go to the best restaurants. So I told them, this is the places to look for","speaker":0,"speakerLabel":"Speaker 0","timestamp":848.05,"duration":3.1100006,"confidence":0.9970703}
+{"text":"best restaurants. Here's how, Instagram works.","speaker":0,"speakerLabel":"Speaker 0","timestamp":851.16,"duration":3.3499908,"confidence":0.9975586}
+{"text":"And then what I want you to do is when I go to that city, I want you to book me","speaker":0,"speakerLabel":"Speaker 0","timestamp":854.51,"duration":4.680008,"confidence":0.99902344}
+{"text":"a 05:30 and a 07:30 dinner reservation","speaker":0,"speakerLabel":"Speaker 0","timestamp":859.19,"duration":3.9799957,"confidence":0.9995117}
+{"text":"for the entire five days. I'm there every day,","speaker":0,"speakerLabel":"Speaker 0","timestamp":863.17,"duration":3.350006,"confidence":0.99902344}
+{"text":"in the afternoon, ask me which one I plan on going to.","speaker":0,"speakerLabel":"Speaker 0","timestamp":866.52,"duration":3.050003,"confidence":0.99902344}
+{"text":"And we'll cancel the other. And sometimes I get charged $10 a If I if I do it too short, I'm happy to pay it to the restaurant.","speaker":0,"speakerLabel":"Speaker 0","timestamp":869.5699999999999,"duration":6.25,"confidence":0.99902344}
+{"text":"This has made travel so easy for me.","speaker":0,"speakerLabel":"Speaker 0","timestamp":875.8199999999999,"duration":3.0499878,"confidence":1}
+{"text":"Could I do this with an agent? No.","speaker":0,"speakerLabel":"Speaker 0","timestamp":878.87,"duration":4.1600037,"confidence":1}
+{"text":"But an Athena assistant who knows how to use","speaker":0,"speakerLabel":"Speaker 0","timestamp":883.03,"duration":3.199997,"confidence":1}
+{"text":"technology and knows how to use this software, they become superhuman.","speaker":0,"speakerLabel":"Speaker 0","timestamp":886.23,"duration":4.0700073,"confidence":0.9777832}
+{"text":"And all I have to do is explain it to them once. I look at the work. I iterate.","speaker":0,"speakerLabel":"Speaker 0","timestamp":890.3,"duration":3.9799957,"confidence":1}
+{"text":"Explain it to them once. A little bit of work. Iterate.","speaker":0,"speakerLabel":"Speaker 0","timestamp":894.28,"duration":3.2299957,"confidence":0.9909668}
+{"text":"That has led to my travel being","speaker":0,"speakerLabel":"Speaker 0","timestamp":897.51,"duration":3.25,"confidence":1}
+{"text":"cheaper,","speaker":0,"speakerLabel":"Speaker 0","timestamp":900.76,"duration":1.2900085,"confidence":0.7272949}
+{"text":"better, and just","speaker":0,"speakerLabel":"Speaker 0","timestamp":902.05,"duration":3.0200043,"confidence":0.9975586}
+{"text":"so deft. I would never ask an American assistant to do this kind of lunacy, because they would look at me and be like, that's completely inefficient.","speaker":0,"speakerLabel":"Speaker 0","timestamp":905.0699999999999,"duration":9.429993,"confidence":0.99902344}
+{"text":"But I have extra hours for my Athena assistant, so I say to my Athena assistant,","speaker":0,"speakerLabel":"Speaker 0","timestamp":914.5,"duration":4.6399994,"confidence":0.99902344}
+{"text":"I wanna fill those hours. They want the work.","speaker":0,"speakerLabel":"Speaker 0","timestamp":919.14,"duration":3.2899933,"confidence":0.9970703}
+{"text":"Them being a little inefficient is no big deal.","speaker":0,"speakerLabel":"Speaker 0","timestamp":922.4300000000001,"duration":4.0400085,"confidence":1}
+{"text":"Because the arbitrage between what it they're getting paid","speaker":0,"speakerLabel":"Speaker 0","timestamp":926.47,"duration":4.399994,"confidence":0.99902344}
+{"text":"in The Philippines and what an American who will not take the job here. I","speaker":0,"speakerLabel":"Speaker 0","timestamp":930.87,"duration":3.980011,"confidence":0.99902344}
+{"text":"couldn't find people who would take the executive assistant job. If you try to get an executive assistant in a major city in America,","speaker":0,"speakerLabel":"Speaker 0","timestamp":934.85,"duration":7.9299927,"confidence":0.99902344}
+{"text":"It's a 100 to 150 k. Why?","speaker":0,"speakerLabel":"Speaker 0","timestamp":942.78,"duration":3.1100006,"confidence":0.9995117}
+{"text":"Because the people who take that job are like, nobody who wants","speaker":0,"speakerLabel":"Speaker 0","timestamp":945.89,"duration":3.0200043,"confidence":0.99902344}
+{"text":"to be of service and do this job anymore.","speaker":0,"speakerLabel":"Speaker 0","timestamp":948.91,"duration":3.2200012,"confidence":1}
+{"text":"What used to be a secretary then became an executive assistant, they just","speaker":0,"speakerLabel":"Speaker 0","timestamp":952.13,"duration":3.199997,"confidence":0.99902344}
+{"text":"people don't want that job. And if they do take it, they only take that job, Alex,","speaker":0,"speakerLabel":"Speaker 0","timestamp":955.33,"duration":4.099991,"confidence":1}
+{"text":"as a springboard to the next job. Yep. So you lose them every eighteen months.","speaker":0,"speakerLabel":"Speaker 0","timestamp":959.4300000000001,"duration":3.9500122,"confidence":0.99902344}
+{"text":"Which then you to retrain them, which is so much fun.","speaker":0,"speakerLabel":"Speaker 0","timestamp":963.38,"duration":3.2899933,"confidence":0.9863281}
+{"text":"If you want to get an EA, go to","speaker":0,"speakerLabel":"Speaker 0","timestamp":966.67,"duration":3.2299957,"confidence":1}
+{"text":"athena.com/jcal. It'll take it right to this page","speaker":1,"speakerLabel":"Speaker 1","timestamp":969.9,"duration":4.220001,"confidence":0.99902344}
+{"text":"secret engine behind Jason Kallikanis' productivity. Jason is pretty There's my tip.","speaker":1,"speakerLabel":"Speaker 1","timestamp":974.12,"duration":4.610016,"confidence":0.95947266}
+{"text":"Gotta say. Yes. I I was I'm glad that you,","speaker":1,"speakerLabel":"Speaker 1","timestamp":978.73,"duration":4.7299805,"confidence":1}
+{"text":"I'm glad that you reminded me to share this tip because I give this tip","speaker":0,"speakerLabel":"Speaker 0","timestamp":983.46,"duration":4.3099976,"confidence":1}
+{"text":"to my friends when they're like, hey. I got an Athena assistant. I heard you talk about it.","speaker":0,"speakerLabel":"Speaker 0","timestamp":987.77,"duration":3.710022,"confidence":0.9970703}
+{"text":"Go to athenawow.com as well. Just athenawow.com.","speaker":0,"speakerLabel":"Speaker 0","timestamp":991.48,"duration":3.769989,"confidence":0.9873047}
+{"text":"Will send you to that URL too. And","speaker":0,"speakerLabel":"Speaker 0","timestamp":995.25,"duration":4.049988,"confidence":0.99902344}
+{"text":"I think after us talking about it on All In and","speaker":0,"speakerLabel":"Speaker 0","timestamp":999.3,"duration":4.340027,"confidence":0.99902344}
+{"text":"about it on This Week in Startups, they've started to build up","speaker":0,"speakerLabel":"Speaker 0","timestamp":1003.64,"duration":3.5599976,"confidence":0.99658203}
+{"text":"their inventory. So if you were somebody who was on a wait list, if you go to my URL,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1007.2,"duration":4.9400024,"confidence":0.99902344}
+{"text":"they'll move you up the wait list because you're a friend of JCAL's.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1012.14,"duration":3.3199768,"confidence":0.9736328}
+{"text":"Also, if you wanna think about this in a different light, I was just listening to you talk about it. I'm like, well,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1015.46,"duration":3.830017,"confidence":0.9951172}
+{"text":"a little expensive. Then I was like, wait. I pay a lot more than that for my nanny right now.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1019.29,"duration":4.869995,"confidence":1}
+{"text":"You know? So as soon as I don't need a nanny, I'm gonna get an EDA.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1024.16,"duration":4.0400085,"confidence":0.9970703}
+{"text":"Two thousand hours a year, if it was","speaker":0,"speakerLabel":"Speaker 0","timestamp":1028.2,"duration":3.75,"confidence":1}
+{"text":"yeah. If it's $2,000 times $20 an hour is","speaker":0,"speakerLabel":"Speaker 0","timestamp":1031.95,"duration":3.7099915,"confidence":0.9980469}
+{"text":"40, and this is 36, so it's, like, whatever it is, $15.06 $16 an hour or something,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1035.66,"duration":4.970001,"confidence":0.9873047}
+{"text":"So it's a great deal for them. Athena has a little bit of margin in there, but not crazy.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1040.63,"duration":4.970001,"confidence":1}
+{"text":"And go ahead and try to hire somebody","speaker":0,"speakerLabel":"Speaker 0","timestamp":1045.6,"duration":3.019989,"confidence":1}
+{"text":"who is a professional, who wants to do this kind of","speaker":0,"speakerLabel":"Speaker 0","timestamp":1048.62,"duration":3.2600098,"confidence":0.99902344}
+{"text":"like, what would seemingly, for an American, be tedious,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1051.88,"duration":3.2299805,"confidence":0.99902344}
+{"text":"Boom. Nannies right now, minimum in a major city,","speaker":2,"speakerLabel":"Speaker 2","timestamp":1055.1100000000001,"duration":4.970001,"confidence":0.9785156}
+{"text":"I know in San Francisco, it's $50 an hour minimum.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1060.08,"duration":3.6500244,"confidence":0.99902344}
+{"text":"Yeah. It's it's 30 to 50 here in Providence, so it's a little bit of a discount. Live","speaker":2,"speakerLabel":"Speaker 2","timestamp":1063.73,"duration":4.1299744,"confidence":0.9970703}
+{"text":"yeah, you you live in, a a I I don't wanna say second tier, but Oh. A","speaker":2,"speakerLabel":"Speaker 2","timestamp":1067.8600000000001,"duration":4.970001,"confidence":0.9760742}
+{"text":"smaller. Well, no. It sound like a major city. I I And then there's","speaker":1,"speakerLabel":"Speaker 1","timestamp":1072.83,"duration":4.5500183,"confidence":0.9213867}
+{"text":"whatever minor cities. What what we what do we say? Like,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1077.38,"duration":3.019989,"confidence":0.8989258}
+{"text":"it's No. No. Tier two cities. Three. It's correct. You're dead on I was just pretending to be annoyed, but","speaker":0,"speakerLabel":"Speaker 0","timestamp":1080.4,"duration":4.01001,"confidence":0.96313477}
+{"text":"I like living in a tier two city because I can walk. I mean, I live","speaker":3,"speakerLabel":"Speaker 3","timestamp":1084.41,"duration":3.4100037,"confidence":0.99316406}
+{"text":"is Austin a tier one city or a tier two? I guess it's a million people now.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1087.82,"duration":3.380005,"confidence":0.9760742}
+{"text":"Is it tier two? Upper end of tier two. I like Chicago, LA, New York, New York,","speaker":0,"speakerLabel":"Speaker 0","timestamp":1091.2,"duration":4.970001,"confidence":0.99902344}
+{"text":"you know, like, the the big tier Washington, DC. Absolutely.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1096.17,"duration":3.3199768,"confidence":0.8745117}
+{"text":"So tier two is a pretty wide band, and I would be confident at the lower end of it by size,","speaker":1,"speakerLabel":"Speaker 1","timestamp":1099.49,"duration":4.9100037,"confidence":0.99902344}
+{"text":"Austen at the higher end by size. But I think they're about the same. Yeah.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1104.4,"duration":3.0500183,"confidence":0.9975586}
+{"text":"Yeah. San Antonio's, like, top 10. I guess it's in population, but, you know,","speaker":2,"speakerLabel":"Speaker 2","timestamp":1107.45,"duration":4.519989,"confidence":0.99658203}
+{"text":"So, yeah, Austin, I think, is tier two at a I think we're at a million here in population. Alright. We have another","speaker":0,"speakerLabel":"Speaker 0","timestamp":1111.97,"duration":4.970001,"confidence":0.9916992}
+{"text":"Let's get to work. We do. Next up, we're gonna talk to our different Avi Patel from","speaker":0,"speakerLabel":"Speaker 0","timestamp":1116.94,"duration":3.769989,"confidence":0.99902344}
+{"text":"Kled. Now, Jason, this is a company that reached my attention because it was going","speaker":1,"speakerLabel":"Speaker 1","timestamp":1120.71,"duration":4.25,"confidence":0.99902344}
+{"text":"absolutely bonkers over on x. And what Avi was talking about was","speaker":1,"speakerLabel":"Speaker 1","timestamp":1124.96,"duration":3.5299988,"confidence":1}
+{"text":"essentially being ripped off by another company. And unlike we","speaker":1,"speakerLabel":"Speaker 1","timestamp":1128.49,"duration":4.0700073,"confidence":0.99902344}
+{"text":"when we usually see this sort of thing, people don't name names. They just allege bad behavior or","speaker":1,"speakerLabel":"Speaker 1","timestamp":1132.56,"duration":4.970001,"confidence":0.99902344}
+{"text":"behavior. In this case, though, Avi went nuclear by saying this company, this venture","speaker":1,"speakerLabel":"Speaker 1","timestamp":1137.53,"duration":4.8200073,"confidence":0.9980469}
+{"text":"capital around. So let's talk to Avi about what's going on. And Nice to meet you as well.","speaker":1,"speakerLabel":"Speaker 1","timestamp":1142.35,"duration":3.919983,"confidence":0.99902344}
+{"text":"Tell us, what does Kled do, k l e d? What is your","speaker":0,"speakerLabel":"Speaker 0","timestamp":1146.27,"duration":3.0200195,"confidence":0.9941406}
+{"text":"company, and what does it do? So Kled is the first human data marketplace.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1149.29,"duration":3.7399902,"confidence":1}
+{"text":"Let anyone upload their personal data and get paid for it. You can think of it kind of","speaker":4,"speakerLabel":"Speaker 4","timestamp":1153.03,"duration":4.25,"confidence":1}
+{"text":"like MerCore or Scale AI, except they focus mainly on aggregation.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1157.28,"duration":3.5599976,"confidence":0.9741211}
+{"text":"Or they focus mainly on labeling. We focus on aggregation. We collect","speaker":4,"speakerLabel":"Speaker 4","timestamp":1160.84,"duration":4.1900024,"confidence":0.99902344}
+{"text":"we've collected over 1,100,000,000 files to date in the last four months alone.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1165.03,"duration":4.3099976,"confidence":0.9992676}
+{"text":"Get over 5,000,000 files upload to our platform a day, have over 300,000 users,","speaker":4,"speakerLabel":"Speaker 4","timestamp":1169.34,"duration":3.9500122,"confidence":0.99934894}
+{"text":"have hit number one of the App Store in multiple countries, and have raised over $10,000,000 from some really cool investors. Yeah. So to","speaker":4,"speakerLabel":"Speaker 4","timestamp":1173.29,"duration":8.769989,"confidence":0.9970703}
+{"text":"explain in plain English, there has always been","speaker":0,"speakerLabel":"Speaker 0","timestamp":1182.06,"duration":3.019989,"confidence":1}
+{"text":"this desire for people to reverse the meta","speaker":0,"speakerLabel":"Speaker 0","timestamp":1185.08,"duration":4.130005,"confidence":1}
+{"text":"model. Meta collects our information by providing free services like","speaker":0,"speakerLabel":"Speaker 0","timestamp":1189.21,"duration":4.3099976,"confidence":1}
+{"text":"Facebook, Instagram, and WhatsApp. They collect your data. You get paid nothing. You get a free product.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1193.52,"duration":4.9400024,"confidence":1}
+{"text":"In return. You get to share your images unlimited to your friends. You don't have to pay for it.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1198.46,"duration":4.700012,"confidence":0.99902344}
+{"text":"But they collect your data. You get nothing from that. They resell","speaker":0,"speakerLabel":"Speaker 0","timestamp":1203.16,"duration":3.019989,"confidence":1}
+{"text":"your data to anyone who will pay them anything for it.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1206.18,"duration":3.0200195,"confidence":1}
+{"text":"Your idea was, hey. Let's get people to upload their data.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1209.2,"duration":3.2299805,"confidence":0.9980469}
+{"text":"And then you can then resell it, and you give them a portion of what you get paid.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1212.43,"duration":3.9500122,"confidence":1}
+{"text":"Correct. Yeah. I I think the the added benefit to that as well is that","speaker":4,"speakerLabel":"Speaker 4","timestamp":1216.38,"duration":3.380005,"confidence":0.9995117}
+{"text":"you can guide participation very easily because you're being very explicit that you're paying people out for it.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1219.76,"duration":4.8499756,"confidence":1}
+{"text":"Meaning that we just have, like, a a massive gig app with tasks directly from the leading labs.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1224.6100000000001,"duration":4.2800293,"confidence":0.9980469}
+{"text":"That tells you exactly what we want, and and we can collect that data better than anyone else. So this is the wrinkle.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1228.8899999999999,"duration":4.9699707,"confidence":0.99609375}
+{"text":"It's really more like MicroOne, one of our portfolio companies, or Scale AI.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1233.8600000000001,"duration":4.25,"confidence":0.99902344}
+{"text":"Where you can say to somebody, hey. We have an LLM","speaker":0,"speakerLabel":"Speaker 0","timestamp":1238.1100000000001,"duration":4.8200073,"confidence":1}
+{"text":"You would abstract who the LLM is, but let's say it was OpenAI.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1242.9299999999998,"duration":4.8200073,"confidence":1}
+{"text":"And they wanna study people who play video games because they wanna have better video game","speaker":0,"speakerLabel":"Speaker 0","timestamp":1247.75,"duration":4.0700073,"confidence":1}
+{"text":"content, or they wanna study people who shop on Amazon and Walmart.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1251.8200000000002,"duration":4.339966,"confidence":0.99902344}
+{"text":"You say, hey. We're gonna collect your data for that. I assume you do that with a browser plug in or you do it","speaker":0,"speakerLabel":"Speaker 0","timestamp":1256.1599999999999,"duration":4.2200317,"confidence":0.99902344}
+{"text":"with We have an app. A desk. We we just have a a a mobile app.","speaker":0,"speakerLabel":"Speaker 0","timestamp":1260.38,"duration":3.3200073,"confidence":0.9838867}
+{"text":"I think it's the easiest form factor. Instead of going for, like, experts, which actually is","speaker":4,"speakerLabel":"Speaker 4","timestamp":1263.7,"duration":4.0999756,"confidence":0.9975586}
+{"text":"typically what most of these labs do, we've shot","speaker":4,"speakerLabel":"Speaker 4","timestamp":1267.8,"duration":3.0200195,"confidence":0.96972656}
+{"text":"for the general consumer audience. We let anyone upload. So","speaker":4,"speakerLabel":"Speaker 4","timestamp":1270.8200000000002,"duration":3.1400146,"confidence":1}
+{"text":"we have an app where it's just a a full feed where you can see pretty much anything on there from","speaker":4,"speakerLabel":"Speaker 4","timestamp":1273.96,"duration":4.2799683,"confidence":0.99902344}
+{"text":"tasks from any of the labs. Oh, wow. And then you can also upload general data.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1278.24,"duration":3.169983,"confidence":0.9980469}
+{"text":"So you can go on there, upload your entire camera roll. And surprisingly, because","speaker":4,"speakerLabel":"Speaker 4","timestamp":1281.4099999999999,"duration":4.7300415,"confidence":1}
+{"text":"we we have again, that's what most people do, actually. Surprisingly, that data is very valuable.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1286.1399999999999,"duration":4.48999,"confidence":0.9980469}
+{"text":"Because it's consent driven. And right now,","speaker":4,"speakerLabel":"Speaker 4","timestamp":1290.63,"duration":3.0200195,"confidence":0.9707031}
+{"text":"people like OpenAI, for example, are preparing for IPO, cannot risk buying bad data","speaker":4,"speakerLabel":"Speaker 4","timestamp":1293.65,"duration":4.579956,"confidence":0.9995117}
+{"text":"that isn't legally licensed. Right? So when you upload on our platform, you're given your 100% consent across the board. And when you license your arms, you're confident you're not gonna","speaker":4,"speakerLabel":"Speaker 4","timestamp":1298.23,"duration":8.650024,"confidence":0.99658203}
+{"text":"sued after. How much would I get paid if I put 100,000 images into the system?","speaker":0,"speakerLabel":"Speaker 0","timestamp":1306.88,"duration":4.48999,"confidence":0.99902344}
+{"text":"Depends on the images, but if it's on the higher end of quality, like, definitely at $500.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1311.37,"duration":4.9700317,"confidence":1}
+{"text":"We had a recent we had a recent lab. I can't name which","speaker":4,"speakerLabel":"Speaker 4","timestamp":1316.3400000000001,"duration":4.339966,"confidence":0.99902344}
+{"text":"one, that was willing to offer a thousand dollars for a full person's camera roll, just the selfies on the camera roll, actually.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1320.6799999999998,"duration":9.039978,"confidence":0.9863281}
+{"text":"And they wanted a 100,000 people. Wow. Actively","speaker":4,"speakerLabel":"Speaker 4","timestamp":1329.72,"duration":4.2200317,"confidence":0.9951172}
+{"text":"working on that contract right now. Yeah. That that's a $100,000,000 contract.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1333.94,"duration":4.369995,"confidence":1}
+{"text":"Correct. Yeah. The the blocker in that is","speaker":4,"speakerLabel":"Speaker 4","timestamp":1338.31,"duration":3.0200195,"confidence":0.99902344}
+{"text":"our fraud detection pipeline, which no one will ever admit, by the way, is","speaker":4,"speakerLabel":"Speaker 4","timestamp":1341.33,"duration":4.0999756,"confidence":1}
+{"text":"what needs to be improved. We're almost there. I'd say another, like, two weeks, and we're gonna be at 90%.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1345.4299999999998,"duration":4.700012,"confidence":0.9995117}
+{"text":"But fraud detection is really hard at scale. If you're collecting data from a bunch","speaker":4,"speakerLabel":"Speaker 4","timestamp":1350.13,"duration":3.8900146,"confidence":0.99902344}
+{"text":"different regions, you need to make sure duplicates aren't being uploaded, interrupt plagiarized images","speaker":4,"speakerLabel":"Speaker 4","timestamp":1354.02,"duration":3.7999878,"confidence":0.99902344}
+{"text":"aren't uploaded, AI generated images, and then even task specific. Like, let's say the task is","speaker":4,"speakerLabel":"Speaker 4","timestamp":1357.8200000000002,"duration":4.5200195,"confidence":0.99902344}
+{"text":"take a video of you, out the trash. That task requires two hands in the video at all times.","speaker":4,"speakerLabel":"Speaker 4","timestamp":1362.3400000000001,"duration":4.1900024,"confidence":0.99609375}
+{"text":"All this into consideration, and then general catalyst gives $31,000,000 to them. That's the problem I","speaker":0,"speakerLabel":"Speaker 0","timestamp":720,"duration":4.85,"confidence":0.9633789}
