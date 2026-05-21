@@ -18,6 +18,12 @@ import { z } from 'zod';
 import type { ClaimClassification, TranscriptSegment } from '../shared/types.js';
 import type { RetrievedSource } from './retrieval.js';
 import { formatForDocket } from './retrieval.js';
+import {
+  getPersonaFragment,
+  getCurrentMode,
+  getExplanationWordMax,
+  type PersonaFragment,
+} from './personaModes.js';
 
 // Match the Haiku ID already used elsewhere in the codebase (llm-router.ts,
 // classifier.ts). One model string, one place to update.
@@ -67,21 +73,28 @@ export interface SynthesisResult {
 
 const wordCount = (s: string): number => s.split(/\s+/).filter(Boolean).length;
 
-const DocketSchema = z.object({
-  grounding: z.string().refine((s) => wordCount(s) <= 40, 'Grounding exceeds 40 words'),
-  verdict: z.enum(['TRUE', 'FALSE', 'MISLEADING', 'PARTIAL', 'UNVERIFIABLE']),
-  explanation: z.string().refine((s) => wordCount(s) <= 28, 'Explanation exceeds 28 words'),
-  citations: z.array(
-    z.object({
-      title: z.string(),
-      // url: null is valid — denotes a LanceDB show-archive reference
-      url: z.string().nullable(),
-      tier: z.number().min(1).max(3),
-      // Optional — Haiku doesn't emit it; post-processor sets it
-      citationSource: z.enum(['haiku', 'post_processor']).optional(),
-    })
-  ),
-});
+// Schema is built per request so the explanation word max can be tuned at
+// runtime via the Customize panel (see personaModes.ts).
+function buildDocketSchema(explanationWordMax: number) {
+  return z.object({
+    grounding: z.string().refine((s) => wordCount(s) <= 40, 'Grounding exceeds 40 words'),
+    verdict: z.enum(['TRUE', 'FALSE', 'MISLEADING', 'PARTIAL', 'UNVERIFIABLE']),
+    explanation: z.string().refine(
+      (s) => wordCount(s) <= explanationWordMax,
+      `Explanation exceeds ${explanationWordMax} words`,
+    ),
+    citations: z.array(
+      z.object({
+        title: z.string(),
+        // url: null is valid — denotes a LanceDB show-archive reference
+        url: z.string().nullable(),
+        tier: z.number().min(1).max(3),
+        // Optional — Haiku doesn't emit it; post-processor sets it
+        citationSource: z.enum(['haiku', 'post_processor']).optional(),
+      })
+    ),
+  });
+}
 
 const CANONICAL_UNVERIFIABLE_PHRASE = 'No primary source located in show archive or live retrieval.';
 const LANCEDB_INJECTION_SCORE_FLOOR = 0.45;
@@ -111,46 +124,61 @@ function scanBlocklist(text: string, list: string[]): string[] {
 
 // ─── Tool definition for Docket ────────────────────────────────────────
 
-const FACT_CHECK_TOOL = {
-  name: 'fact_check',
-  description: 'Output a structured fact-check verdict for the current claim.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      grounding: {
-        type: 'string',
-        description: "One sentence stating what the retrieved evidence directly says about the claim's specific assertion. Must reference at least one source. If evidence does not address the assertion, say so explicitly.",
-      },
-      verdict: {
-        type: 'string',
-        enum: ['TRUE', 'FALSE', 'MISLEADING', 'PARTIAL', 'UNVERIFIABLE'],
-      },
-      explanation: {
-        type: 'string',
-        description: '20–24 words target, 28 hard max. Include [1][2] citation references.',
-      },
-      citations: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            title: { type: 'string' },
-            // null URL → LanceDB show-archive reference (no public link).
-            url: { type: ['string', 'null'] },
-            tier: { type: 'number', enum: [1, 2, 3] },
+function buildFactCheckTool(explanationWordMax: number) {
+  const targetHigh = Math.max(12, explanationWordMax - 4);
+  const targetLow = Math.max(8, targetHigh - 4);
+  return {
+    name: 'fact_check',
+    description: 'Output a structured fact-check verdict for the current claim.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        grounding: {
+          type: 'string',
+          description: "One sentence stating what the retrieved evidence directly says about the claim's specific assertion. Must reference at least one source. If evidence does not address the assertion, say so explicitly.",
+        },
+        verdict: {
+          type: 'string',
+          enum: ['TRUE', 'FALSE', 'MISLEADING', 'PARTIAL', 'UNVERIFIABLE'],
+        },
+        explanation: {
+          type: 'string',
+          description: `${targetLow}–${targetHigh} words target, ${explanationWordMax} hard max. Include [1][2] citation references.`,
+        },
+        citations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              // null URL → LanceDB show-archive reference (no public link).
+              url: { type: ['string', 'null'] },
+              tier: { type: 'number', enum: [1, 2, 3] },
+            },
+            required: ['title', 'url', 'tier'],
           },
-          required: ['title', 'url', 'tier'],
         },
       },
+      required: ['grounding', 'verdict', 'explanation', 'citations'],
     },
-    required: ['grounding', 'verdict', 'explanation', 'citations'],
-  },
-};
+  };
+}
 
 // ─── System prompts ────────────────────────────────────────────────────
 
-const DOCKET_SYSTEM = `You are The Docket — a real-time fact-checker for a live podcast interview.
-VOICE: Clinical precision. Senior research librarian. "The record is the record." Zero fluff, zero editorializing, zero speculation.
+// Built per request so the persona fragment (voice, grounding addendum,
+// verdict addendum) and the explanation word max can be tuned at runtime.
+// For mode=producer with default wordMax=28, this reproduces the May 2026
+// DOCKET_SYSTEM byte-for-byte.
+function buildDocketSystem(fragment: PersonaFragment, explanationWordMax: number): string {
+  const groundingExtra = fragment.groundingInstructions
+    ? `\n\n${fragment.groundingInstructions}`
+    : '';
+  const verdictExtra = fragment.verdictGuidance
+    ? `\n\n${fragment.verdictGuidance}`
+    : '';
+  return `You are The Docket — a real-time fact-checker for a live podcast interview.
+${fragment.explanationVoice}
 RULES:
 * You verify claims using ONLY the sources provided. Never invent sources.
 * Treat host AND co-host statements with identical rigor to guest statements.
@@ -160,12 +188,12 @@ RULES:
 * Never editorialize: "worth noting", "red flag", "good question"
 * Never reference "cynic" or implication/risk framing
 * Grounding must be 40 words or fewer. Count carefully.
-* Explanation must be 28 words or fewer. Count carefully.
+* Explanation must be ${explanationWordMax} words or fewer. Count carefully.
 * Every citation number [1], [2] must correspond to a source in the provided list. Never fabricate.
 
 GROUNDING:
 
-Before assigning a verdict, populate the grounding field: state in one sentence what the retrieved evidence directly says about the specific assertion in the claim. Do not restate the claim. Do not summarize the topic. If the evidence does not directly address the assertion, say so explicitly and assign UNVERIFIABLE. The grounding must reference at least one citation by number.
+Before assigning a verdict, populate the grounding field: state in one sentence what the retrieved evidence directly says about the specific assertion in the claim. Do not restate the claim. Do not summarize the topic. If the evidence does not directly address the assertion, say so explicitly and assign UNVERIFIABLE. The grounding must reference at least one citation by number.${groundingExtra}
 
 SOURCE SECTIONS:
 
@@ -190,7 +218,7 @@ For claims about product availability ("X is live in App Store"), platform reach
 
 UNVERIFIABLE — No retrieved source addresses the entity in the claim at all. This verdict is reserved for genuine retrieval failure — not for "I found a source about the entity but it doesn't confirm the exact stat." If at least one merged source names or covers the entity in the claim, use PARTIAL instead. Sources about a different entity that happens to share the claim's number (e.g., "$280M valuation" matched against an unrelated company's $280M raise) do NOT count as topical — those still warrant UNVERIFIABLE.
 
-When in doubt between PARTIAL and UNVERIFIABLE: if you can write a meaningful explanation that references at least one source, it's PARTIAL. If you genuinely have nothing to work with, it's UNVERIFIABLE.
+When in doubt between PARTIAL and UNVERIFIABLE: if you can write a meaningful explanation that references at least one source, it's PARTIAL. If you genuinely have nothing to work with, it's UNVERIFIABLE.${verdictExtra}
 
 LANCEDB (SHOW ARCHIVE) CITATION RULE:
 
@@ -365,6 +393,7 @@ OUTPUT:
   "explanation": "TWiST Ep 2194 discussed LinkedIn's scale and platform reach [1]; the specific one billion figure is not independently confirmed.",
   "citations": [{"title": "TWiST Ep 2194 – LinkedIn platform discussion", "url": null, "tier": 1}]
 }`;
+}
 
 // ─── Anthropic call helper (raw fetch — matches llm-router.ts pattern) ─
 
@@ -461,7 +490,8 @@ function citationsRefInExplanation(text: string): number[] {
 export function applyLanceDBInjection(
   candidate: DocketOutput,
   sources: RetrievedSource[],
-  claim: ClaimClassification
+  claim: ClaimClassification,
+  explanationWordMax = getExplanationWordMax()
 ): DocketOutput {
   const lanceSources = sources.filter((s) => s.type === 'lancedb');
   if (lanceSources.length === 0) return candidate;
@@ -513,10 +543,10 @@ export function applyLanceDBInjection(
   const appendSentence = ` TWiST Ep ${ep} (${date}) covered this topic [${injectedIdx}].`;
   if (next.explanation.includes(CANONICAL_UNVERIFIABLE_PHRASE)) {
     const replaced = next.explanation.replace(CANONICAL_UNVERIFIABLE_PHRASE, replacementSentence);
-    next = { ...next, explanation: wordCount(replaced) <= 28 ? replaced : replacementSentence };
+    next = { ...next, explanation: wordCount(replaced) <= explanationWordMax ? replaced : replacementSentence };
   } else {
     const appended = next.explanation.trimEnd() + appendSentence;
-    if (wordCount(appended) <= 28) {
+    if (wordCount(appended) <= explanationWordMax) {
       next = { ...next, explanation: appended };
     }
   }
@@ -533,15 +563,16 @@ export function applyLanceDBInjection(
 export function buildCorrectiveInstruction(
   input: { explanation?: unknown; grounding?: unknown },
   explFail: string | undefined,
-  groundingFail: string | undefined
+  groundingFail: string | undefined,
+  explanationWordMax = getExplanationWordMax()
 ): string {
   const parts: string[] = [];
 
   if (explFail && typeof input.explanation === 'string') {
     const n = input.explanation.split(/\s+/).filter(Boolean).length;
     parts.push(
-      `Your previous explanation was ${n} words. The required maximum is 28 words. ` +
-      `Shorten the previous explanation to 28 words or fewer while preserving all citation references in the form [1], [2], etc. ` +
+      `Your previous explanation was ${n} words. The required maximum is ${explanationWordMax} words. ` +
+      `Shorten the previous explanation to ${explanationWordMax} words or fewer while preserving all citation references in the form [1], [2], etc. ` +
       `Do not introduce new citations. Do not change the verdict. Do not change which sources are referenced — only the prose length.\n\n` +
       `Your previous explanation:\n"${input.explanation}"`
     );
@@ -573,6 +604,16 @@ export async function runDocket(
     return { output: null, ms: 0 };
   }
 
+  // Snapshot persona + word-max settings once per request so a mid-flight
+  // panel change doesn't tear the schema/tool/prompt apart between attempts.
+  const personaMode = getCurrentMode();
+  const personaFragment = getPersonaFragment(personaMode);
+  const explanationWordMax = getExplanationWordMax();
+  const docketSystem = buildDocketSystem(personaFragment, explanationWordMax);
+  const factCheckTool = buildFactCheckTool(explanationWordMax);
+  const docketSchema = buildDocketSchema(explanationWordMax);
+  console.log(`[DOCKET] Mode=${personaMode} explanationWordMax=${explanationWordMax}`);
+
   // All-Tier-3 retrieval: nudge toward PARTIAL (no longer forced UNVERIFIABLE).
   // Trust Haiku's judgment per the new VERDICT RULES — citations from related
   // context still count.
@@ -593,11 +634,11 @@ export async function runDocket(
     let raw: any;
     try {
       raw = await callHaiku({
-        systemPrompt: DOCKET_SYSTEM,
+        systemPrompt: docketSystem,
         userMessage: attemptUserMessage,
         maxTokens: 500,
         temperature: 0,
-        tools: [FACT_CHECK_TOOL],
+        tools: [factCheckTool],
         toolChoice: { type: 'tool', name: 'fact_check' },
       });
     } catch (err) {
@@ -612,7 +653,7 @@ export async function runDocket(
       continue;
     }
 
-    const zParse = DocketSchema.safeParse(input);
+    const zParse = docketSchema.safeParse(input);
     if (!zParse.success) {
       const messages = zParse.error.issues.map((i) => i.message);
       console.warn(`[DOCKET] Zod validation failed (attempt ${attempt}): ${messages.join('; ')}`);
@@ -623,7 +664,7 @@ export async function runDocket(
         const explFail = messages.find((m) => m.startsWith('Explanation exceeds'));
         const groundingFail = messages.find((m) => m.startsWith('Grounding exceeds'));
         if (explFail || groundingFail) {
-          correctiveInstruction = buildCorrectiveInstruction(input, explFail, groundingFail);
+          correctiveInstruction = buildCorrectiveInstruction(input, explFail, groundingFail, explanationWordMax);
         } else {
           // Non-word-count Zod failure (verdict-enum, tier-range, citation-url, etc.).
           // Without a hint, attempt 2 retries identically and fails identically.
@@ -694,7 +735,7 @@ export async function runDocket(
       })),
     };
 
-    candidate = applyLanceDBInjection(candidate, sources, claim);
+    candidate = applyLanceDBInjection(candidate, sources, claim, explanationWordMax);
 
     // Provenance downgrade: if every citation references a derived_verdict
     // source (Sentinel's own prior conclusions written back to LanceDB), the
