@@ -49,13 +49,14 @@ export async function callLLM(
   systemPrompt: string,
   context: string
 ): Promise<RouterResult> {
-  // CLASSIFIER_PROVIDER=gemini routes the classifier through Gemini → Groq →
-  // Ollama instead of the Haiku-first default. Stops Anthropic credit spend
-  // on the highest-volume LLM call.
+  // CLASSIFIER_PROVIDER=gemini routes the classifier through Gemini → Groq
+  // instead of the Haiku-first default. Stops Anthropic credit spend on the
+  // highest-volume LLM call. Ollama removed as classifier fallback — when
+  // both primary and Groq fail, classifier returns empty (segment unevaluated).
   const baseChain = ROUTING[personaId] ?? (
     personaId === 'classifier' && process.env.CLASSIFIER_PROVIDER === 'gemini'
-      ? ['gemini', 'groq', 'ollama']
-      : ['haiku', 'groq', 'ollama']
+      ? ['gemini', 'groq']
+      : ['haiku', 'groq']
   );
   // In production, Ollama isn't reachable (no local model server on the PaaS).
   // Drop it from the fallback chain so we fail fast to 'none' instead of
