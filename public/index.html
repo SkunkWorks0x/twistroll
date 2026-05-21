@@ -1798,11 +1798,12 @@
   //     polled yet, or server returned an empty object), apply the same
   //     legacy fallback inline so we never render the literal "SPEAKER N"
   //     for ids 0 and 1.
-  //   - Names: only an explicit operator-provided per-id override
-  //     (sessionContext.speakerNames[id]) is rendered. Otherwise the label
-  //     is the role itself: HOST / COHOST / GUEST. We do NOT pull from
-  //     ctx.hostName / cohostName / guestName — those auto-filled paths
-  //     produced "JASON" / "LON" without explicit consent.
+  //   - Names: sessionContext.speakerNames[id] sources both operator
+  //     overrides AND registry-derived auto-bindings (host roster /
+  //     YouTube title guests / transcript intro patterns). Display is
+  //     first-name uppercase, full name when first-name is ambiguous
+  //     across known speakers. Falls back to HOST/COHOST/GUEST when
+  //     no name is bound for the id.
   // Speaker keys round-trip through JSON as strings, so look up by both forms.
   function resolveSpeaker(speakerId) {
     const map = state.session.effectiveSpeakerMap
@@ -1820,11 +1821,47 @@
 
     const namesMap = ctx.speakerNames || {};
     const perId = namesMap[speakerId] ?? namesMap[String(speakerId)];
+    const display = displayName(perId, namesMap);
 
-    if (role === 'host')   return { role, name: perId || 'HOST',   roleClass: 'role-host' };
-    if (role === 'cohost') return { role, name: perId || 'COHOST', roleClass: 'role-cohost' };
-    if (role === 'guest')  return { role, name: perId || 'GUEST',  roleClass: 'role-guest' };
-    return { role: 'guest', name: perId || 'GUEST', roleClass: 'role-guest' };
+    if (role === 'host')   return { role, name: display || 'HOST',   roleClass: 'role-host' };
+    if (role === 'cohost') return { role, name: display || 'COHOST', roleClass: 'role-cohost' };
+    if (role === 'guest')  return { role, name: display || 'GUEST',  roleClass: 'role-guest' };
+    return { role: 'guest', name: display || 'GUEST', roleClass: 'role-guest' };
+  }
+
+  // First-name uppercase display, full-name fallback when ambiguous (two
+  // speakers share a first name). Operator-edited names still feed in via
+  // sessionContext.speakerNames so manual overrides render the same way.
+  function displayName(perId, allNames) {
+    if (!perId) return null;
+    const firstName = perId.split(/\s+/)[0];
+    if (!firstName) return perId.toUpperCase();
+    const firstLower = firstName.toLowerCase();
+    let dupes = 0;
+    for (const n of Object.values(allNames || {})) {
+      if (n && n.split(/\s+/)[0].toLowerCase() === firstLower) {
+        dupes++;
+        if (dupes > 1) break;
+      }
+    }
+    return dupes > 1 ? perId.toUpperCase() : firstName.toUpperCase();
+  }
+
+  // Cache registry-derived speaker name/role from a transcript_segment broadcast.
+  // Older segments + cards re-render via applyMetaToTranscript / renderSidebar.
+  function applySpeakerNameFromSegment(seg) {
+    if (!seg || !seg.speakerName) return;
+    state.session.sessionContext = state.session.sessionContext || {};
+    const names = state.session.sessionContext.speakerNames = state.session.sessionContext.speakerNames || {};
+    const map = state.session.effectiveSpeakerMap = state.session.effectiveSpeakerMap || (state.session.speakerMap || {});
+    const id = seg.speaker;
+    let changed = false;
+    if (names[id] !== seg.speakerName) { names[id] = seg.speakerName; changed = true; }
+    if (seg.speakerRole && map[id] !== seg.speakerRole) { map[id] = seg.speakerRole; changed = true; }
+    if (changed) {
+      applyMetaToTranscript();
+      renderSidebar();
+    }
   }
 
   // Resolve a card's speaker for the claim-quote pill. Returns r.name as-is
@@ -1980,6 +2017,7 @@
   function handleMessage(msg, wsReceivedMs) {
     switch (msg.type) {
       case 'transcript_segment':
+        applySpeakerNameFromSegment(msg.data);
         addSegment(msg.data);
         break;
       case 'claim_card':
