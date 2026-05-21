@@ -3,7 +3,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { resolve, dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { appConfig } from '../config/config.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
@@ -370,6 +370,17 @@ function processIncomingSegment(segment: TranscriptSegment): void {
   sessionPipelineCounters.segmentsReceived++;
   // Broadcast first — never gate transcript visibility on classifier latency.
   broadcast({ type: 'transcript_segment', data: segment });
+
+  if (process.env.CAPTURE_TRANSCRIPT === 'true') {
+    try {
+      appendFileSync(join(DEMO_DIR, 'captured-transcript.jsonl'), JSON.stringify({
+        text: segment.text, speaker: segment.speaker, speakerLabel: segment.speakerLabel,
+        timestamp: segment.timestamp, duration: segment.duration, confidence: segment.confidence,
+      }) + '\n');
+    } catch (err) {
+      console.error(`[capture] appendFileSync failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // Roll the context buffer.
   lastSegments.push(segment);
