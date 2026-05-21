@@ -264,12 +264,59 @@
   }
   .source-chip.tier-1 { border-left: 2px solid #34D399; }
   .source-chip.tier-3 { border-left: 2px solid #FBBF24; }
+  .source-chip[data-url] { cursor: pointer; }
   .source-chip-more {
     font-family: var(--mono);
     font-size: 11px;
     color: var(--text-faint);
     padding: 2px 4px;
   }
+
+  .citation-tooltip {
+    position: fixed;
+    z-index: 1000;
+    background: #18181C;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    padding: 12px;
+    max-width: 320px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms;
+  }
+  .citation-tooltip.visible { opacity: 1; pointer-events: auto; }
+  .citation-tooltip .tt-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: #E2E4E9;
+    margin-bottom: 6px;
+    word-break: break-word;
+  }
+  .citation-tooltip .tt-snippet {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 13px;
+    font-style: italic;
+    color: #8B8F9A;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+  .citation-tooltip .tt-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #555861;
+  }
+  .citation-tooltip .tt-tier {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .citation-tooltip .tt-tier.tier-1 { border-left: 2px solid #34D399; }
+  .citation-tooltip .tt-tier.tier-3 { border-left: 2px solid #FBBF24; }
 
   .follow-banner {
     position: sticky;
@@ -1235,6 +1282,7 @@
     </div>
     <div id="follow-banner" class="follow-banner hidden">0 new claims ↑</div>
     <div id="pipeline-stats" class="pipeline-stats hidden"></div>
+    <div id="citation-tooltip" class="citation-tooltip" role="tooltip"></div>
   </aside>
 </main>
 
@@ -2057,24 +2105,93 @@
     // verdict are unchanged; this hides chips above the chosen tier).
     const visible = citations.filter((c) => (c.tier || 99) <= customize.maxDisplayTier);
     if (visible.length === 0) return null;
-    const chips = visible.map(extractChipData).filter(Boolean);
-    if (chips.length === 0) return null;
+    const pairs = visible
+      .map((c) => ({ citation: c, chip: extractChipData(c) }))
+      .filter((p) => p.chip);
+    if (pairs.length === 0) return null;
     const wrapper = document.createElement('span');
     wrapper.className = 'source-chips';
-    chips.slice(0, 2).forEach((chip) => {
+    pairs.slice(0, 2).forEach(({ citation, chip }) => {
       const el = document.createElement('span');
       el.className = `source-chip tier-${chip.tier}`;
       el.textContent = chip.year ? `${chip.name} · ${chip.year}` : chip.name;
+      el.dataset.title = citation.title || '';
+      el.dataset.tier = String(citation.tier || '');
+      if (citation.snippet) el.dataset.snippet = citation.snippet;
+      if (citation.url) {
+        el.dataset.url = citation.url;
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          navigator.clipboard.writeText(citation.url).catch(() => {});
+        });
+      }
       wrapper.appendChild(el);
     });
-    if (chips.length > 2) {
+    if (pairs.length > 2) {
       const more = document.createElement('span');
       more.className = 'source-chip-more';
-      more.textContent = `+${chips.length - 2} more`;
+      more.textContent = `+${pairs.length - 2} more`;
       wrapper.appendChild(more);
     }
     return wrapper;
   }
+
+  // ─── Citation hover tooltip (single reusable element) ────────────
+  const citationTooltipEl = document.getElementById('citation-tooltip');
+  let citationTooltipHideTimer = null;
+  function showCitationTooltip(chipEl) {
+    if (citationTooltipHideTimer) {
+      clearTimeout(citationTooltipHideTimer);
+      citationTooltipHideTimer = null;
+    }
+    const title = chipEl.dataset.title || '';
+    const snippet = chipEl.dataset.snippet || '';
+    const tier = chipEl.dataset.tier || '';
+    const url = chipEl.dataset.url || '';
+    const tierHtml = tier
+      ? `<span class="tt-tier tier-${escape(tier)}">T${escape(tier)}</span>`
+      : '<span></span>';
+    const copyHint = url ? '<span>Click to copy URL</span>' : '<span></span>';
+    const snippetHtml = snippet ? `<div class="tt-snippet">${escape(snippet)}</div>` : '';
+    citationTooltipEl.innerHTML =
+      `<div class="tt-title">${escape(title)}</div>` +
+      snippetHtml +
+      `<div class="tt-meta">${tierHtml}${copyHint}</div>`;
+    citationTooltipEl.classList.add('visible');
+    const chipRect = chipEl.getBoundingClientRect();
+    const ttRect = citationTooltipEl.getBoundingClientRect();
+    let left = chipRect.left + chipRect.width / 2 - ttRect.width / 2;
+    let top = chipRect.top - ttRect.height - 8;
+    if (top < 10) top = chipRect.bottom + 8; // flip below if near top of viewport
+    if (left < 10) left = 10;
+    if (left + ttRect.width > window.innerWidth - 10) {
+      left = window.innerWidth - ttRect.width - 10;
+    }
+    citationTooltipEl.style.left = left + 'px';
+    citationTooltipEl.style.top = top + 'px';
+  }
+  function hideCitationTooltip() {
+    if (citationTooltipHideTimer) clearTimeout(citationTooltipHideTimer);
+    citationTooltipHideTimer = setTimeout(() => {
+      citationTooltipEl.classList.remove('visible');
+      citationTooltipHideTimer = null;
+    }, 100);
+  }
+  document.addEventListener('mouseover', (e) => {
+    const chip = e.target.closest('.source-chip');
+    if (chip) showCitationTooltip(chip);
+  });
+  document.addEventListener('mouseout', (e) => {
+    const chip = e.target.closest('.source-chip');
+    if (chip) hideCitationTooltip();
+  });
+  citationTooltipEl.addEventListener('mouseenter', () => {
+    if (citationTooltipHideTimer) {
+      clearTimeout(citationTooltipHideTimer);
+      citationTooltipHideTimer = null;
+    }
+  });
+  citationTooltipEl.addEventListener('mouseleave', hideCitationTooltip);
 
   const pipelineStatsEl = document.getElementById('pipeline-stats');
   function renderPipelineStats(msg) {
