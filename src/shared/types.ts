@@ -37,6 +37,7 @@ export interface StatusMessage {
   state: 'connected' | 'processing' | 'idle' | 'disconnected' | 'ollama_down';
   session?: string;
   lastReaction?: number;
+  classifierHealth?: 'live' | 'degraded' | 'offline';
 }
 
 // ─── Deepgram transcript segment (Sentinel v2 audio pipeline) ───

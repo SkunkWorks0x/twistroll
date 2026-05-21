@@ -7,6 +7,7 @@ import { readFileSync, existsSync, readdirSync, appendFileSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { appConfig } from '../config/config.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
+import { getClassifierHealth } from './llm-router.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier, setCurrentDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
@@ -163,6 +164,7 @@ interface DeepgramHealthMessage extends DeepgramHealthState {
 }
 let deepgramHealth: DeepgramHealthState | null = null;
 let currentSpeakerNames: Record<number, string> = {};
+let lastBroadcastClassifierHealth: 'live' | 'degraded' | 'offline' = 'live';
 
 function setDeepgramHealth(next: DeepgramHealthState): void {
   if (
@@ -352,6 +354,11 @@ setClassifierHandlers(
     } else {
       console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
       console.log(`[classifier-suppress] reason=not_a_claim segmentId=${task.segmentId}`);
+    }
+    const ch = getClassifierHealth();
+    if (ch !== lastBroadcastClassifierHealth) {
+      lastBroadcastClassifierHealth = ch;
+      broadcastStatus();
     }
   },
   (err, _task) => {
@@ -1004,6 +1011,7 @@ wss.on('connection', (ws) => {
   const status: StatusMessage = {
     type: 'status',
     state: !OLLAMA_NEEDED || isOllamaAvailable() ? 'connected' : 'ollama_down',
+    classifierHealth: getClassifierHealth(),
   };
   ws.send(JSON.stringify(status));
   if (deepgramHealth) {
@@ -1075,6 +1083,14 @@ function broadcast(
       client.send(payload);
     }
   }
+}
+
+function broadcastStatus(): void {
+  broadcast({
+    type: 'status',
+    state: !OLLAMA_NEEDED || isOllamaAvailable() ? 'connected' : 'ollama_down',
+    classifierHealth: getClassifierHealth(),
+  });
 }
 
 // Pipeline stats bar feed — 1.5s cadence is the sweet spot: fast enough
@@ -1187,10 +1203,10 @@ async function main() {
       await checkOllama();
       if (!wasAvailable && isOllamaAvailable()) {
         console.log('✅ Ollama reconnected');
-        broadcast({ type: 'status', state: 'connected' });
+        broadcastStatus();
       } else if (wasAvailable && !isOllamaAvailable()) {
         console.warn('⚠️  Ollama disconnected');
-        broadcast({ type: 'status', state: 'ollama_down' });
+        broadcastStatus();
       }
     }, 10000);
   }

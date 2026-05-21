@@ -39,6 +39,20 @@ const GEMINI_MODEL = 'gemini-3.5-flash';
 const GROK_MODEL = 'grok-4-1-fast';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
+// Primary classifier provider depends on env: 'gemini' when CLASSIFIER_PROVIDER=gemini,
+// 'haiku' otherwise. Used to derive classifier health ('live' = primary responded).
+function primaryClassifierProvider(): LlmProvider {
+  return process.env.CLASSIFIER_PROVIDER === 'gemini' ? 'gemini' : 'haiku';
+}
+
+let lastClassifierProvider: LlmProvider | 'none' = primaryClassifierProvider();
+
+export function getClassifierHealth(): 'live' | 'degraded' | 'offline' {
+  if (lastClassifierProvider === primaryClassifierProvider()) return 'live';
+  if (lastClassifierProvider === 'groq') return 'degraded';
+  return 'offline';
+}
+
 export interface RouterResult {
   text: string;
   provider: LlmProvider | 'none';
@@ -74,6 +88,7 @@ export async function callLLM(
       const text = await callProvider(provider, systemPrompt, context);
       const ms = Date.now() - start;
       console.log(`[${personaId}] responded via ${provider} in ${ms}ms`);
+      if (personaId === 'classifier') lastClassifierProvider = provider;
       return { text, provider };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -83,6 +98,7 @@ export async function callLLM(
   }
 
   console.error(`[${personaId}] all providers exhausted — returning empty`);
+  if (personaId === 'classifier') lastClassifierProvider = 'none';
   return { text: '', provider: 'none' };
 }
 
