@@ -27,7 +27,7 @@ export function isDensity(v: unknown): v is Density {
 }
 
 let mode: PersonaMode = 'producer';
-let explanationWordMax = 40;
+let explanationWordMax = 28;
 let strictness: Strictness = 'balanced';
 let classifierConfidenceThreshold = (() => {
   const env = parseFloat(process.env.CLAIM_CONFIDENCE_THRESHOLD || '0.7');
@@ -93,8 +93,8 @@ const ANALYST: PersonaFragment = {
     'VOICE: Deeper grounding. Name sources by publication when it tightens precision ("Reuters [1]" not "the source"). Use the full word budget. Surface the specific gap that prevents a higher-confidence verdict.',
   groundingInstructions:
     'ANALYST GROUNDING: Use the full grounding budget. State what each cited source directly establishes, what it does not, and which specific assertion remains open. Reference at least two citations when available.',
-  verdictGuidance:
-    'ANALYST VERDICTS: Prefer PARTIAL with detailed citation context over UNVERIFIABLE — explain what is and is not established by the sources.',
+  // Verdict guidance intentionally empty — mode changes wording, not verdicts.
+  verdictGuidance: '',
 };
 
 const CYNIC: PersonaFragment = {
