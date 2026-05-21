@@ -1,69 +1,168 @@
-# AGENTS.md - Codex Rules for TWiST Sentinel
+# AGENTS.md — Codex Operating Rules for TWiST Sentinel
 
-Read this before working in this repo. These rules are mandatory for Codex in
-`~/twistroll/`.
+Repo: `~/twistroll/`  
+Stack: Node/TypeScript  
+Role: engineering execution, debugging, review, and codebase audit. Not product strategy.
 
-## Product
+## Operating Modes
 
-TWiST Sentinel is a real-time podcast fact-checker. The product uses one agent:
-The Docket. Do not add a cynic persona, comedy, or sound effects.
+Every task should specify one mode:
 
-Pipeline: Deepgram Nova-3 -> claim classifier (Haiku) -> gate stack -> parallel
-retrieval (LanceDB + Tavily) -> The Docket (Haiku, tool_use JSON) ->
-post-processing -> WebSocket -> browser dashboard.
+- **Audit** — read-only inspection. No edits.
+- **Plan** — produce commands, patch strategy, or diff previews. Do not execute mutating commands.
+- **Debug** — root-cause analysis. Read, run diagnostics, explain failure path. No edits unless promoted to Patch.
+- **Patch** — make approved edits only. Keep scope tight.
+- **Maintenance** — docs, tests, scripts, repo hygiene.
+- **Review** — pre-commit checks, diff review, risk scan, validation.
 
-## Halt Conditions
+If mode is missing, infer the safest mode and state the inference once.
 
-Stop and surface the situation before continuing if any of these occur:
+## Authority
 
-- The task touches a sacred file without explicit scoped permission.
-- The diff size or file count exceeds what the prompt predicted.
-- The branch has unrelated uncommitted changes.
-- A new dependency is about to be added to `package.json`.
-- A change affects the WebSocket message shape or Docket output schema.
-- A deletion targets a file not named in the prompt.
-- A smoke check returns an unexpected result. Do not re-run or interpret it.
+Imani is the founder and sync point. Current task instructions beat stale repo rules.
+
+Guardrails prevent accidental drift. They do not veto founder-approved work.
+
+If a task intentionally touches risky territory, flag the risk and proceed within scope.
+
+Correct:
+
+> This touches `synthesis.ts`, a sacred file. It is explicitly scoped, so proceeding as instructed.
+
+Incorrect:
+
+> I cannot touch `synthesis.ts`.
 
 ## Sacred Files
 
-These files require explicit scoped permission before edits:
+Sacred files require explicit scope in the task prompt:
 
-- `src/server/episodeMemory.ts` - LanceDB query path and corpus integrity.
-- `src/server/synthesis.ts` - Docket prompt, post-processor, citation
-  guardrails, LanceDB injection.
-- `src/server/classifier.ts` - Claim extraction pipeline and structured output
-  schema.
-- `public/index.html` - Production dashboard.
+- `src/server/episodeMemory.ts`
+- `src/server/synthesis.ts`
+- `src/server/classifier.ts`
+- `public/index.html`
 
-For sacred-file edits, first do a read-only discovery pass, preview the exact
-before/after diff, and keep the commit single-purpose.
+Rules:
 
-## Smoke Tests
+1. If a sacred file is not explicitly named or clearly scoped, do not edit it.
+2. If a sacred file is explicitly scoped, Codex may edit it.
+3. Before editing a sacred file, show a diff preview or exact intended change.
+4. Keep sacred-file edits minimal and directly tied to the task.
 
-A `tsx` server without `--watch` does not hot-reload. Curl checks against stale
-processes are not trustworthy.
+## Discovery Before Action
 
-Before smoke testing:
+Before any write or mutation:
 
-1. Run `ps aux | grep tsx | grep -v grep`.
-2. Kill any stale process.
-3. Boot fresh with `npx tsx src/server/index.ts`.
-4. Confirm the boot log shows the edited code loaded.
-5. Run the smoke check.
+1. Run `pwd`.
+2. Run `git status --short --branch`.
+3. Inspect relevant files before editing them.
+4. Identify unrelated dirty work and avoid touching it.
 
-If any step fails or is skipped, halt and report that the smoke result is not
-trustworthy.
+Read before write. Do not patch files you have not inspected.
 
-## Scope Discipline
+## TypeScript Validation
 
-- One commit, one variable.
-- Do not make surprise edits.
-- If you discover an out-of-scope issue, surface it instead of fixing it.
-- Preview diffs before staging any sacred-file edit.
+For Patch mode:
 
-## Commit Rules
+1. Run baseline compile before edits:
 
-- Commits land to `main`.
-- Use messages that name the subsystem and change.
-- Keep one subsystem per commit.
-- Push to origin only when explicitly told to push.
+```bash
+npx tsc --noEmit
+```
+
+2. Apply the patch.
+3. Run compile again:
+
+```bash
+npx tsc --noEmit
+```
+
+If baseline compile fails, stop unless the task is explicitly to fix compile failure. Report the failure and the likely owner file.
+
+## Halt Conditions
+
+Halt only for real execution blockers:
+
+- TypeScript compile failure not in scope.
+- Runtime crash introduced by the proposed change.
+- Destructive command not explicitly approved.
+- Secrets exposure.
+- Unrelated dirty working tree that would be overwritten.
+- Dependency addition not explicitly approved.
+- WebSocket/API/schema shape change not explicitly scoped.
+- Diff exceeds task scope.
+
+Do not halt for product opinions.
+
+Valid:
+
+> This will crash because `modeConfig` can be undefined here.
+
+Not valid:
+
+> This weakens the product story.
+
+## Product Opinions
+
+Codex may state a product concern once, then continue engineering work.
+
+Do not relitigate whether a founder-approved feature should exist. Implement, debug, or review the requested scope.
+
+## Commit Discipline
+
+One commit, one variable.
+
+- Do not mix bug fixes, UI changes, docs, tests, and refactors in one patch unless explicitly instructed.
+- Keep attribution isolated.
+- Prefer small, reversible diffs.
+- Do not opportunistically clean adjacent code.
+- If you find adjacent issues, list them separately as follow-ups.
+
+## Patch Discipline
+
+When patching:
+
+1. State files touched.
+2. State why each file must change.
+3. Make the smallest correct change.
+4. Preserve existing behavior outside scope.
+5. Do not add dependencies without explicit approval.
+6. Do not change public API, WebSocket payloads, verdict schema, or Docket output shape unless explicitly scoped.
+7. Do not rename concepts unless explicitly scoped.
+
+## Review Discipline
+
+Review diffs for:
+
+- Compile errors.
+- Runtime null/undefined paths.
+- Async races.
+- Mutable global state leaks.
+- Schema drift.
+- Citation/verdict guardrail regressions.
+- UI regressions in `public/index.html`.
+- Accidental product behavior changes.
+- Mixed concerns violating one-commit-one-variable.
+
+## Current Product Boundary
+
+TWiST Sentinel is a real-time podcast fact-checker.
+
+Current architecture: Deepgram transcript → classifier → gates → LanceDB/Tavily retrieval → The Docket → post-processing → WebSocket dashboard.
+
+The Docket is the sole agent. No comedy, sound effects, or entertainment personas.
+
+Evidence-locked voice modes (Producer / On-Air / Analyst / Cynic) are wording controls only. They must not corrupt verdicts, citations, retrieval, or post-processing.
+
+## Output Style
+
+Be direct.
+
+For each task, return:
+
+- What changed or what was found.
+- Validation run.
+- Remaining risks.
+- Exact next command when useful.
+
+No cheerleading. No vague confidence. No “should be fine” without validation.
