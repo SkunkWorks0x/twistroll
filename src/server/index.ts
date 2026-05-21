@@ -8,6 +8,13 @@ import { randomUUID } from 'crypto';
 import { appConfig } from '../config/config.js';
 import { checkOllama, isOllamaAvailable } from './ollama.js';
 import { getClassifierHealth } from './llm-router.js';
+import {
+  initializeRegistry,
+  observeSegment as observeSpeakerSegment,
+  lookup as lookupSpeaker,
+  manualOverride as pinSpeaker,
+} from './speakerRegistry.js';
+import { fetchYouTubeTitle } from './youtubeMeta.js';
 import { commitEpisode } from './episodeMemory.js';
 import { loadDossier, setCurrentDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
@@ -385,6 +392,7 @@ function processIncomingSegment(segment: TranscriptSegment): void {
   if (sessionState === 'connecting') setSessionState('live');
 
   sessionPipelineCounters.segmentsReceived++;
+  applySpeakerRegistry(segment);
   // Broadcast first — never gate transcript visibility on classifier latency.
   broadcast({ type: 'transcript_segment', data: segment });
 
@@ -423,6 +431,19 @@ function processIncomingSegment(segment: TranscriptSegment): void {
     segmentId: segment.id,
     enqueuedAt: Date.now(),
   });
+}
+
+// Speaker registry application — runs before broadcast so the dashboard
+// receives segments already tagged with the resolved name/role.
+function applySpeakerRegistry(segment: TranscriptSegment): void {
+  observeSpeakerSegment(segment.speaker, segment.text);
+  const info = lookupSpeaker(segment.speaker);
+  if (!info.name) return;
+  segment.speakerName = info.name;
+  if (info.role) segment.speakerRole = info.role;
+  if (currentSpeakerNames[segment.speaker] !== info.name) {
+    currentSpeakerNames[segment.speaker] = info.name;
+  }
 }
 
 if (deepgram) {
@@ -615,6 +636,17 @@ app.post('/api/session/start', async (req, res) => {
   deepgramHealth = null;
   currentSpeakerMap = validateSpeakerMap(speakerMap);
   currentSpeakerNames = validateSpeakerNames(body.speakerNames ?? body.sessionContext?.speakerNames);
+  // Speaker registry: initialize with optional YouTube title (2s budget).
+  let registryTitle: string | undefined;
+  if (mode === 'stream' && /youtube\.com|youtu\.be/.test(source)) {
+    const t = await fetchYouTubeTitle(source).catch(() => null);
+    if (t) registryTitle = t;
+  }
+  initializeRegistry(registryTitle ? { title: registryTitle } : undefined);
+  for (const [idStr, name] of Object.entries(currentSpeakerNames)) {
+    const id = Number(idStr);
+    if (Number.isFinite(id)) pinSpeaker(id, name, currentSpeakerMap[id] ?? 'guest');
+  }
 
   setSessionState('connecting', source);
   const sessionId = crypto.randomUUID();
@@ -757,6 +789,8 @@ app.post('/api/session/demo', async (req, res) => {
   clearAllStages();
   resetSessionPipelineCounters();
   deepgramHealth = null;
+  // Speaker registry: demo replay has no title metadata — initialize empty.
+  initializeRegistry();
 
   // Path 1: try live YouTube first unless forced to replay.
   if (!forceReplay && deepgram) {
@@ -805,6 +839,12 @@ app.post('/api/session/speakers', (req, res) => {
   const body = req.body as { speakerMap?: unknown; speakerNames?: unknown };
   currentSpeakerMap = validateSpeakerMap(body.speakerMap);
   currentSpeakerNames = validateSpeakerNames(body.speakerNames);
+  // Pin manual overrides in the registry — observeSegment becomes a no-op
+  // for any pinned speakerId for the rest of the session.
+  for (const [idStr, name] of Object.entries(currentSpeakerNames)) {
+    const id = Number(idStr);
+    if (Number.isFinite(id)) pinSpeaker(id, name, currentSpeakerMap[id] ?? 'guest');
+  }
   res.json({
     status: 'ok',
     speakerMap: currentSpeakerMap,

@@ -51,6 +51,9 @@ export interface TranscriptSegment {
   isFinal: boolean;      // Always true — interim results are dropped before emit
   confidence: number;    // Deepgram per-segment confidence (0–1)
   createdAt: number;     // Date.now() — monotonic ordering for clients
+  // Speaker registry resolution (optional — unset until the registry binds a name).
+  speakerName?: string;
+  speakerRole?: 'host' | 'guest';
 }
 
 export interface TranscriptSegmentMessage {
