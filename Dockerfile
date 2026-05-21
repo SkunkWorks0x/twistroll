@@ -35,6 +35,7 @@ COPY --from=builder /app/dist ./dist
 COPY public ./public
 COPY data/lance-db ./data/lance-db
 COPY data/dossiers ./data/dossiers
+COPY data/demo ./data/demo
 
 ENV NODE_ENV=production
 ENV PORT=3000
