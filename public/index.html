@@ -959,6 +959,161 @@
     text-transform: uppercase;
     margin-right: 4px;
   }
+
+  /* ─── Customize panel ─── */
+  .customize-panel {
+    margin-bottom: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: #08080A;
+    overflow: hidden;
+  }
+  .customize-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #FFFFFF;
+    font-weight: 900;
+    user-select: none;
+    background: linear-gradient(180deg, rgba(255, 92, 0, 0.06), transparent);
+  }
+  .customize-header:hover { color: #FF5C00; }
+  .customize-header .customize-caret {
+    color: #FF5C00;
+    transition: transform 120ms;
+  }
+  .customize-panel.collapsed .customize-caret { transform: rotate(-90deg); }
+  .customize-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 14px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .customize-panel.collapsed .customize-body { display: none; }
+  .customize-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .customize-label {
+    color: #8B8F9A;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .customize-select {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 10px;
+    background: #111114;
+    color: #E8E8E8;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #8B8F9A 50%),
+                      linear-gradient(135deg, #8B8F9A 50%, transparent 50%);
+    background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 28px;
+  }
+  .customize-select:focus { border-color: #FF5C00; }
+  .customize-segmented {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 4px;
+  }
+  .customize-segmented button {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 7px 6px;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.03);
+    color: #8B8F9A;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .customize-segmented button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #D8DAE0;
+  }
+  .customize-segmented button.active {
+    border-color: rgba(255, 92, 0, 0.55);
+    background: rgba(255, 92, 0, 0.10);
+    color: #FF5C00;
+  }
+  .customize-slider-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .customize-slider {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(255, 92, 0, 0.55) 0%, rgba(255, 92, 0, 0.55) var(--slider-pct, 0%), rgba(255, 255, 255, 0.08) var(--slider-pct, 0%), rgba(255, 255, 255, 0.08) 100%);
+    outline: none;
+    cursor: pointer;
+  }
+  .customize-slider::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #FF5C00;
+    box-shadow: 0 0 8px rgba(255, 92, 0, 0.6);
+    cursor: pointer;
+    border: none;
+  }
+  .customize-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #FF5C00;
+    box-shadow: 0 0 8px rgba(255, 92, 0, 0.6);
+    cursor: pointer;
+    border: none;
+  }
+  .customize-slider-value {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: #E8E8E8;
+    min-width: 78px;
+    text-align: right;
+    letter-spacing: 0.04em;
+  }
+  .customize-slider-value .customize-slider-num { color: #FF5C00; font-weight: 800; }
+  .customize-footnote {
+    margin-top: 2px;
+    color: #555861;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    font-style: italic;
+  }
 </style>
 </head>
 <body>
@@ -989,6 +1144,47 @@
     </div>
   </section>
   <aside id="sidebar-pane">
+    <div id="customize-panel" class="customize-panel">
+      <div class="customize-header" id="customize-toggle">
+        <span>Customize</span>
+        <span class="customize-caret">▾</span>
+      </div>
+      <div class="customize-body">
+        <div class="customize-row">
+          <span class="customize-label">Mode</span>
+          <select class="customize-select" id="customize-mode">
+            <option value="producer">Producer</option>
+            <option value="on-air">On-Air</option>
+            <option value="analyst">Analyst</option>
+            <option value="cynic">Cynic</option>
+          </select>
+        </div>
+        <div class="customize-row">
+          <span class="customize-label">Length</span>
+          <div class="customize-slider-row">
+            <input type="range" class="customize-slider" id="customize-length" min="0" max="3" step="1" value="2" />
+            <span class="customize-slider-value" id="customize-length-value">Standard <span class="customize-slider-num">40</span></span>
+          </div>
+        </div>
+        <div class="customize-row">
+          <span class="customize-label">Strictness</span>
+          <div class="customize-segmented" id="customize-strictness">
+            <button data-value="tier1">Tier 1</button>
+            <button data-value="balanced">Balanced</button>
+            <button data-value="broad">Broad</button>
+          </div>
+        </div>
+        <div class="customize-row">
+          <span class="customize-label">Density</span>
+          <div class="customize-segmented" id="customize-density">
+            <button data-value="quiet">Quiet</button>
+            <button data-value="normal">Normal</button>
+            <button data-value="aggressive">Aggro</button>
+          </div>
+        </div>
+        <div class="customize-footnote">Voice changes wording. Evidence stays locked.</div>
+      </div>
+    </div>
     <div class="sidebar-title">
       <span>THE DOCKET</span>
       <span class="claim-count" id="claim-count-display">0 CLAIMS</span>
@@ -1305,6 +1501,141 @@
   state.session.speakerMap = speakerPrefs.speakerMap;
   state.session.effectiveSpeakerMap = speakerPrefs.speakerMap;
   state.session.sessionContext = { speakerNames: speakerPrefs.speakerNames };
+
+  // ─── Customize panel state ──────────────────────────────────
+  // Source of truth for the four panel knobs. maxDisplayTier is derived from
+  // strictness and read by renderSourceChips at every card paint.
+  const LENGTH_STOPS = [20, 28, 40, 80];
+  const LENGTH_LABELS = ['Concise', 'Default', 'Standard', 'Detailed'];
+  const customize = {
+    mode: 'producer',
+    wordMax: 40,
+    strictness: 'balanced',
+    maxDisplayTier: 2,
+    density: 'normal',
+  };
+
+  function strictnessToTier(s) {
+    if (s === 'tier1') return 1;
+    if (s === 'broad') return 3;
+    return 2;
+  }
+
+  function lengthIndexFromWordMax(n) {
+    // Snap an arbitrary wordMax to the nearest panel stop so the slider
+    // always reflects a valid position when the server hydrates state.
+    let best = 0;
+    let bestDelta = Infinity;
+    for (let i = 0; i < LENGTH_STOPS.length; i++) {
+      const d = Math.abs(LENGTH_STOPS[i] - n);
+      if (d < bestDelta) { best = i; bestDelta = d; }
+    }
+    return best;
+  }
+
+  function syncLengthControl(wordMax) {
+    const slider = document.getElementById('customize-length');
+    const valueEl = document.getElementById('customize-length-value');
+    if (!slider || !valueEl) return;
+    const idx = lengthIndexFromWordMax(wordMax);
+    slider.value = String(idx);
+    const pct = (idx / (LENGTH_STOPS.length - 1)) * 100;
+    slider.style.setProperty('--slider-pct', `${pct}%`);
+    valueEl.innerHTML = `${LENGTH_LABELS[idx]} <span class="customize-slider-num">${LENGTH_STOPS[idx]}</span>`;
+  }
+
+  function syncSegmented(groupId, value) {
+    const buttons = document.querySelectorAll(`#${groupId} button`);
+    buttons.forEach((b) => b.classList.toggle('active', b.dataset.value === value));
+  }
+
+  function syncCustomizeUI() {
+    const modeEl = document.getElementById('customize-mode');
+    if (modeEl) modeEl.value = customize.mode;
+    syncLengthControl(customize.wordMax);
+    syncSegmented('customize-strictness', customize.strictness);
+    syncSegmented('customize-density', customize.density);
+  }
+
+  async function postModeChange(patch) {
+    try {
+      const r = await authFetch('/api/session/mode', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && d.applied) applyCustomizeApplied(d.applied);
+    } catch {
+      // authFetch handles 401; other failures leave UI in optimistic state.
+    }
+  }
+
+  function applyCustomizeApplied(applied) {
+    if (applied.mode) customize.mode = applied.mode;
+    if (typeof applied.wordMax === 'number') customize.wordMax = applied.wordMax;
+    if (applied.strictness) {
+      customize.strictness = applied.strictness;
+      customize.maxDisplayTier = typeof applied.maxDisplayTier === 'number'
+        ? applied.maxDisplayTier
+        : strictnessToTier(applied.strictness);
+    }
+    if (applied.density) customize.density = applied.density;
+    syncCustomizeUI();
+    // Strictness changed display tier — repaint card chips.
+    renderSidebar();
+  }
+
+  async function hydrateCustomizePanel() {
+    try {
+      const r = await authFetch('/api/session/mode');
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && d.applied) applyCustomizeApplied(d.applied);
+    } catch { /* auth handled by authFetch */ }
+  }
+
+  function bindCustomizePanel() {
+    const panel = document.getElementById('customize-panel');
+    const toggle = document.getElementById('customize-toggle');
+    const modeEl = document.getElementById('customize-mode');
+    const lengthEl = document.getElementById('customize-length');
+
+    // Default: open on first load. After that, respect the operator's choice.
+    const stored = sessionStorage.getItem('sentinel_customize_collapsed');
+    if (stored === '1') panel.classList.add('collapsed');
+
+    toggle.addEventListener('click', () => {
+      panel.classList.toggle('collapsed');
+      sessionStorage.setItem(
+        'sentinel_customize_collapsed',
+        panel.classList.contains('collapsed') ? '1' : '0',
+      );
+    });
+
+    modeEl.addEventListener('change', () => {
+      postModeChange({ mode: modeEl.value });
+    });
+
+    lengthEl.addEventListener('input', () => {
+      const idx = parseInt(lengthEl.value, 10) || 0;
+      syncLengthControl(LENGTH_STOPS[idx]);
+    });
+    lengthEl.addEventListener('change', () => {
+      const idx = parseInt(lengthEl.value, 10) || 0;
+      postModeChange({ wordMax: LENGTH_STOPS[idx] });
+    });
+
+    document.querySelectorAll('#customize-strictness button').forEach((b) => {
+      b.addEventListener('click', () => postModeChange({ strictness: b.dataset.value }));
+    });
+    document.querySelectorAll('#customize-density button').forEach((b) => {
+      b.addEventListener('click', () => postModeChange({ density: b.dataset.value }));
+    });
+
+    syncCustomizeUI();
+  }
 
   const MAX_SEGMENTS = 250;
   const MAX_CARDS = 10;
@@ -1677,7 +2008,11 @@
 
   function renderSourceChips(citations) {
     if (!citations || citations.length === 0) return null;
-    const chips = citations.map(extractChipData).filter(Boolean);
+    // Strictness filter (display-only — citations themselves and the Docket
+    // verdict are unchanged; this hides chips above the chosen tier).
+    const visible = citations.filter((c) => (c.tier || 99) <= customize.maxDisplayTier);
+    if (visible.length === 0) return null;
+    const chips = visible.map(extractChipData).filter(Boolean);
     if (chips.length === 0) return null;
     const wrapper = document.createElement('span');
     wrapper.className = 'source-chips';
@@ -2019,6 +2354,8 @@
     renderSessionBar();
     refreshSessionMeta();
     setInterval(refreshSessionMeta, 10000);
+    bindCustomizePanel();
+    hydrateCustomizePanel();
     connect();
   })();
 })();
