@@ -242,6 +242,8 @@
   .pipeline-stats.hidden { display: none; }
   .pipeline-stats .stat-sep { color: rgba(255, 255, 255, 0.10); margin: 0 6px; }
   .pipeline-stats .stat-num { color: #8B8F9A; }
+  .pipeline-stats .stat-uneval-zero { color: #555861; }
+  .pipeline-stats .stat-uneval-warn { color: #FBBF24; }
 
   .source-chips {
     display: flex;
@@ -2080,6 +2082,8 @@
     // Server only emits during non-idle sessions; once the bar receives any
     // message it stays visible until session_state→idle hides it.
     pipelineStatsEl.classList.remove('hidden');
+    const unevalN = msg.uneval || 0;
+    const unevalCls = unevalN > 0 ? 'stat-uneval-warn' : 'stat-uneval-zero';
     pipelineStatsEl.innerHTML =
       `Seg <span class="stat-num">${msg.segments}</span>` +
       `<span class="stat-sep">|</span>` +
@@ -2087,7 +2091,9 @@
       `<span class="stat-sep">|</span>` +
       `Cards <span class="stat-num">${msg.cards}</span>` +
       `<span class="stat-sep">|</span>` +
-      `Sup <span class="stat-num">${msg.suppressed}</span>`;
+      `Sup <span class="stat-num">${msg.suppressed}</span>` +
+      `<span class="stat-sep">|</span>` +
+      `Uneval <span class="${unevalCls}">${unevalN}</span>`;
     state.latestStats = msg;
     if (state.cards.length === 0 && state.pending.size === 0) renderSidebar();
   }

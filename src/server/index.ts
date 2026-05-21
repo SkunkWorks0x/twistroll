@@ -273,11 +273,13 @@ const sessionPipelineCounters = {
   segmentsReceived: 0,
   claimsHeard: 0,
   cardsEmitted: 0,
+  unevaluated: 0,
 };
 function resetSessionPipelineCounters(): void {
   sessionPipelineCounters.segmentsReceived = 0;
   sessionPipelineCounters.claimsHeard = 0;
   sessionPipelineCounters.cardsEmitted = 0;
+  sessionPipelineCounters.unevaluated = 0;
 }
 
 function pruneExpiredSpans(): void {
@@ -352,8 +354,16 @@ setClassifierHandlers(
       );
       console.log(`[classifier-suppress] reason=low_confidence confidence=${classification.confidence.toFixed(2)} claimText="${classification.claimText.slice(0, 50)}"`);
     } else {
-      console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
-      console.log(`[classifier-suppress] reason=not_a_claim segmentId=${task.segmentId}`);
+      const isUneval = classification.reason === 'classifier call failed'
+        || classification.reason === 'malformed classifier output';
+      if (isUneval) {
+        sessionPipelineCounters.unevaluated++;
+        console.log(`[CLASSIFIER] Unevaluated: "${classification.reason}"`);
+        console.log(`[classifier-suppress] reason=unevaluated segmentId=${task.segmentId}`);
+      } else {
+        console.log(`[CLASSIFIER] No claim: "${classification.reason}"`);
+        console.log(`[classifier-suppress] reason=not_a_claim segmentId=${task.segmentId}`);
+      }
     }
     const ch = getClassifierHealth();
     if (ch !== lastBroadcastClassifierHealth) {
@@ -1112,6 +1122,7 @@ setInterval(() => {
     claimsHeard: sessionPipelineCounters.claimsHeard,
     cards: sessionPipelineCounters.cardsEmitted,
     suppressed,
+    uneval: sessionPipelineCounters.unevaluated,
   });
 }, PIPELINE_STATS_INTERVAL_MS).unref();
 

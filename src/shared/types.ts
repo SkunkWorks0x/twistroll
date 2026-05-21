@@ -152,6 +152,7 @@ export interface PipelineStatsMessage {
   claimsHeard: number;    // classifier-emitted positive claims above threshold
   cards: number;          // verdict cards broadcast
   suppressed: number;     // claimsHeard - cards - currently in flight
+  uneval: number;         // classifier was called but returned no valid extraction (provider failure / malformed)
 }
 
 export type WSMessage =
