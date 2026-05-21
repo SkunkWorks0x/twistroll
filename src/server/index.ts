@@ -884,6 +884,9 @@ app.post('/api/session/mode', (req, res) => {
     if (!Number.isFinite(n)) {
       return res.status(400).json({ error: 'wordMax must be a number' });
     }
+    if (![20, 28, 40, 80].includes(n)) {
+      return res.status(400).json({ error: 'wordMax must be one of 20, 28, 40, 80' });
+    }
     nextWordMax = n;
   }
 
