@@ -19,6 +19,24 @@ import {
 import { enqueueClaim, queueStats, setProcessHandler, setRetrievalStartHandler } from './claimQueue.js';
 import { getBreakerState } from './retrieval.js';
 import { synthesize } from './synthesis.js';
+import {
+  type Density,
+  type PersonaMode,
+  type Strictness,
+  isPersonaMode,
+  isStrictness,
+  isDensity,
+  setCurrentMode,
+  getCurrentMode,
+  setExplanationWordMax,
+  getExplanationWordMax,
+  setStrictness,
+  getStrictness,
+  getMaxDisplayTier,
+  setDensity,
+  getDensity,
+  getClassifierConfidenceThreshold,
+} from './personaModes.js';
 import { recordStage, getStages, dropStages, clearAllStages } from './ttfcStages.js';
 import type {
   TrollReaction,
@@ -203,7 +221,9 @@ function toSessionError(err: unknown, source: SessionError['source'] = 'server')
 // ─── Classifier state ───
 const SEGMENT_BUFFER_MAX = 12;
 const WINDOW_SIZE = 3;
-const CLAIM_CONFIDENCE_THRESHOLD = parseFloat(process.env.CLAIM_CONFIDENCE_THRESHOLD || '0.7');
+// Read live from personaModes — Customize panel can change density (which
+// remaps the threshold) at runtime. The env-var default is captured inside
+// personaModes during its module init.
 const CLAIM_SPAN_TTL_MS = 15000;
 const lastSegments: TranscriptSegment[] = [];
 
@@ -295,7 +315,8 @@ setClassifierHandlers(
     classifierStats.segmentsProcessed++;
     classifierStats.sumLatencyMs += latencyMs;
 
-    if (classification.isClaim && classification.confidence >= CLAIM_CONFIDENCE_THRESHOLD) {
+    const claimConfidenceThreshold = getClassifierConfidenceThreshold();
+    if (classification.isClaim && classification.confidence >= claimConfidenceThreshold) {
       classifierStats.claimsDetected++;
       sessionPipelineCounters.claimsHeard++;
       classifierStats.sumConfidence += classification.confidence;
@@ -325,7 +346,7 @@ setClassifierHandlers(
       }
     } else if (classification.isClaim) {
       console.log(
-        `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${CLAIM_CONFIDENCE_THRESHOLD}): "${classification.claimText}"`
+        `[CLASSIFIER] Claim below threshold (${classification.confidence.toFixed(2)} < ${claimConfidenceThreshold}): "${classification.claimText}"`
       );
       console.log(`[classifier-suppress] reason=low_confidence confidence=${classification.confidence.toFixed(2)} claimText="${classification.claimText.slice(0, 50)}"`);
     } else {
@@ -763,6 +784,86 @@ app.post('/api/session/speakers', (req, res) => {
   });
 });
 
+// Customize panel — applies any subset of { mode, wordMax, strictness,
+// density } to the runtime config in personaModes. Voice fragments take
+// effect on the next Docket call; density flips the next classifier window;
+// strictness is read by the dashboard at render time.
+app.post('/api/session/mode', (req, res) => {
+  const body = (req.body || {}) as {
+    mode?: unknown;
+    wordMax?: unknown;
+    strictness?: unknown;
+    density?: unknown;
+  };
+
+  let nextMode: PersonaMode | undefined;
+  let nextWordMax: number | undefined;
+  let nextStrictness: Strictness | undefined;
+  let nextDensity: Density | undefined;
+
+  if (body.mode !== undefined) {
+    if (!isPersonaMode(body.mode)) {
+      return res.status(400).json({ error: `Invalid mode: ${String(body.mode)}` });
+    }
+    nextMode = body.mode;
+  }
+
+  if (body.wordMax !== undefined) {
+    const n = typeof body.wordMax === 'number' ? body.wordMax : Number(body.wordMax);
+    if (!Number.isFinite(n)) {
+      return res.status(400).json({ error: 'wordMax must be a number' });
+    }
+    nextWordMax = n;
+  }
+
+  if (body.strictness !== undefined) {
+    if (!isStrictness(body.strictness)) {
+      return res.status(400).json({ error: `Invalid strictness: ${String(body.strictness)}` });
+    }
+    nextStrictness = body.strictness;
+  }
+
+  if (body.density !== undefined) {
+    if (!isDensity(body.density)) {
+      return res.status(400).json({ error: `Invalid density: ${String(body.density)}` });
+    }
+    nextDensity = body.density;
+  }
+
+  if (nextMode !== undefined) setCurrentMode(nextMode);
+  if (nextWordMax !== undefined) setExplanationWordMax(nextWordMax);
+  if (nextStrictness !== undefined) setStrictness(nextStrictness);
+  if (nextDensity !== undefined) setDensity(nextDensity);
+
+  const applied = {
+    mode: getCurrentMode(),
+    wordMax: getExplanationWordMax(),
+    strictness: getStrictness(),
+    maxDisplayTier: getMaxDisplayTier(),
+    density: getDensity(),
+    classifierConfidenceThreshold: getClassifierConfidenceThreshold(),
+  };
+  console.log(`[mode] Applied ${JSON.stringify(applied)}`);
+  res.json({ ok: true, applied });
+});
+
+// GET variant lets the dashboard hydrate panel state on load (so a refresh
+// preserves the active mode/limits across page loads). Same payload shape
+// as the POST response's `applied` field.
+app.get('/api/session/mode', (_req, res) => {
+  res.json({
+    ok: true,
+    applied: {
+      mode: getCurrentMode(),
+      wordMax: getExplanationWordMax(),
+      strictness: getStrictness(),
+      maxDisplayTier: getMaxDisplayTier(),
+      density: getDensity(),
+      classifierConfidenceThreshold: getClassifierConfidenceThreshold(),
+    },
+  });
+});
+
 app.post('/api/session/stop', async (_req, res) => {
   // Replay mode has no Deepgram connection — just cancel timers and idle.
   if (replayActive) {
@@ -852,7 +953,7 @@ app.get('/api/classifier/stats', (_req, res) => {
     claimsByGuest,
     averageConfidence: claimsDetected > 0 ? sumConfidence / claimsDetected : 0,
     averageLatencyMs: segmentsProcessed > 0 ? sumLatencyMs / segmentsProcessed : 0,
-    confidenceThreshold: CLAIM_CONFIDENCE_THRESHOLD,
+    confidenceThreshold: getClassifierConfidenceThreshold(),
     activeSpans: activeSpans.length,
     ...classifierQueueStats(),
   });
