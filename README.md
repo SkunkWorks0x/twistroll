@@ -12,6 +12,18 @@ The local retrieval archive is rebuilt for Ollama EmbeddingGemma 768-dim vectors
 
 Sentinel transcribes live podcast audio in real time, detects checkable claims, retrieves evidence from the TWiST archive and live web search, and renders structured verdict cards with citations. It uses a single fact-checking agent, The Docket, to produce grounding-first verdicts. Cross-episode memory covers 127 TWiST episodes and 3,956 searchable chunks.
 
+## Key Features
+
+- **Evidence-locked voice modes** — Four presentation styles (Producer / On-Air / Analyst / Cynic) change wording only. Verdicts, citations, retrieval, and post-processing stay fixed regardless of mode. Voice changes wording. Evidence stays locked.
+- **Customization panel** — Mode, explanation length (20/28/40/80 words), source strictness (Tier 1 / Balanced / Broad), and claim density (Quiet / Normal / Aggro). All settings validate server-side.
+- **TWiST Memory badges** — Cross-episode citations display a TWiST Memory badge showing which prior episode the evidence came from.
+- **Classifier health pill** — Live status indicator (LIVE / DEGRADED / OFFLINE) with UNEVAL counter for claims that couldn't be classified.
+- **Citation hover tooltips** — Hover any source chip to see the retrieval snippet and tier badge without expanding the card.
+- **Speaker registry** — Attribution-aware speaker binding with host roster detection and manual pill override.
+- **Sponsor gate** — Expanded blocklist with phrase-detection regex suppresses sponsor-mention claims automatically.
+- **Gemini 3.5 Flash classifier** — Optional fast classifier behind `CLASSIFIER_PROVIDER=gemini` env flag. Measured latency comparable to Haiku (~1.4s) on full classifier workload; primary value is removing Anthropic credit dependency on the highest-volume pipeline call.
+- **Demo replay** — "Try with Latest TWiST Episode" button feeds a cached real transcript (E2291, 674 segments) through the full pipeline. Cards are live-generated, not pre-rendered.
+
 ## Quick Start: Local
 
 Prerequisites:
@@ -99,16 +111,18 @@ curl -X POST http://localhost:3000/api/session/start \
 
 Use this for Zoom/private meetings or any audio playing on a local Mac. Install BlackHole 2ch, route audio through a Multi-Output Device, grant microphone permission to the terminal app, then select `System Audio` in the dashboard.
 
-Full setup: [Production Runbook](docs/PRODUCTION_RUNBOOK.md).
+Full Zoom setup: [Zoom Setup](docs/zoom-setup.md).
+General Mac runbook: [Production Runbook](docs/PRODUCTION_RUNBOOK.md).
 
 ## Architecture
 
 ```text
 Deepgram Nova-3
-  -> Claim Classifier (Haiku)
-  -> Gate Stack
-  -> Parallel Retrieval (LanceDB + Tavily)
-  -> The Docket (Haiku, tool_use)
+  -> Claim Classifier (Haiku or Gemini 3.5 Flash)
+  -> Gate Stack (7 layers including sponsor name + sponsor phrase detection)
+  -> Parallel Retrieval (LanceDB 127 episodes + Tavily)
+  -> The Docket (Haiku, tool_use, evidence-locked voice modes)
+  -> Post-processing (Zod, citation cross-check, anti-pattern scan)
   -> Dashboard
 ```
 
@@ -138,6 +152,14 @@ The dashboard is built for live production use:
 - Verdict pills for fast scanning.
 - Citation rows with source tiers and copyable URLs.
 - Actionable session errors with copyable diagnostics.
+- Customization panel: mode, length, strictness, density controls.
+- Classifier health pill with live/degraded/offline status.
+- TWiST Memory badges on cross-episode citations.
+- Citation hover tooltips with retrieval snippets.
+- Grounding line (italic, muted) below verdict for evidence context.
+- Auto-collapse older cards with click-to-expand.
+- Auto-follow pause with "N new claims" resume banner.
+- Live stats bar: segments processed, claims heard, cards rendered, claims suppressed, and unevaluated count.
 
 ## Cross-Episode Memory
 
@@ -185,6 +207,10 @@ Authorization: Bearer <token>
 | `CLASSIFIER_MAX_CONCURRENCY` | No | Concurrent classifier calls. |
 | `CLASSIFIER_MAX_PENDING` | No | Pending classifier queue size. |
 | `CLAIM_QUEUE_MAX_PENDING` | No | Pending claim queue size. |
+| `CLASSIFIER_PROVIDER` | No | Set to `gemini` to route the classifier through Gemini 3.5 Flash. Unset / any other value → Haiku. |
+| `GEMINI_API_KEY` | When `CLASSIFIER_PROVIDER=gemini` | Gemini 3.5 Flash classifier. |
+| `DEMO_FORCE_REPLAY` | No | Set to `1` to force demo replay mode on the quick-start button. |
+| `DEMO_YOUTUBE_URL` | No | YouTube URL for the demo quick-start button fallback. |
 
 ## Preflight Scripts
 
@@ -208,6 +234,7 @@ Checks required environment variables, `ffmpeg`, `yt-dlp`, and prints whether th
 
 - [Production Runbook](docs/PRODUCTION_RUNBOOK.md)
 - [Monday Live Checklist](docs/MONDAY_LIVE_CHECKLIST.md)
+- [Zoom Setup Guide](docs/zoom-setup.md)
 
 ## Built By
 
