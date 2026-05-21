@@ -305,6 +305,17 @@ export function enqueueClaim(
     console.log(`[queue-filter] sponsor-phrase: "${claim.claimText.slice(0, 60)}"`);
     return { enqueued: false, reason: 'sponsor phrase' };
   }
+  // Adjacent-segment sponsor-phrase check — sponsor reads commonly span
+  // multiple segments where the trigger phrase ("use the code X", "promo
+  // code", etc.) sits in one segment and the product-feature sentence the
+  // classifier extracted sits in another. Scan the recent-segment buffer so
+  // the gate catches the product-description half too.
+  for (const seg of recentSegments) {
+    if (SPONSOR_PHRASE_RE.test(seg.text)) {
+      console.log(`[queue-filter] sponsor-phrase-context: claim="${claim.claimText.slice(0, 60)}" trigger="${seg.text.slice(0, 60)}"`);
+      return { enqueued: false, reason: 'sponsor phrase (recent context)' };
+    }
+  }
 
   const tokenCount = claim.primaryEntity.trim().split(/\s+/).length;
   if (/^Speaker \d+$/i.test(claim.primaryEntity.trim())) {
