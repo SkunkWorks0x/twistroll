@@ -7,7 +7,7 @@
 // Tests buildCorrectiveInstruction in isolation. No Haiku, no network.
 // Verifies the corrective prompt structure for each failure shape:
 //   - explanation overflow only
-//   - follow-up overflow only
+//   - grounding overflow only
 //   - both overflow simultaneously
 //   - defensive: non-string fields don't throw
 
@@ -32,7 +32,7 @@ function assert(label: string, cond: boolean): void {
 }
 
 const exp32 = Array.from({ length: 32 }, (_, i) => `word${i + 1}`).join(' ');
-const fu22 = Array.from({ length: 22 }, (_, i) => `q${i + 1}`).join(' ');
+const g42 = Array.from({ length: 42 }, (_, i) => `g${i + 1}`).join(' ');
 
 console.log('Docket corrective-retry — unit assertions\n');
 
@@ -40,7 +40,7 @@ console.log('Docket corrective-retry — unit assertions\n');
 console.log('Test 1 — Explanation overflow builds corrective with previous text + word count');
 {
   const out = buildCorrectiveInstruction(
-    { explanation: exp32, follow_up: 'short ok' },
+    { explanation: exp32, grounding: 'short ok' },
     'Explanation exceeds 28 words',
     undefined
   );
@@ -52,32 +52,32 @@ console.log('Test 1 — Explanation overflow builds corrective with previous tex
   assert('contains "Do not change the verdict"', out.includes('Do not change the verdict'));
 }
 
-// ─── Test 2 — Follow-up overflow ───────────────────────────────────────
-console.log('\nTest 2 — Follow-up overflow builds corrective with previous text + word count');
+// ─── Test 2 — Grounding overflow ───────────────────────────────────────
+console.log('\nTest 2 — Grounding overflow builds corrective with previous text + word count');
 {
   const out = buildCorrectiveInstruction(
-    { explanation: 'ok', follow_up: fu22 },
+    { explanation: 'ok', grounding: g42 },
     undefined,
-    'Follow-up exceeds 18 words'
+    'Grounding exceeds 40 words'
   );
   console.log(`      output:\n${out}\n`);
-  assert('contains "22 words"', out.includes('22 words'));
-  assert('contains "18 words or fewer"', out.includes('18 words or fewer'));
-  assert('contains literal previous follow-up text', out.includes(fu22));
-  assert('does NOT contain "verdict" (FU branch should not mention verdict)', !out.includes('verdict'));
+  assert('contains "42 words"', out.includes('42 words'));
+  assert('contains "40 words or fewer"', out.includes('40 words or fewer'));
+  assert('contains literal previous grounding text', out.includes(g42));
+  assert('does NOT contain "verdict" (grounding branch should not mention verdict)', !out.includes('verdict'));
 }
 
 // ─── Test 3 — Both fail simultaneously ─────────────────────────────────
-console.log('\nTest 3 — Both explanation and follow-up overflow');
+console.log('\nTest 3 — Both explanation and grounding overflow');
 {
   const out = buildCorrectiveInstruction(
-    { explanation: exp32, follow_up: fu22 },
+    { explanation: exp32, grounding: g42 },
     'Explanation exceeds 28 words',
-    'Follow-up exceeds 18 words'
+    'Grounding exceeds 40 words'
   );
   console.log(`      output:\n${out}\n`);
-  assert('contains both prior texts', out.includes(exp32) && out.includes(fu22));
-  assert('contains both word counts (32 and 22)', out.includes('32 words') && out.includes('22 words'));
+  assert('contains both prior texts', out.includes(exp32) && out.includes(g42));
+  assert('contains both word counts (32 and 42)', out.includes('32 words') && out.includes('42 words'));
   assert('ends with "Produce the corrected fact_check tool call now."', out.endsWith('Produce the corrected fact_check tool call now.'));
 }
 
@@ -88,9 +88,9 @@ console.log('\nTest 4 — Non-string fields do not throw, output is just closing
   let out = '';
   try {
     out = buildCorrectiveInstruction(
-      { explanation: undefined, follow_up: 42 },
+      { explanation: undefined, grounding: 42 },
       'Explanation exceeds 28 words',
-      'Follow-up exceeds 18 words'
+      'Grounding exceeds 40 words'
     );
   } catch {
     threw = true;
