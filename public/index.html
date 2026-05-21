@@ -1652,11 +1652,16 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      if (!r.ok) return;
+      if (!r.ok) {
+        // Revert optimistic UI to last server-confirmed state.
+        syncCustomizeUI();
+        return;
+      }
       const d = await r.json();
       if (d && d.applied) applyCustomizeApplied(d.applied);
     } catch {
-      // authFetch handles 401; other failures leave UI in optimistic state.
+      // authFetch handles 401; for other failures, revert the optimistic UI.
+      syncCustomizeUI();
     }
   }
 
