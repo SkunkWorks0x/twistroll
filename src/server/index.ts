@@ -526,6 +526,10 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
       console.log(`[synthesis] suppressed card — no Docket verdict claimId=${claim.segmentId} primaryEntity="${claim.primaryEntity}"`);
       return;
     }
+    if (!result.docket.citations || result.docket.citations.length === 0) {
+      console.log(`[synthesis] suppressed card — zero citations claimId=${claim.segmentId} verdict=${result.docket.verdict}`);
+      return;
+    }
     const card: CardBroadcast = {
       type: 'claim_card',
       claimId: claim.segmentId,
