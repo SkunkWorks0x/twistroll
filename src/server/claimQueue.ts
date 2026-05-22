@@ -48,7 +48,7 @@ const GENERIC_TERMS = new Set(
 
 const SPONSOR_NAMES = new Set(
   [
-    'sentry', 'render', 'deel', 'plaud', 'plaud.ai', 'im8 health', 'im8',
+    'sentry', 'render', 'deel', 'plaud', 'plaud.ai', 'plaid note', 'im8 health', 'im8',
     'lemon.io', 'linkedin', 'northwest registered agent', 'northwest',
     'squarespace', 'vanta', 'google cloud', 'hubspot', 'gusto', 'gamma',
     'netsuite', 'agree', 'grasshopper', 'grasshopper bank',
