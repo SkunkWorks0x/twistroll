@@ -9,9 +9,9 @@ for (const [alias, canonical] of entityAliases) {
   );
 }
 
-assert.equal(normalizeEntities('wade raised a new round'), 'wayve raised a new round');
+assert.equal(normalizeEntities('wade raised a new round'), 'Wayve raised a new round');
 assert.equal(normalizeEntities('WADE raised a new round'), 'WAYVE raised a new round');
-assert.equal(normalizeEntities('open ai launched a model'), 'openai launched a model');
+assert.equal(normalizeEntities('open ai launched a model'), 'OpenAI launched a model');
 assert.equal(normalizeEntities('OPEN AI launched a model'), 'OPENAI launched a model');
 
 const unchanged = 'Stripe and Databricks discussed enterprise AI.';
