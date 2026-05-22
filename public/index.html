@@ -382,13 +382,33 @@
   /* Inline segment span — flows as prose inside .paragraph-body. */
   .segment { display: inline; }
   .segment.is-claim {
-    box-shadow: inset 3px 0 0 0 #FF5C00;
-    padding-left: 6px;
-    background: rgba(255, 92, 0, 0.06);
     display: inline;
+    background: rgba(255, 92, 0, 0.22);
+    padding: 1px 4px;
+    border-radius: 3px;
     cursor: pointer;
+    /* clone so padding + radius render on every line-fragment of a wrapped
+       inline span, not just the first/last fragment. */
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
-  .segment.is-claim:hover { background: rgba(255, 92, 0, 0.12); }
+  .segment.is-claim:hover { background: rgba(255, 92, 0, 0.34); }
+  /* Per-character reveal — each .char fades from 0→1 with a staggered
+     animation-delay set inline by makeSegmentSpan. After the segment's
+     total reveal duration, the JS collapses the chars back to plain text
+     to bound DOM size across a long session. */
+  .segment .char {
+    opacity: 0;
+    animation: char-reveal 220ms ease-out forwards;
+  }
+  @keyframes char-reveal {
+    to { opacity: 1; }
+  }
+  /* Smooth background transition so retroactive claim marks (claim arrives
+     after its segment has already rendered) fade in rather than snap. */
+  .segment {
+    transition: background-color 220ms ease-out;
+  }
   .timestamp {
     color: #555861;
     font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -2089,8 +2109,24 @@
     const span = document.createElement('span');
     span.className = 'segment';
     span.dataset.segmentId = seg.id;
-    span.textContent = isFirstInParagraph ? seg.text : ' ' + seg.text;
     if (state.segmentsWithClaims.has(seg.id)) span.classList.add('is-claim');
+    const text = isFirstInParagraph ? seg.text : ' ' + seg.text;
+    // Adaptive stagger: short segments reveal in ~150ms, long ones cap
+    // at ~500ms so the typewriter doesn't drift behind live audio.
+    const stagger = Math.min(15, 500 / Math.max(1, text.length));
+    for (let i = 0; i < text.length; i++) {
+      const ch = document.createElement('span');
+      ch.className = 'char';
+      ch.style.animationDelay = (i * stagger).toFixed(1) + 'ms';
+      ch.textContent = text[i];
+      span.appendChild(ch);
+    }
+    // Collapse per-char spans back to a single text node after the reveal
+    // finishes — keeps the long-session DOM size bounded.
+    const totalMs = text.length * stagger + 240;
+    setTimeout(() => {
+      if (span.isConnected) span.textContent = text;
+    }, totalMs);
     return span;
   }
 
