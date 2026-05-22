@@ -46,14 +46,22 @@ const GENERIC_TERMS = new Set(
   ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
 
+const SPONSOR_NAMES_RAW = [
+  'sentry', 'render', 'deel', 'plaud', 'plaud.ai', 'plaid note', 'im8 health', 'im8',
+  'lemon.io', 'linkedin', 'northwest registered agent', 'northwest',
+  'squarespace', 'vanta', 'google cloud', 'hubspot', 'gusto', 'gamma',
+  'netsuite', 'agree', 'grasshopper', 'grasshopper bank',
+];
 const SPONSOR_NAMES = new Set(
-  [
-    'sentry', 'render', 'deel', 'plaud', 'plaud.ai', 'plaid note', 'im8 health', 'im8',
-    'lemon.io', 'linkedin', 'northwest registered agent', 'northwest',
-    'squarespace', 'vanta', 'google cloud', 'hubspot', 'gusto', 'gamma',
-    'netsuite', 'agree', 'grasshopper', 'grasshopper bank',
-  ].map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  SPONSOR_NAMES_RAW.map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
 );
+// Substring-match list: normalized entries ≥8 chars only. Catches compound
+// product names ("Plaid note pen" against "plaid note") that exact match
+// would miss, while keeping short single-word sponsors ('deel', 'gusto')
+// on exact match so they don't false-positive on unrelated tokens.
+const SPONSOR_NAME_PREFIXES = SPONSOR_NAMES_RAW
+  .map((s) => s.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  .filter((s) => s.length >= 8);
 
 // Sponsor-read phrase detection — catches reads with non-blocklisted entities
 // (e.g., Twist promo-code reads). Conservative pattern: requires a strong
@@ -297,7 +305,7 @@ export function enqueueClaim(
   }
 
   const normEntity = normalizeEntity(claim.primaryEntity);
-  if (SPONSOR_NAMES.has(normEntity)) {
+  if (SPONSOR_NAMES.has(normEntity) || SPONSOR_NAME_PREFIXES.some((p) => normEntity.includes(p))) {
     console.log(`[queue-filter] sponsor-read: "${claim.primaryEntity}"`);
     return { enqueued: false, reason: 'sponsor read' };
   }
