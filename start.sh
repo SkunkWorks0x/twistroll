@@ -32,23 +32,26 @@ for bin in yt-dlp ffmpeg; do
   fi
 done
 
-# 3. Ollama daemon
-if curl -sf http://${OLLAMA_BASE_URL:-localhost:11434}/api/tags &>/dev/null; then
-  echo -e "${GREEN}✓${NC} Ollama daemon running"
+# 3. Ollama daemon — only needed when local embeddings are in use.
+#    EMBED_PROVIDER=openai uses cloud embeddings and doesn't touch Ollama.
+if [ "${EMBED_PROVIDER:-}" != "openai" ]; then
+  if curl -sf http://${OLLAMA_BASE_URL:-localhost:11434}/api/tags &>/dev/null; then
+    echo -e "${GREEN}✓${NC} Ollama daemon running"
 
-  # 3a. Required models
-  MODELS=$(curl -sf http://${OLLAMA_BASE_URL:-localhost:11434}/api/tags)
-  for model in embeddinggemma qwen2.5; do
-    if echo "$MODELS" | grep -qi "$model"; then
-      echo -e "${GREEN}✓${NC}   Model: $model"
-    else
-      echo -e "${RED}✗${NC}   Model $model not pulled — run: ollama pull $model"
-      FAIL=1
-    fi
-  done
-else
-  echo -e "${RED}✗${NC} Ollama not running — start with: ollama serve"
-  FAIL=1
+    # 3a. Required models
+    MODELS=$(curl -sf http://${OLLAMA_BASE_URL:-localhost:11434}/api/tags)
+    for model in embeddinggemma qwen2.5; do
+      if echo "$MODELS" | grep -qi "$model"; then
+        echo -e "${GREEN}✓${NC}   Model: $model"
+      else
+        echo -e "${RED}✗${NC}   Model $model not pulled — run: ollama pull $model"
+        FAIL=1
+      fi
+    done
+  else
+    echo -e "${RED}✗${NC} Ollama not running — start with: ollama serve"
+    FAIL=1
+  fi
 fi
 
 # 4. .env file exists
