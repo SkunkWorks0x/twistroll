@@ -547,6 +547,58 @@ export function applyLanceDBInjection(
   return next;
 }
 
+// URL cross-check guardrail. Strip citations whose URLs aren't in the
+// retrieved sources, then renumber surviving inline refs ([1], [2], …)
+// against the new citation array. Refs that pointed to dropped citations
+// are removed. If every citation is stripped and the verdict required
+// evidence, downgrade to UNVERIFIABLE so the empty-absence render policy
+// suppresses the card. Exported for unit testing.
+export function stripHallucinatedCitations(
+  candidate: DocketOutput,
+  validUrls: ReadonlySet<string>
+): DocketOutput {
+  const survivalMap = new Map<number, number>();
+  const surviving: DocketCitation[] = [];
+  candidate.citations.forEach((c, idx) => {
+    if (c.url === null || validUrls.has(c.url)) {
+      survivalMap.set(idx + 1, surviving.length + 1);
+      surviving.push(c);
+    }
+  });
+
+  if (surviving.length === candidate.citations.length) return candidate;
+
+  const dropped = candidate.citations.length - surviving.length;
+  console.warn(`[DOCKET] Stripped ${dropped} hallucinated citation URL(s)`);
+
+  if (surviving.length === 0) {
+    if (candidate.verdict !== 'UNVERIFIABLE') {
+      return {
+        ...candidate,
+        citations: surviving,
+        verdict: 'UNVERIFIABLE',
+        explanation: 'No primary source located in show archive or live retrieval.',
+      };
+    }
+    return { ...candidate, citations: surviving };
+  }
+
+  const remap = (text: string): string =>
+    text
+      .replace(/(\s*)\[(\d+)\]/g, (_match, ws: string, n: string) => {
+        const newIdx = survivalMap.get(parseInt(n, 10));
+        return newIdx === undefined ? '' : `${ws}[${newIdx}]`;
+      })
+      .trim();
+
+  return {
+    ...candidate,
+    citations: surviving,
+    explanation: remap(candidate.explanation),
+    grounding: remap(candidate.grounding),
+  };
+}
+
 // Build a corrective instruction appended to the user message on retry attempt 2
 // when attempt 1 failed Zod validation due to explanation or grounding word
 // overflow. Tells Haiku to shorten while preserving citations and verdict.
@@ -711,25 +763,10 @@ export async function runDocket(
       }
     }
 
-    // URL cross-check: every cited URL must be in the retrieved sources.
-    // Strip hallucinated URLs. null-URL citations are LanceDB archive
-    // references (no public URL) — pass them through.
+    // URL cross-check: strip hallucinated URLs and renumber surviving refs.
+    // null-URL citations are LanceDB archive references — pass through.
     const validUrls = new Set(sources.map((s) => s.url).filter((u): u is string => !!u));
-    const surviving = candidate.citations.filter(
-      (c) => c.url === null || validUrls.has(c.url)
-    );
-    if (surviving.length !== candidate.citations.length) {
-      const dropped = candidate.citations.length - surviving.length;
-      console.warn(`[DOCKET] Stripped ${dropped} hallucinated citation URL(s)`);
-      candidate = { ...candidate, citations: surviving };
-      if (surviving.length === 0 && candidate.verdict !== 'UNVERIFIABLE') {
-        candidate = {
-          ...candidate,
-          verdict: 'UNVERIFIABLE',
-          explanation: 'No primary source located in show archive or live retrieval.',
-        };
-      }
-    }
+    candidate = stripHallucinatedCitations(candidate, validUrls);
 
     // Tag Haiku-emitted citations with provenance. The post-processor
     // injection below tags its citations 'post_processor'.
