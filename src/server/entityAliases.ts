@@ -28,6 +28,7 @@ export const entityAliases = new Map<string, string>([
   ['Elan Musk', 'Elon Musk'],
   ['Sam Altmann', 'Sam Altman'],
   ['Y Combinater', 'Y Combinator'],
+  ['Ahmad Akhund', 'Immad Akhund'],
 ]);
 
 function escapeRegExp(s: string): string {
