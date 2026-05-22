@@ -1984,7 +1984,7 @@
   let reconnectTimer;
 
   function setStatus(state, label) {
-    statusEl.classList.remove('connected', 'disconnected');
+    statusEl.classList.remove('connected', 'disconnected', 'degraded', 'offline');
     statusEl.classList.add(state);
     statusLabelEl.textContent = label;
   }
