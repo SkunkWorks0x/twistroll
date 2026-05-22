@@ -334,7 +334,7 @@
   }
   .follow-banner.hidden { display: none; }
 
-  .seg {
+  .transcript-paragraph {
     display: grid;
     grid-template-columns: 84px 1fr 44px;
     column-gap: 18px;
@@ -345,8 +345,8 @@
     margin-bottom: 2px;
     transition: background 100ms;
   }
-  .seg:hover { background: rgba(255, 255, 255, 0.025); }
-  .seg .speaker {
+  .transcript-paragraph:hover { background: rgba(255, 255, 255, 0.025); }
+  .speaker-label {
     align-self: start;
     margin-top: 3px;
     padding: 3px 7px;
@@ -362,7 +362,7 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  .seg .speaker::before {
+  .speaker-label::before {
     content: "";
     display: inline-block;
     width: 5px;
@@ -372,50 +372,36 @@
     background: var(--speaker-color, #8B8F9A);
     vertical-align: middle;
   }
-  .seg .text {
+  .paragraph-body {
     color: #F4F5F7;
     font-family: "Source Serif 4", Georgia, serif;
     font-size: 17px;
     line-height: 1.42;
     letter-spacing: -0.01em;
   }
-  .seg .ts {
+  /* Inline segment span — flows as prose inside .paragraph-body. */
+  .segment { display: inline; }
+  .segment.is-claim {
+    box-shadow: inset 3px 0 0 0 #FF5C00;
+    padding-left: 6px;
+    background: rgba(255, 92, 0, 0.06);
+    display: inline;
+    cursor: pointer;
+  }
+  .segment.is-claim:hover { background: rgba(255, 92, 0, 0.12); }
+  .timestamp {
     color: #555861;
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 10px;
     font-weight: 600;
     text-align: right;
   }
-  .seg.has-claim {
-    position: relative;
-    background: linear-gradient(90deg, rgba(255, 92, 0, 0.14), rgba(255, 92, 0, 0.025) 55%, transparent);
-    box-shadow: inset 0 0 0 1px rgba(255, 92, 0, 0.16);
-    cursor: pointer;
-  }
-  .seg.has-claim:hover {
-    background: linear-gradient(90deg, rgba(255, 92, 0, 0.20), rgba(255, 92, 0, 0.04) 55%, transparent);
-  }
-  .seg.has-claim::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 7px;
-    bottom: 7px;
-    width: 3px;
-    border-radius: 999px;
-    background: #FF5C00;
-    box-shadow: 0 0 12px rgba(255, 92, 0, 0.65);
-  }
 
-  /* Role-based speaker name colors. With these in place, the has-claim
-     orange wash + left border still flag claim segments — the speaker
-     name keeps its role color so the speaker identity stays visually
-     consistent across claim and non-claim segments. */
-  /* Role drives the colored dot via --speaker-color; the pill text stays gray. */
-  .seg .speaker.role-host     { --speaker-color: #FF5C00; }
-  .seg .speaker.role-cohost   { --speaker-color: #FBBF24; }
-  .seg .speaker.role-guest    { --speaker-color: #34D399; }
-  .seg .speaker.role-unmapped { --speaker-color: #6B7280; }
+  /* Role drives the colored dot on the paragraph speaker label. */
+  .transcript-paragraph .speaker-label.role-host     { --speaker-color: #FF5C00; }
+  .transcript-paragraph .speaker-label.role-cohost   { --speaker-color: #FBBF24; }
+  .transcript-paragraph .speaker-label.role-guest    { --speaker-color: #34D399; }
+  .transcript-paragraph .speaker-label.role-unmapped { --speaker-color: #6B7280; }
 
   /* Same role colors applied to the speaker-pill prefix on claim cards. */
   .speaker-pill.role-host     { color: #FF5C00; }
@@ -428,7 +414,7 @@
     50%      { background-color: var(--orange-bright); }
   }
   .pulse { animation: pulse-bg 120ms ease-in-out; }
-  .seg.pulse { background: var(--orange-bright); }
+  .segment.pulse { background: var(--orange-bright); }
 
   /* ─── Sidebar / cards ─────────────────────────────────────── */
   .sidebar-title {
@@ -1776,6 +1762,30 @@
   }
   const statusLabelEl = statusEl.querySelector('.label');
 
+  // Delegated transcript click handler. One listener instead of per-segment
+  // wiring — the paragraph DOM may hold dozens of inline .segment spans
+  // and per-span listeners would balloon as the session runs.
+  //   - .speaker-label click → cycle the speaker's role/name assignment
+  //   - .segment.is-claim click → scroll the matching sidebar card into view
+  transcriptEl.addEventListener('click', (e) => {
+    const labelEl = e.target.closest('.speaker-label');
+    if (labelEl) {
+      e.stopPropagation();
+      const id = parseInt(labelEl.dataset.speaker, 10);
+      if (Number.isFinite(id)) assignSpeaker(id);
+      return;
+    }
+    const segEl = e.target.closest('.segment.is-claim');
+    if (segEl) {
+      const segmentId = segEl.dataset.segmentId;
+      const card = sidebarEl.querySelector(`[data-claim-id="${CSS.escape(segmentId)}"]`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pulse(card);
+      }
+    }
+  });
+
   // ─── Utilities ──────────────────────────────────────────────
   const escape = (s) =>
     String(s).replace(/[&<>"']/g, (c) => ({
@@ -1882,19 +1892,20 @@
     return { label: r.name, roleClass: r.roleClass };
   }
 
-  // Re-paint speaker labels on every existing segment. Called when session
+  // Re-paint speaker labels on every existing paragraph. Called when session
   // metadata changes (e.g., a producer hits /api/session/start mid-show).
   function applyMetaToTranscript() {
-    const els = transcriptEl.querySelectorAll('.seg[data-speaker]');
-    for (const el of els) {
-      const id = parseInt(el.dataset.speaker, 10);
+    const paras = transcriptEl.querySelectorAll('.transcript-paragraph[data-speaker]');
+    for (const para of paras) {
+      const id = parseInt(para.dataset.speaker, 10);
       if (!Number.isFinite(id)) continue;
-      const speakerEl = el.querySelector('.speaker');
-      if (!speakerEl) continue;
+      const labelEl = para.querySelector('.speaker-label');
+      if (!labelEl) continue;
       const { name, roleClass } = resolveSpeaker(id);
-      speakerEl.textContent = name;
-      speakerEl.className = `speaker ${roleClass}`;
-      speakerEl.title = 'Click to assign speaker';
+      labelEl.textContent = name;
+      labelEl.className = `speaker-label ${roleClass}`;
+      labelEl.dataset.speaker = String(id);
+      labelEl.title = 'Click to assign speaker';
     }
   }
 
@@ -2060,52 +2071,107 @@
   }
 
   // ─── Transcript rendering ──────────────────────────────────
+  // Paragraph merge: consecutive same-speaker segments fold into one
+  // <div class="transcript-paragraph"> so the transcript reads like
+  // flowing prose instead of choppy subtitle lines. A new paragraph
+  // starts when the speaker changes, when the gap between segments
+  // exceeds the threshold, or when the current paragraph exceeds the
+  // word budget.
+  const PARAGRAPH_MAX_WORDS = 80;
+  const PARAGRAPH_GAP_SECONDS = 2.5;
+  let paragraphIdCounter = 0;
+
+  function wordCountOf(text) {
+    return text.split(/\s+/).filter(Boolean).length;
+  }
+
+  function makeSegmentSpan(seg, isFirstInParagraph) {
+    const span = document.createElement('span');
+    span.className = 'segment';
+    span.dataset.segmentId = seg.id;
+    span.textContent = isFirstInParagraph ? seg.text : ' ' + seg.text;
+    if (state.segmentsWithClaims.has(seg.id)) span.classList.add('is-claim');
+    return span;
+  }
+
+  function makeParagraph(seg, speakerName, roleClass) {
+    const para = document.createElement('div');
+    para.className = 'transcript-paragraph';
+    para.dataset.speaker = String(seg.speaker);
+    para.dataset.paragraphId = 'para_' + (++paragraphIdCounter);
+    para.dataset.lastTs = String(seg.timestamp);
+    para.dataset.lastDuration = String(seg.duration || 0);
+    para.dataset.wordCount = String(wordCountOf(seg.text));
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'speaker-label ' + roleClass;
+    labelEl.dataset.speaker = String(seg.speaker);
+    labelEl.title = 'Click to assign speaker';
+    labelEl.textContent = speakerName;
+
+    const body = document.createElement('span');
+    body.className = 'paragraph-body';
+    body.appendChild(makeSegmentSpan(seg, true));
+
+    const tsEl = document.createElement('span');
+    tsEl.className = 'timestamp';
+    tsEl.textContent = fmtTimestamp(seg.timestamp);
+
+    para.appendChild(labelEl);
+    para.appendChild(body);
+    para.appendChild(tsEl);
+    return para;
+  }
+
+  function shouldStartNewParagraph(lastPara, seg) {
+    if (!lastPara || !lastPara.classList?.contains('transcript-paragraph')) return true;
+    if (lastPara.dataset.speaker !== String(seg.speaker)) return true;
+    const lastTs = parseFloat(lastPara.dataset.lastTs);
+    const lastDur = parseFloat(lastPara.dataset.lastDuration) || 0;
+    if (Number.isFinite(lastTs) && (seg.timestamp - (lastTs + lastDur)) > PARAGRAPH_GAP_SECONDS) return true;
+    const wc = parseInt(lastPara.dataset.wordCount, 10) || 0;
+    if (wc > PARAGRAPH_MAX_WORDS) return true;
+    return false;
+  }
+
+  function appendToParagraph(para, seg) {
+    const body = para.querySelector('.paragraph-body');
+    if (body) body.appendChild(makeSegmentSpan(seg, false));
+    para.dataset.lastTs = String(seg.timestamp);
+    para.dataset.lastDuration = String(seg.duration || 0);
+    const wc = parseInt(para.dataset.wordCount, 10) || 0;
+    para.dataset.wordCount = String(wc + wordCountOf(seg.text));
+    const tsEl = para.querySelector('.timestamp');
+    if (tsEl) tsEl.textContent = fmtTimestamp(seg.timestamp);
+  }
+
+  function dropSegmentFromDom(segmentId) {
+    const span = transcriptEl.querySelector(`.segment[data-segment-id="${CSS.escape(segmentId)}"]`);
+    if (!span) return;
+    const para = span.closest('.transcript-paragraph');
+    span.remove();
+    const body = para?.querySelector('.paragraph-body');
+    if (para && body && body.children.length === 0) para.remove();
+  }
+
   function addSegment(seg) {
     state.segments.push(seg);
     while (state.segments.length > MAX_SEGMENTS) {
       const dropped = state.segments.shift();
-      if (dropped) state.segmentsWithClaims.delete(dropped.id);
+      if (dropped) {
+        state.segmentsWithClaims.delete(dropped.id);
+        dropSegmentFromDom(dropped.id);
+      }
     }
 
     if (state.segments.length === 1) transcriptEl.innerHTML = '';
 
-    const el = document.createElement('div');
-    el.className = 'seg';
-    el.dataset.segmentId = seg.id;
-    el.dataset.speaker = String(seg.speaker);
-    const { name: speakerName, roleClass: speakerRoleClass } = resolveSpeaker(seg.speaker);
-    el.innerHTML = `
-      <span class="speaker ${speakerRoleClass}">${escape(speakerName)}</span>
-      <span class="text">${escape(seg.text)}</span>
-      <span class="ts">${fmtTimestamp(seg.timestamp)}</span>
-    `;
-    const speakerEl = el.querySelector('.speaker');
-    if (speakerEl) {
-      speakerEl.title = 'Click to assign speaker';
-      speakerEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        assignSpeaker(seg.speaker);
-      });
-    }
-    el.addEventListener('click', () => {
-      // Only react if this segment has a claim attached.
-      if (!el.classList.contains('has-claim')) return;
-      const card = sidebarEl.querySelector(`[data-claim-id="${CSS.escape(seg.id)}"]`);
-      if (card) {
-        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        pulse(card);
-      }
-    });
-    transcriptEl.appendChild(el);
-
-    // If a claim already arrived for this segment id (rare race), mark it.
-    if (state.segmentsWithClaims.has(seg.id)) {
-      el.classList.add('has-claim');
-    }
-
-    // Trim DOM to match state.segments length.
-    while (transcriptEl.children.length > state.segments.length) {
-      transcriptEl.removeChild(transcriptEl.firstChild);
+    const { name: speakerName, roleClass } = resolveSpeaker(seg.speaker);
+    const lastPara = transcriptEl.lastElementChild;
+    if (shouldStartNewParagraph(lastPara, seg)) {
+      transcriptEl.appendChild(makeParagraph(seg, speakerName, roleClass));
+    } else {
+      appendToParagraph(lastPara, seg);
     }
 
     // Auto-scroll to bottom unless the user has scrolled up.
@@ -2117,7 +2183,7 @@
   function markSegmentAsClaim(segmentId) {
     state.segmentsWithClaims.add(segmentId);
     const segEl = transcriptEl.querySelector(`[data-segment-id="${CSS.escape(segmentId)}"]`);
-    if (segEl) segEl.classList.add('has-claim');
+    if (segEl) segEl.classList.add('is-claim');
   }
 
   // ─── Card rendering ─────────────────────────────────────────
