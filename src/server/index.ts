@@ -849,6 +849,11 @@ app.post('/api/session/demo', async (req, res) => {
   if (records.length === 0) {
     return res.status(500).json({ error: `Replay file ${chosen} contained no valid segments` });
   }
+  // Demo replay has no live operator to set roles in the UI before the
+  // first segment lands. Map the first three Deepgram speakers (0/1/2) to
+  // host/cohost/guest by appearance order — matches the canonical
+  // twist-sample.jsonl seating. Pill overrides still work mid-session.
+  currentSpeakerMap = validateSpeakerMap({ 0: 'host', 1: 'cohost', 2: 'guest' });
   startReplay(records, `demo://${chosen}`);
   res.json({ status: 'connecting', mode: 'replay', file: chosen, segments: records.length, source: `demo://${chosen}` });
 });
