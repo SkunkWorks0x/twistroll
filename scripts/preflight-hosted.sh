@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -u
 
+# Pick up keys from a local .env so the script can run before any process
+# manager (Railway, systemd) has exported them. No-op when .env is absent.
+[ -f .env ] && set -a && source .env && set +a
+
 fail=0
 
 pass() {
