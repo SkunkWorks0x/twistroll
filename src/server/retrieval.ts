@@ -605,6 +605,12 @@ async function timed<T>(fn: () => Promise<T>): Promise<{ data: T; ms: number }> 
 const TAVILY_TIMEOUT_FIRST_MS = 2500;
 const TAVILY_TIMEOUT_RETRY_MS = 3000;
 
+// LanceDB query timeout. Local Ollama embeds return in <100ms; hosted
+// OpenAI embeds add a network round-trip — bump the budget so retrieval
+// doesn't time out on the cold path. Override via env when needed.
+const LANCEDB_TIMEOUT_MS = Number(process.env.LANCEDB_TIMEOUT_MS)
+  || (process.env.EMBED_PROVIDER === 'openai' ? 2000 : 300);
+
 // Tavily retry-once on timeout. First attempt 2500ms; on timeout (only — not
 // other errors), retry once at 3000ms. Both fail → empty array. Mirrors the
 // retry shape in llm-router.ts's grok path.
@@ -629,7 +635,7 @@ async function tavilyWithRetry(claim: ClaimClassification): Promise<RetrievedSou
 export async function retrieve(claim: ClaimClassification): Promise<RetrievalResult> {
   const tStart = Date.now();
   const [lr, tr, gr] = await Promise.all([
-    timed(() => withTimeout(queryLanceDB(claim), 300, 'lancedb').catch(() => [] as RetrievedSource[])),
+    timed(() => withTimeout(queryLanceDB(claim), LANCEDB_TIMEOUT_MS, 'lancedb').catch(() => [] as RetrievedSource[])),
     timed(() => tavilyWithRetry(claim)),
     // Grokipedia disabled — 2026-05-07 live test showed 8/8 timeouts at 2500ms
     // against grok-4-1-fast. Function preserved (queryGrokipedia is exported)
