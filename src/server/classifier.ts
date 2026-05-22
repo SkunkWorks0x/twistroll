@@ -24,17 +24,30 @@ const PRIOR_CONTEXT_SIZE = 5;
 const ENTITY_TYPES: EntityType[] = ['company', 'person', 'product', 'metric', 'event', 'unknown'];
 const CLAIM_TYPES: ClaimType[] = ['financial', 'historical', 'attribution', 'comparative', 'prediction', 'unknown'];
 
+// Last successfully-extracted named entity. Used to resolve generic
+// references ("the company", "their company", "the guest's company") and
+// pronouns ("we", "our", "they") in subsequent windows when the entity
+// isn't named in the current 3-segment window. Resets at session
+// boundaries — signaled by prior.length === 0 (matches the lastSegments
+// reset on /api/session/start). Process-lifetime otherwise.
+let currentTopicEntity: string | null = null;
+
 const SYSTEM_PROMPT_TEMPLATE = `You are a factual claim detector for a live podcast interview. You evaluate a window of recent statements and determine whether they contain a verifiable factual claim.
 
 ENTITY EXTRACTION — TRANSCRIPT-GROUNDED ONLY
 - Extract entities ONLY from verbatim text present in the provided transcript segments.
 - primaryEntity must be a substring that appears literally in the current 3-segment window, OR a pronoun resolved to an explicit antecedent within that same window.
-- If a speaker uses "we", "our", "my company" and the company name appears explicitly earlier in the window, resolve it. If the company name does NOT appear in the window, output primaryEntity as empty string.
+- If a speaker uses "we", "our", "my company" and the company name appears explicitly earlier in the window, resolve it. If the company name does NOT appear in the window AND no "Current discussion topic" line is provided in the user message, output primaryEntity as empty string.
 - Do NOT import, infer, or bridge entity names from any source outside the transcript segments provided.
 - Do NOT assume speaker identity from speaker IDs. Speaker IDs are arbitrary numbers, not stable identifiers.
 - Treat all speakers with identical rigor. Host claims are extracted with the same rules as guest claims.
 - primaryEntity must be a proper noun — the name of a specific company, person, product, or organization. Do NOT extract descriptive phrases ("polyamorous agreement", "biggest deal"), news source names used as attribution ("Bloomberg reports", "according to Reuters"), or generic category labels.
 - If the claim is ABOUT company X but REPORTED BY source Y, extract X as primaryEntity, not Y. Example: "Bloomberg reports Microsoft transferred capital" → primaryEntity is "Microsoft", not "Bloomberg".
+
+DISCUSSION TOPIC CONTEXT
+- If the user message includes a "Current discussion topic:" line, that names the entity speakers are currently discussing across multiple windows.
+- When the current window uses generic references ("the company", "their company", "the guest's company", "the founder's company") or pronouns ("we", "our", "they", "their") AND no explicit entity name appears in the current window, resolve primaryEntity to the topic entity.
+- Never output "Speaker N", "the guest", "the host", "the company", or any other generic reference as primaryEntity. Either resolve to the topic entity, or leave primary_entity as an empty string.
 
 A verifiable factual claim contains one or more of:
 - A specific number, percentage, or statistic
@@ -141,9 +154,17 @@ export async function classifyWindow(
   const current = window[window.length - 1];
   const fallbackSpeaker = resolveSpeaker(current.speaker, speakerMap);
 
+  // Session-boundary reset for the topic state. prior is the lastSegments
+  // buffer in index.ts, cleared on session start.
+  if (prior.length === 0) currentTopicEntity = null;
+
   // Build user message with seg1..segN labels (UUIDs are too noisy for the LLM
   // to echo reliably; we map labels back to real IDs after the call).
   let userMsg = '';
+
+  if (currentTopicEntity) {
+    userMsg += `Current discussion topic: ${currentTopicEntity}. Resolve generic references ("the company", "their company", "the guest's company") and pronouns to ${currentTopicEntity} when no explicit entity name appears in the current window.\n\n`;
+  }
 
   // Capitalize the role tag for the user message (CSS-like uppercase).
   const tag = (r: SpeakerRole) => (r === 'host' ? 'Host' : r === 'cohost' ? 'Co-host' : 'Guest');
@@ -237,6 +258,12 @@ export async function classifyWindow(
   claimText = normalizeEntities(claimText);
   primaryEntity = normalizeEntities(primaryEntity);
   searchableNoun = normalizeEntities(searchableNoun);
+
+  // Update topic memory whenever we get a fresh named entity. Carried into
+  // the next window's user message so pronoun-only claims can resolve.
+  if (primaryEntity.trim()) {
+    currentTopicEntity = primaryEntity;
+  }
 
   return {
     classification: {
