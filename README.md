@@ -6,7 +6,7 @@ Real-time podcast fact-checker for TWiST.
 
 Sentinel is ready for live local demos using BlackHole 2ch system audio on macOS. The dashboard supports operator speaker assignment for `HOST`, `COHOST`, `GUEST 1`, `GUEST 2`, and `GUEST 3`; this keeps Jason, Alex, and multi-guest panels readable during recording.
 
-The local retrieval archive is rebuilt for Ollama EmbeddingGemma 768-dim vectors and contains 3,956 chunks across 127 TWiST episodes. Entity alias normalization is wired before retrieval to correct common Deepgram proper-noun misses such as Wayve/Waabi variants.
+The local retrieval archive is embedded with OpenAI `text-embedding-3-small` (1536-dim) and contains 3,956 chunks across 127 TWiST episodes. Entity alias normalization is wired before retrieval to correct common Deepgram proper-noun misses such as Wayve/Waabi variants.
 
 ## What It Does
 
@@ -163,7 +163,7 @@ The dashboard is built for live production use:
 
 ## Cross-Episode Memory
 
-The local LanceDB archive contains 127 TWiST episodes and 3,956 searchable chunks. Local embeddings use EmbeddingGemma 308M through Ollama. Hosted deployments can use OpenAI `text-embedding-3-small`; vectors are not interchangeable, so changing embedding providers requires re-embedding the corpus.
+The local LanceDB archive contains 127 TWiST episodes and 3,956 searchable chunks. The committed corpus is embedded with OpenAI `text-embedding-3-small` (1536-dim) — the default for both local and hosted runs. Local-only setups can switch to Ollama EmbeddingGemma 308M (768-dim) by setting `EMBED_PROVIDER=ollama`; vectors are not interchangeable, so switching providers requires re-embedding via `npm run reembed`.
 
 ## API Endpoints
 
@@ -196,8 +196,8 @@ Authorization: Bearer <token>
 | `ANTHROPIC_API_KEY` | Yes | Claim classifier and The Docket. |
 | `CLOUD_API_KEY` | No | Fallback alias when `ANTHROPIC_API_KEY` is unset. |
 | `TAVILY_API_KEY` | Yes for production | Live web retrieval. |
-| `EMBED_PROVIDER` | No | `ollama` for local, `openai` for hosted. |
-| `OPENAI_API_KEY` | When `EMBED_PROVIDER=openai` | OpenAI embeddings. |
+| `EMBED_PROVIDER` | No | Defaults to `openai` (`text-embedding-3-small`, 1536-dim). Set to `ollama` for local 768-dim EmbeddingGemma. |
+| `OPENAI_API_KEY` | Yes (default) | OpenAI embeddings. Optional only when `EMBED_PROVIDER=ollama`. |
 | `OLLAMA_BASE_URL` | Local only | Ollama endpoint. Defaults to `http://localhost:11434`. |
 | `OLLAMA_MODEL_TROLLS` | Local fallback only | Historical name for classifier fallback model. |
 | `GROQ_API_KEY` | No | Optional classifier fallback. |
