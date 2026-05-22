@@ -91,8 +91,12 @@ app.use('/api', (req, res, next) => {
 
 // API: Get current state
 app.get('/api/status', (_req, res) => {
+  const retrievalReady = process.env.EMBED_PROVIDER === 'openai'
+    ? !!process.env.OPENAI_API_KEY
+    : isOllamaAvailable();
   res.json({
     ollama: isOllamaAvailable(),
+    retrievalReady,
   });
 });
 
@@ -151,6 +155,17 @@ const AUTH_ENABLED = ACCESS_TOKEN.length >= 24;
 // isn't load-bearing — don't surface "OLLAMA DOWN" to the dashboard, and
 // skip the periodic health-check polling entirely.
 const OLLAMA_NEEDED = process.env.EMBED_PROVIDER !== 'openai';
+
+// Boot-time guard: OpenAI embeddings configured without the key will throw
+// on every LanceDB query. Log loudly here; /api/status reports the same
+// state via retrievalReady so the dashboard can degrade visibly instead of
+// looking healthy while retrieval is dead.
+if (process.env.EMBED_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
+  console.error(
+    '[BOOT] EMBED_PROVIDER=openai but OPENAI_API_KEY is unset — retrieval will fail. ' +
+    'Set OPENAI_API_KEY or use EMBED_PROVIDER=ollama.'
+  );
+}
 
 // ─── Session state machine ───
 type SessionUiState = 'idle' | 'connecting' | 'live' | 'error';
