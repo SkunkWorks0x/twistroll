@@ -2550,7 +2550,7 @@
       exp.innerHTML = formatExplanationWithRefs(docket.explanation);
       el.appendChild(exp);
 
-      const lanceHits = (docket.citations || []).filter((c) => c.url === null);
+      const lanceHits = (docket.citations || []).filter((c) => c.citationSource === 'post_processor');
       if (lanceHits.length > 0) {
         const badge = document.createElement('div');
         badge.className = 'memory-badge';
@@ -2577,7 +2577,15 @@
         docket.citations.forEach((c, i) => {
           const row = document.createElement('div');
           row.className = 'citation';
-          if (c.url) {
+          if (c.citationSource === 'post_processor') {
+            row.classList.add('archive');
+            row.innerHTML = `
+              <span class="num">[${i + 1}]</span>
+              <span class="title">${escape(c.title)}</span>
+              <span class="archive-label">— show archive</span>
+              <span class="tier">T${c.tier}</span>
+            `;
+          } else if (c.url) {
             row.innerHTML = `
               <span class="num">[${i + 1}]</span>
               <span class="title" title="Click to copy URL">${escape(c.title)}</span>
@@ -2588,11 +2596,9 @@
               copyToClipboard(c.url, row);
             });
           } else {
-            row.classList.add('archive');
             row.innerHTML = `
               <span class="num">[${i + 1}]</span>
               <span class="title">${escape(c.title)}</span>
-              <span class="archive-label">— show archive</span>
               <span class="tier">T${c.tier}</span>
             `;
           }
