@@ -97,6 +97,7 @@ app.get('/api/status', (_req, res) => {
   res.json({
     ollama: isOllamaAvailable(),
     retrievalReady,
+    hosted: process.env.HOSTED === '1',
   });
 });
 

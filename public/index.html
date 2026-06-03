@@ -1337,6 +1337,8 @@
   const sessionBar = document.getElementById('session-bar');
   const demoBar = document.getElementById('demo-bar');
   const session = { state: 'idle', url: null, error: null, deepgramHealth: { state: 'connected' } };
+  // Set from /api/status after auth (that read is auth-gated). Default false → local UI.
+  let isHosted = false;
 
   // Secondary-row quick actions. Shown only in idle+youtube; hidden in
   // connecting/live/error and in system-audio mode so the bar stays clean.
@@ -1349,7 +1351,7 @@
     demoBar.className = 'demo-bar visible';
     demoBar.innerHTML = `
       <span class="demo-bar-label">Quick start:</span>
-      <button id="demo-twist">Try with latest TWiST episode</button>
+      <button id="demo-twist" class="${isHosted ? 'session-action primary' : ''}">Try with latest TWiST episode</button>
       <button id="demo-capture" class="disabled" style="display:none" title="Coming soon — capture audio from any browser tab">Capture Browser Audio (coming soon)</button>
     `;
     document.getElementById('demo-twist').addEventListener('click', startDemo);
@@ -1407,23 +1409,37 @@
       return;
     }
     if (session.state === 'idle') {
+      // Hosted: live capture (YouTube + System Audio) runs locally only. Force
+      // the YouTube view so System Audio never renders, and make the toggle
+      // inert — the demo replay below is the hosted path.
+      const effMode = isHosted ? 'youtube' : sessionMode;
       const toggle = `
         <div class="session-mode-toggle">
-          <button data-mode="youtube" class="${sessionMode === 'youtube' ? 'active' : ''}">YouTube</button>
-          <button data-mode="system-audio" class="${sessionMode === 'system-audio' ? 'active' : ''}">System Audio</button>
+          <button data-mode="youtube" class="${effMode === 'youtube' ? 'active' : ''}"${isHosted ? ' disabled' : ''}>YouTube</button>
+          <button data-mode="system-audio" class="${effMode === 'system-audio' ? 'active' : ''}"${isHosted ? ' disabled' : ''}>System Audio</button>
         </div>
       `;
-      if (sessionMode === 'youtube') {
-        sessionBar.innerHTML = `
-          <span class="session-dot"></span>
-          ${toggle}
-          <input class="session-input" id="session-url" type="url" placeholder="Paste YouTube URL..." />
-          <button class="session-action primary" id="session-start">Start Stream</button>
-        `;
-        const inp = document.getElementById('session-url');
-        const btn = document.getElementById('session-start');
-        btn.addEventListener('click', () => startYouTube(inp.value));
-        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startYouTube(inp.value); });
+      if (effMode === 'youtube') {
+        if (isHosted) {
+          sessionBar.innerHTML = `
+            <span class="session-dot"></span>
+            ${toggle}
+            <input class="session-input" id="session-url" type="url" placeholder="Live YouTube runs locally only" disabled />
+            <button class="session-action secondary" id="session-start" disabled>Start Stream</button>
+            <span class="session-helper">Live YouTube capture runs locally only — use the demo below.</span>
+          `;
+        } else {
+          sessionBar.innerHTML = `
+            <span class="session-dot"></span>
+            ${toggle}
+            <input class="session-input" id="session-url" type="url" placeholder="Paste YouTube URL..." />
+            <button class="session-action primary" id="session-start">Start Stream</button>
+          `;
+          const inp = document.getElementById('session-url');
+          const btn = document.getElementById('session-start');
+          btn.addEventListener('click', () => startYouTube(inp.value));
+          inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startYouTube(inp.value); });
+        }
       } else {
         sessionBar.innerHTML = `
           <span class="session-dot"></span>
@@ -1433,10 +1449,12 @@
         `;
         document.getElementById('session-start').addEventListener('click', () => startSystemAudio());
       }
-      sessionBar.querySelectorAll('.session-mode-toggle button').forEach((b) => {
-        b.addEventListener('click', () => setSessionMode(b.dataset.mode));
-      });
-      renderDemoBar(sessionMode === 'youtube');
+      if (!isHosted) {
+        sessionBar.querySelectorAll('.session-mode-toggle button').forEach((b) => {
+          b.addEventListener('click', () => setSessionMode(b.dataset.mode));
+        });
+      }
+      renderDemoBar(effMode === 'youtube');
     } else if (session.state === 'connecting') {
       sessionBar.innerHTML = `
         <span class="session-dot"></span>
@@ -2675,6 +2693,8 @@
         promptForToken('Auth check failed');
         return;
       }
+      const status = await r.json().catch(() => ({}));
+      isHosted = status.hosted === true;
     } catch {
       return;
     }
