@@ -67,7 +67,7 @@ Requires Node 18+ and API keys for Anthropic + Deepgram + Tavily + OpenAI in `.e
 
 ## Built by
 
-**Imani** · [@SkunkWorks0x](https://x.com/SkunkWorks0x) · Solo founder
+@SkunkWorks0x
 
 Built for Jason Calacanis's TWiST bounty — "A real time podcast fact checker."
 
