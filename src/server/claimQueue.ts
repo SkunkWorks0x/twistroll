@@ -71,6 +71,13 @@ const SPONSOR_NAME_PREFIXES = SPONSOR_NAMES_RAW
 // banking/startup discussion.
 const SPONSOR_PHRASE_RE = /promo code|(use|using|enter|with) (the )?code \w+|cash bonus|sponsored by|brought to you by/i;
 
+// Self-referential show-meta gate inputs: the host narrating the show itself
+// (schedule/greeting/format) is not a checkable claim. Suppressed only when the
+// entity IS the show AND there are no figures AND the text reads as schedule/
+// greeting — substantive numeric self-claims and external entities pass.
+const SHOW_ENTITIES = new Set(['twist', 'thisweekinstartups', 'twistartups']);
+const SHOW_META_RE = /\b(monday|tuesday|wednesday|thursday|friday)\b|days?\s+a\s+week|broadcasts?\b|\bairs?\b|welcome\s+(back\s+)?to|tune\s+in/i;
+
 function normalizeEntity(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -337,6 +344,16 @@ export function enqueueClaim(
   if (GENERIC_TERMS.has(normEntity)) {
     console.log(`[queue-filter] weak-entity: "${claim.primaryEntity}" (reason: generic_term)`);
     return { enqueued: false, reason: 'weak entity (generic term)' };
+  }
+
+  // Self-referential show-meta (schedule/greeting/format) — not a checkable
+  // claim. SHOW_META_RE is the precision guard: a substantive numeric self-claim
+  // ("our 1% is $50M") carries no schedule/greeting token and passes. No
+  // keyNumbers guard — the classifier extracts incidental cardinals ("three"
+  // from "three days a week"), which would short-circuit and defeat the gate.
+  if (SHOW_ENTITIES.has(normEntity) && SHOW_META_RE.test(claim.claimText)) {
+    console.log(`[queue-filter] show-meta: "${claim.claimText.slice(0, 60)}"`);
+    return { enqueued: false, reason: 'show-meta (self-referential)' };
   }
 
   if (checkCooldown(claim)) {
