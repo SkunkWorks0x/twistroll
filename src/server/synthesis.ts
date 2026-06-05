@@ -460,6 +460,15 @@ export function isEmptyAbsence(candidate: DocketOutput | null): boolean {
   return !!candidate && candidate.verdict === 'UNVERIFIABLE' && candidate.citations.length === 0;
 }
 
+// Funding-round detector for the verdict veto. Gate-validated positive set; rejects
+// calendar periods (bare year / quarter) so a token like "2025" never trips the round
+// arm. Narrow by design — bridge/growth/"X round" phrasing is a validated follow-up.
+function isFundingRound(token: string): boolean {
+  const t = token.toLowerCase().trim();
+  if (/^\d{4}$/.test(t) || /\bq[1-4]\b/.test(t)) return false;
+  return /series\s+[a-z]\b/.test(t) || /\bseed\b/.test(t) || /\bpre-?seed\b/.test(t) || /\bround\s+[a-z]\b/.test(t);
+}
+
 function citationsRefInExplanation(text: string): number[] {
   const out = new Set<number>();
   const matches = text.matchAll(/\[(\d+)\]/g);
@@ -818,6 +827,39 @@ export async function runDocket(
           ...candidate,
           verdict: 'UNVERIFIABLE',
           explanation: 'No primary source located in show archive or live retrieval.',
+        };
+      }
+    }
+
+    // Code-side verdict veto. The Docket returns a confident FALSE whenever a source's
+    // figure differs from the claim's — even when the source covers a DIFFERENT entity or
+    // funding round than the claim, fact-checking the host wrong on a true statement.
+    // Adjudicate the classifier's source-free claim-features against the Docket's reported
+    // source-features; FALSE only, entity arm first. On override, keep the off-event
+    // citation [1] (so isEmptyAbsence still renders the card) and swap in a fixed,
+    // anti-pattern-clean template — inserted after the anti-pattern scan and Zod, so it is
+    // clean and within budget by construction. Entity match is exact and isFundingRound is
+    // narrow by design; alias-canonicalization and more round tokens are a validated follow-up.
+    if (candidate.verdict === 'FALSE') {
+      const norm = (s?: string | null) => (s ?? '').toLowerCase().trim();
+      const srcEntity = norm(candidate.top_source_entity);
+      const srcRound = candidate.top_source_round_or_period ?? '';
+      if (norm(claim.primaryEntity) !== srcEntity && !['', 'none', 'unspecified'].includes(srcEntity)) {
+        console.log(`[DOCKET] Veto FALSE→UNVERIFIABLE (entity): claim="${claim.primaryEntity}" source="${candidate.top_source_entity}"`);
+        candidate = {
+          ...candidate,
+          verdict: 'UNVERIFIABLE',
+          grounding: `The retrieved source [1] reports on ${candidate.top_source_entity}, a different entity than ${claim.primaryEntity} in the claim, so it does not bear on the claim.`,
+          explanation: `The cited source covers ${candidate.top_source_entity}, not ${claim.primaryEntity}; it cannot confirm or refute the claim [1].`,
+        };
+      } else if (norm(claim.claimAssertionType) === 'specific_value' && norm(claim.claimRoundOrPeriod) === 'unspecified' && isFundingRound(srcRound)) {
+        const roundLabel = srcRound.replace(/\b\w/g, (c) => c.toUpperCase());
+        console.log(`[DOCKET] Veto FALSE→UNVERIFIABLE (round): claim names no round; source round="${srcRound}"`);
+        candidate = {
+          ...candidate,
+          verdict: 'UNVERIFIABLE',
+          grounding: `The retrieved source [1] describes ${roundLabel} financing, a round the claim does not name, so it does not bear on the claim.`,
+          explanation: `Source [1] addresses ${roundLabel} financing, which the claim does not name; it cannot confirm or refute it.`,
         };
       }
     }
