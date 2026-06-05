@@ -469,6 +469,21 @@ function isFundingRound(token: string): boolean {
   return /series\s+[a-z]\b/.test(t) || /\bseed\b/.test(t) || /\bpre-?seed\b/.test(t) || /\bround\s+[a-z]\b/.test(t);
 }
 
+// Synthesis-local entity canonicalization for the verdict veto's entity-arm comparison
+// ONLY. Deliberately NOT added to the shared entityAliases map: that map is applied to
+// the displayed claimText in the classifier (classifier.ts:270), and "Mercury Bank" →
+// "Mercury" is a synonym for what the host actually SAID — not a Deepgram mistranscription
+// — so rewriting it there would misquote the host on the card. Narrow surface-variant
+// equivalences only; NO general suffix strip (which would wrongly conflate "Mercury" the
+// fintech with "Mercury Systems" the defense company).
+const ENTITY_VARIANTS = new Map<string, string>([
+  ['mercury bank', 'mercury'],
+]);
+function canonEntity(s?: string | null): string {
+  const n = (s ?? '').toLowerCase().trim();
+  return ENTITY_VARIANTS.get(n) ?? n;
+}
+
 function citationsRefInExplanation(text: string): number[] {
   const out = new Set<number>();
   const matches = text.matchAll(/\[(\d+)\]/g);
@@ -838,13 +853,14 @@ export async function runDocket(
     // source-features; FALSE only, entity arm first. On override, keep the off-event
     // citation [1] (so isEmptyAbsence still renders the card) and swap in a fixed,
     // anti-pattern-clean template — inserted after the anti-pattern scan and Zod, so it is
-    // clean and within budget by construction. Entity match is exact and isFundingRound is
-    // narrow by design; alias-canonicalization and more round tokens are a validated follow-up.
+    // clean and within budget by construction. The entity arm canonicalizes both sides
+    // through a narrow synthesis-local variant map (canonEntity); isFundingRound stays narrow.
+    // Broader alias coverage and more round tokens are a validated follow-up.
     if (candidate.verdict === 'FALSE') {
       const norm = (s?: string | null) => (s ?? '').toLowerCase().trim();
       const srcEntity = norm(candidate.top_source_entity);
       const srcRound = candidate.top_source_round_or_period ?? '';
-      if (norm(claim.primaryEntity) !== srcEntity && !['', 'none', 'unspecified'].includes(srcEntity)) {
+      if (canonEntity(claim.primaryEntity) !== canonEntity(candidate.top_source_entity) && !['', 'none', 'unspecified'].includes(srcEntity)) {
         console.log(`[DOCKET] Veto FALSE→UNVERIFIABLE (entity): claim="${claim.primaryEntity}" source="${candidate.top_source_entity}"`);
         candidate = {
           ...candidate,
