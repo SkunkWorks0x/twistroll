@@ -48,6 +48,9 @@ export interface DocketOutput {
   verdict: 'TRUE' | 'FALSE' | 'MISLEADING' | 'PARTIAL' | 'UNVERIFIABLE';
   explanation: string;
   citations: DocketCitation[];
+  // REPORT-ONLY source-side fields — filled by the model, consumed by NO verdict logic.
+  top_source_entity?: string;
+  top_source_round_or_period?: string;
 }
 
 export interface SynthesisResult {
@@ -82,6 +85,9 @@ function buildDocketSchema(explanationWordMax: number) {
         citationSource: z.enum(['haiku', 'post_processor']).optional(),
       })
     ),
+    // Report-only source-side fields — optional so an omission never fails the verdict parse.
+    top_source_entity: z.string().optional(),
+    top_source_round_or_period: z.string().optional(),
   });
 }
 
@@ -147,8 +153,10 @@ function buildFactCheckTool(explanationWordMax: number) {
             required: ['title', 'url', 'tier'],
           },
         },
+        top_source_entity: { type: 'string', description: 'Report-only: the entity the most-relevant cited source is about; "none" if no source.' },
+        top_source_round_or_period: { type: 'string', description: 'Report-only: the round/period/version the most-relevant source describes; "unspecified" or "none".' },
       },
-      required: ['grounding', 'verdict', 'explanation', 'citations'],
+      required: ['grounding', 'verdict', 'explanation', 'citations', 'top_source_entity', 'top_source_round_or_period'],
     },
   };
 }
