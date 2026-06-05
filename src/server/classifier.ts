@@ -89,11 +89,13 @@ Respond with ONLY this JSON, nothing else:
   "key_numbers": ["array", "of", "stat strings with units verbatim"],
   "claim_type": "financial/historical/attribution/comparative/prediction/unknown",
   "searchable_noun": "1-3 word search kernel or empty string",
+  "claim_round_or_period": "the funding round, fiscal period, title, or version named in the CLAIM itself (e.g. 'Series D', 'Q1 2026', 'v2'); 'unspecified' if the claim names none",
+  "claim_assertion_type": "specific_value (asserts a specific number/date/fact) | universal (a never/always/no-one statement) | comparative (more/less/highest/first) | other",
   "claim_span_start": "seg1/seg2/seg3 - first relevant segment label",
   "claim_span_end": "seg1/seg2/seg3 - last relevant segment label"
 }
 
-If is_claim is false: primary_entity and searchable_noun are empty strings, key_numbers is [], entity_type and claim_type are "unknown", and claim_span_start = claim_span_end = the most recent segment label (the last seg in the window).`;
+If is_claim is false: primary_entity and searchable_noun are empty strings, key_numbers is [], entity_type and claim_type are "unknown", claim_round_or_period is "unspecified", claim_assertion_type is "other", and claim_span_start = claim_span_end = the most recent segment label (the last seg in the window).`;
 
 // Resolve a Deepgram speaker id to its role. Three-tier fallback:
 //   1. Explicit speakerMap entry → use it (host/cohost/guest)
@@ -252,6 +254,16 @@ export async function classifyWindow(
   const claimType: ClaimType = CLAIM_TYPES.includes(claimTypeRaw as ClaimType) ? (claimTypeRaw as ClaimType) : 'unknown';
   let searchableNoun = isClaim && typeof parsed.searchable_noun === 'string' ? parsed.searchable_noun : '';
 
+  // Report-only diagnostic fields — observational, consumed by no gate/verdict logic.
+  const claimRoundOrPeriod = isClaim && typeof parsed.claim_round_or_period === 'string' && parsed.claim_round_or_period.trim()
+    ? parsed.claim_round_or_period.trim()
+    : 'unspecified';
+  const assertionRaw = typeof parsed.claim_assertion_type === 'string' ? parsed.claim_assertion_type.trim().toLowerCase() : '';
+  const claimAssertionType: 'specific_value' | 'universal' | 'comparative' | 'other' =
+    ['specific_value', 'universal', 'comparative', 'other'].includes(assertionRaw)
+      ? (assertionRaw as 'specific_value' | 'universal' | 'comparative' | 'other')
+      : 'other';
+
   const startSegmentId = labelToSegmentId(parsed.claim_span_start, window, current.id);
   const endSegmentId = labelToSegmentId(parsed.claim_span_end, window, current.id);
 
@@ -280,6 +292,8 @@ export async function classifyWindow(
       keyNumbers,
       claimType,
       searchableNoun,
+      claimRoundOrPeriod,
+      claimAssertionType,
       claimSpan: { startSegmentId, endSegmentId },
     },
     latencyMs,

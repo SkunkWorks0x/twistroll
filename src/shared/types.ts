@@ -82,6 +82,11 @@ export interface ClaimClassification {
   claimType: ClaimType;
   searchableNoun: string;      // 1–3 word retrieval kernel
 
+  // Report-only diagnostic fields (round-perception measurement) — set by the
+  // classifier, consumed by no gate/verdict logic.
+  claimRoundOrPeriod?: string;
+  claimAssertionType?: 'specific_value' | 'universal' | 'comparative' | 'other';
+
   // Window span — segment IDs covered by this claim.
   claimSpan: {
     startSegmentId: string;
