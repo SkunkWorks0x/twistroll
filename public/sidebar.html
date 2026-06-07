@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TWiST Sentinel — Live Verdicts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400&family=JetBrains+Mono:wght@500;700&display=swap" />
+<style>
+  :root {
+    --bg0:#08080A; --bg1:#111114; --bg2:#18181C;
+    --t0:#FFFFFF; --t1:#E2E4E9; --t2:#8B8F9A; --t3:#555861;
+    --orange:#FF5C00;
+    --v-true:#34D399; --v-warn:#FBBF24; --v-false:#F87171; --v-unv:#6B7280;
+    --line:rgba(255,255,255,0.06);
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --serif:"Source Serif 4",Georgia,serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    background:var(--bg0); color:var(--t1);
+    font-family:var(--mono);
+    -webkit-font-smoothing:antialiased;
+    display:flex; justify-content:center;
+    min-height:100vh;
+  }
+  #app {
+    width:100%; max-width:460px;
+    min-height:100vh;
+    display:flex; flex-direction:column;
+    background:var(--bg0);
+  }
+
+  /* ─── Status strip ─── */
+  .strip {
+    position:sticky; top:0; z-index:5;
+    display:flex; align-items:center; gap:10px;
+    padding:9px 12px;
+    background:var(--bg1);
+    border-bottom:1px solid var(--line);
+    font-size:11px; letter-spacing:0.04em;
+  }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--t3); }
+  .dot.live { background:var(--v-true); }
+  .dot.reconnecting { background:var(--v-warn); }
+  .dot.idle { background:var(--t3); }
+  .dot.blip { animation:blip 120ms ease-out; }
+  @keyframes blip { 0%{transform:scale(1)} 50%{transform:scale(1.6)} 100%{transform:scale(1)} }
+  .source { font-weight:700; text-transform:uppercase; color:var(--t2); letter-spacing:0.08em; }
+  .source.active { color:var(--orange); }
+  .count { color:var(--t2); }
+  .strip-spacer { flex:1; }
+  .strip-btn {
+    font-family:var(--mono); font-size:10px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.06em;
+    color:var(--orange); background:transparent;
+    border:1px solid rgba(255,92,0,0.4); border-radius:4px;
+    padding:4px 8px; cursor:pointer; text-decoration:none;
+    line-height:1; white-space:nowrap;
+  }
+  .strip-btn:hover { background:rgba(255,92,0,0.1); }
+  .strip-btn.studio { color:var(--t2); border-color:var(--line); }
+  .strip-btn.studio:hover { color:var(--t1); }
+
+  /* ─── Card stack ─── */
+  .stack { flex:1; padding:10px; display:flex; flex-direction:column; gap:8px; }
+
+  .empty { color:var(--t3); font-size:12px; text-align:center; padding:40px 16px; }
+
+  .card {
+    --vc:var(--v-unv);
+    background:var(--bg1);
+    border:1px solid var(--line);
+    border-left:3px solid var(--vc);
+    border-radius:6px;
+    padding:10px 12px;
+    cursor:pointer;
+  }
+  .card[data-verdict="TRUE"]        { --vc:var(--v-true); }
+  .card[data-verdict="FALSE"]       { --vc:var(--v-false); }
+  .card[data-verdict="MISLEADING"],
+  .card[data-verdict="PARTIAL"]     { --vc:var(--v-warn); }
+  .card.in, .progress.in { animation:cardIn 180ms ease-out; }
+  @keyframes cardIn { from{opacity:0; transform:translateY(-4px);} to{opacity:1; transform:none;} }
+
+  .card-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+  .pill {
+    font-family:var(--mono); font-size:9px; font-weight:700;
+    letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--vc); border:1px solid var(--vc);
+    border-radius:3px; padding:2px 6px; line-height:1; white-space:nowrap;
+  }
+  .time { font-family:var(--mono); font-size:10px; color:var(--t3); flex:none; }
+
+  .claim {
+    font-family:var(--serif); font-size:15px; line-height:1.4; color:var(--t0);
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .card.expanded .claim { -webkit-line-clamp:unset; overflow:visible; }
+
+  .body { margin-top:8px; }
+  .card.slim .body { display:none; }
+  .card.slim.expanded .body { display:block; }
+
+  .explain { font-family:var(--serif); font-size:13px; line-height:1.45; color:var(--t1); }
+  .ref { font-family:var(--mono); font-size:10px; color:var(--orange); vertical-align:1px; padding:0 1px; }
+
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .chip {
+    font-family:var(--mono); font-size:10px; color:var(--t1);
+    background:var(--bg2); border:1px solid var(--line);
+    border-left:2px solid var(--t3);
+    border-radius:3px; padding:3px 7px; text-decoration:none; line-height:1.2;
+  }
+  .chip.tier-1 { border-left-color:var(--v-true); }
+  .chip.tier-2 { border-left-color:var(--t2); }
+  .chip.tier-3 { border-left-color:var(--t3); }
+  a.chip:hover { color:var(--orange); }
+  .chip-more { font-family:var(--mono); font-size:10px; color:var(--t3); align-self:center; }
+
+  /* ─── In-progress card ─── */
+  .progress {
+    background:var(--bg1);
+    border:1px solid var(--line); border-left:3px dashed var(--t3);
+    border-radius:6px; padding:10px 12px;
+  }
+  .progress .entity { font-family:var(--serif); font-size:14px; color:var(--t1); }
+  .progress .stage { font-family:var(--mono); font-size:10px; color:var(--t2); margin-top:4px; letter-spacing:0.04em; }
+
+  /* ─── Unverifiable aggregate ─── */
+  .unverif {
+    background:var(--bg1); border:1px solid var(--line); border-left:3px solid var(--v-unv);
+    border-radius:6px;
+  }
+  .unverif-head {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding:9px 12px; cursor:pointer;
+    font-family:var(--mono); font-size:11px; color:var(--t2); letter-spacing:0.04em;
+  }
+  .unverif-head .hint { color:var(--t3); font-size:10px; }
+  .unverif-list { display:none; padding:0 12px 10px; flex-direction:column; gap:6px; }
+  .unverif.open .unverif-list { display:flex; }
+  .unverif-item {
+    border-left:2px solid var(--v-unv); padding:4px 0 4px 8px;
+  }
+  .unverif-item .ucl { font-family:var(--serif); font-size:13px; color:var(--t2); line-height:1.35; }
+
+  /* ─── Token gate (mirrors SENTINEL ACCESS card) ─── */
+  .gate {
+    position:fixed; inset:0; z-index:1000;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(8,8,10,0.96);
+  }
+  .gate.hidden { display:none; }
+  .gate-card {
+    display:flex; flex-direction:column; gap:12px;
+    padding:24px; border-radius:12px;
+    background:var(--bg2); border:1px solid rgba(255,92,0,0.4);
+    min-width:300px; max-width:88vw;
+  }
+  .gate-title { font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--orange); }
+  .gate-input { font-family:var(--mono); font-size:13px; padding:10px 12px; background:var(--bg0); border:1px solid var(--line); border-radius:6px; color:var(--t1); outline:none; }
+  .gate-input:focus { border-color:var(--orange); }
+  .gate-button { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; padding:10px 14px; background:var(--orange); border:none; border-radius:6px; color:var(--bg0); cursor:pointer; }
+  .gate-button:hover { filter:brightness(1.1); }
+  .gate-error { font-family:var(--mono); font-size:10px; color:var(--v-false); min-height:12px; }
+
+  /* Shown in the opener while the app is popped out into a PiP window. */
+  .dock-note { display:none; color:var(--t3); font-size:12px; text-align:center; padding:40px 16px; cursor:pointer; }
+  .dock-note:hover { color:var(--t1); }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div class="strip">
+      <span id="dot" class="dot idle"></span>
+      <span id="source" class="source">IDLE</span>
+      <span id="count" class="count">0 checked</span>
+      <span class="strip-spacer"></span>
+      <button id="popout" class="strip-btn" hidden>Pop out</button>
+      <a class="strip-btn studio" href="/">Studio</a>
+    </div>
+    <div id="stack" class="stack">
+      <div id="empty" class="empty">Listening for checkable claims.</div>
+    </div>
+  </div>
+
+  <div id="dock-note" class="dock-note">Popped out — click to bring back.</div>
+
+  <div id="gate" class="gate hidden">
+    <form id="gate-form" class="gate-card">
+      <div class="gate-title">Sentinel Access</div>
+      <input id="gate-input" class="gate-input" type="password" placeholder="Enter access token" autocomplete="off" />
+      <button type="submit" class="gate-button">Connect</button>
+      <div id="gate-error" class="gate-error"></div>
+    </form>
+  </div>
+
+<script>
+(() => {
+  const TOKEN_KEY = 'sentinel_token';
+  const MAX_CARDS = 100;          // pruned so a multi-hour session can't grow unbounded
+  const MAX_UNVERIF_DETAIL = 100; // detail list capped; the counter stays the true total
+  const MAX_SEEN = 2000;          // dedup memory; FIFO-evicted so it stays bounded too
+  const PROGRESS_TTL_MS = 90_000; // drop in-flight cards that never produced a verdict
+  const BACKOFF_MIN = 500, BACKOFF_MAX = 8000;
+
+  let token = sessionStorage.getItem(TOKEN_KEY) || null;
+
+  // Node refs captured once. They survive being moved into the PiP document,
+  // so the WS handlers keep driving the same DOM after a pop-out.
+  const app = document.getElementById('app');
+  const appHost = document.body;
+  const stack = document.getElementById('stack');
+  const emptyEl = document.getElementById('empty');
+  const dotEl = document.getElementById('dot');
+  const sourceEl = document.getElementById('source');
+  const countEl = document.getElementById('count');
+  const popBtn = document.getElementById('popout');
+  const dockNote = document.getElementById('dock-note');
+  const gate = document.getElementById('gate');
+  const gateForm = document.getElementById('gate-form');
+  const gateInput = document.getElementById('gate-input');
+  const gateError = document.getElementById('gate-error');
+
+  // ─── State ───
+  const slots = new Map();   // claimId → in-flight progress node (only while pending)
+  const seen = new Set();    // claimIds that reached a terminal verdict (dedup)
+  let checked = 0;
+  let unverifTotal = 0;
+  let unverifRow = null;     // lazily-created aggregate row, pinned to stack top
+
+  // ─── Strip ───
+  let wsOpen = false;
+  let sessState = 'idle';
+  let sessUrl = '';
+
+  function renderStrip() {
+    dotEl.className = 'dot ' + (!wsOpen ? 'reconnecting' : (sessState === 'connecting' || sessState === 'live') ? 'live' : 'idle');
+    let label = 'IDLE', active = false;
+    if (sessState === 'connecting' || sessState === 'live') {
+      label = sessUrl.indexOf('demo://') === 0 ? 'DEMO REPLAY' : 'LIVE';
+      active = true;
+    }
+    sourceEl.textContent = label;
+    sourceEl.classList.toggle('active', active && wsOpen);
+  }
+  function applySession(state, url) {
+    sessState = state || 'idle';
+    sessUrl = state === 'idle' ? '' : (url || sessUrl);
+    renderStrip();
+  }
+  function bumpChecked() {
+    checked++;
+    countEl.textContent = checked + ' checked';
+  }
+  function listeningPulse() {
+    if (!wsOpen) return;
+    dotEl.classList.remove('blip'); void dotEl.offsetWidth; dotEl.classList.add('blip');
+  }
+
+  // ─── Empty state ───
+  function refreshEmpty() {
+    const hasContent = stack.querySelector('.card, .progress, .unverif');
+    emptyEl.style.display = hasContent ? 'none' : '';
+  }
+
+  // ─── Ordering: newest-first, below the pinned unverifiable row ───
+  function topAnchor() {
+    if (unverifRow && unverifRow.isConnected) return unverifRow.nextSibling;
+    return stack.firstChild;
+  }
+  function prependNode(node) {
+    stack.insertBefore(node, topAnchor());
+  }
+  function pruneCards() {
+    // Only finished verdict cards count toward the cap; in-flight progress
+    // nodes are transient (cleared by onCard or the orphan sweep).
+    const cards = stack.querySelectorAll('.card');
+    for (let i = cards.length - 1; i >= MAX_CARDS; i--) cards[i].remove();
+  }
+
+  // ─── Safe text helpers (NEVER innerHTML with claim/citation data) ───
+  function appendWithRefs(parent, text) {
+    // Splits "…fact [1] more [2]" into text nodes + styled [N] ref spans.
+    const parts = String(text == null ? '' : text).split(/(\[\d+\])/g);
+    for (const part of parts) {
+      if (!part) continue;
+      if (/^\[\d+\]$/.test(part)) {
+        const s = document.createElement('span');
+        s.className = 'ref';
+        s.textContent = part;
+        parent.appendChild(s);
+      } else {
+        parent.appendChild(document.createTextNode(part));
+      }
+    }
+  }
+  function httpUrl(raw) {
+    if (typeof raw !== 'string') return null;
+    try {
+      const u = new URL(raw);
+      return (u.protocol === 'http:' || u.protocol === 'https:') ? u : null;
+    } catch { return null; }
+  }
+  function chipLabel(citation, parsed) {
+    if (parsed) return parsed.hostname.replace(/^www\./, '');
+    const t = citation && typeof citation.title === 'string' ? citation.title : '';
+    return t.split(/[\s—\-:|]+/).filter(Boolean)[0] || 'source';
+  }
+  function fmtClock(d) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  function buildChips(citations) {
+    const wrap = document.createElement('div');
+    wrap.className = 'chips';
+    const list = Array.isArray(citations) ? citations : [];
+    list.slice(0, 3).forEach((c) => {
+      const parsed = httpUrl(c && c.url);
+      const tier = Number(c && c.tier) === 1 ? 1 : Number(c && c.tier) === 3 ? 3 : 2;
+      const el = parsed ? document.createElement('a') : document.createElement('span');
+      if (parsed) { el.href = parsed.href; el.target = '_blank'; el.rel = 'noopener noreferrer'; }
+      el.className = 'chip tier-' + tier;
+      el.textContent = chipLabel(c, parsed);
+      el.addEventListener('click', (e) => e.stopPropagation());
+      wrap.appendChild(el);
+    });
+    if (list.length > 3) {
+      const more = document.createElement('span');
+      more.className = 'chip-more';
+      more.textContent = '+' + (list.length - 3);
+      wrap.appendChild(more);
+    }
+    return wrap;
+  }
+
+  function buildCard(card, verdict) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.claimId = card.claimId;
+    el.dataset.verdict = verdict;
+    if (verdict === 'TRUE') el.classList.add('slim');
+
+    const head = document.createElement('div');
+    head.className = 'card-head';
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.textContent = verdict;
+    const time = document.createElement('span');
+    time.className = 'time';
+    time.textContent = fmtClock(new Date());
+    head.appendChild(pill);
+    head.appendChild(time);
+
+    const claim = document.createElement('div');
+    claim.className = 'claim';
+    claim.textContent = card.claimText || '';
+
+    el.appendChild(head);
+    el.appendChild(claim);
+
+    const docket = card.docket || {};
+    const body = document.createElement('div');
+    body.className = 'body';
+    if (docket.explanation) {
+      const exp = document.createElement('div');
+      exp.className = 'explain';
+      appendWithRefs(exp, docket.explanation);
+      body.appendChild(exp);
+    }
+    if (docket.citations && docket.citations.length) {
+      body.appendChild(buildChips(docket.citations));
+    }
+    if (body.childNodes.length) el.appendChild(body);
+
+    el.addEventListener('click', () => el.classList.toggle('expanded'));
+    return el;
+  }
+
+  function buildProgress(msg) {
+    const el = document.createElement('div');
+    el.className = 'progress';
+    el.dataset.claimId = msg.claimId;
+    el.dataset.ts = String(Date.now());
+    const entity = document.createElement('div');
+    entity.className = 'entity';
+    entity.textContent = msg.primaryEntity || 'Claim detected';
+    const stage = document.createElement('div');
+    stage.className = 'stage';
+    stage.textContent = stageLabel(msg.stage);
+    el.appendChild(entity);
+    el.appendChild(stage);
+    return el;
+  }
+  function stageLabel(stage) {
+    if (stage === 'retrieving') return 'Searching sources…';
+    if (stage === 'analyzing') return 'Analyzing evidence…';
+    return 'Claim detected';
+  }
+
+  // ─── Unverifiable aggregate ───
+  function ensureUnverifRow() {
+    if (unverifRow && unverifRow.isConnected) return unverifRow;
+    unverifRow = document.createElement('div');
+    unverifRow.className = 'unverif';
+    const head = document.createElement('div');
+    head.className = 'unverif-head';
+    const count = document.createElement('span');
+    count.className = 'ucount';
+    const hint = document.createElement('span');
+    hint.className = 'hint';
+    hint.textContent = 'tap to view';
+    head.appendChild(count);
+    head.appendChild(hint);
+    const list = document.createElement('div');
+    list.className = 'unverif-list';
+    head.addEventListener('click', () => unverifRow.classList.toggle('open'));
+    unverifRow.appendChild(head);
+    unverifRow.appendChild(list);
+    stack.insertBefore(unverifRow, stack.firstChild);
+    return unverifRow;
+  }
+  function addUnverif(card) {
+    ensureUnverifRow();
+    unverifTotal++;
+    unverifRow.querySelector('.ucount').textContent =
+      unverifTotal + ' unverifiable';
+    const list = unverifRow.querySelector('.unverif-list');
+    const item = document.createElement('div');
+    item.className = 'unverif-item';
+    const cl = document.createElement('div');
+    cl.className = 'ucl';
+    cl.textContent = card.claimText || '';
+    item.appendChild(cl);
+    list.insertBefore(item, list.firstChild);
+    while (list.children.length > MAX_UNVERIF_DETAIL) list.lastChild.remove();
+  }
+
+  // ─── Message handlers ───
+  function onProgress(msg) {
+    if (!msg.claimId || seen.has(msg.claimId)) return; // late progress after verdict = stale
+    const existing = slots.get(msg.claimId);
+    if (existing) {
+      existing.querySelector('.stage').textContent = stageLabel(msg.stage);
+      existing.querySelector('.entity').textContent = msg.primaryEntity || 'Claim detected';
+      existing.dataset.ts = String(Date.now());
+      return;
+    }
+    const node = buildProgress(msg);
+    node.classList.add('in');
+    prependNode(node);
+    slots.set(msg.claimId, node);
+    refreshEmpty();
+  }
+
+  function onCard(card) {
+    if (!card.claimId || seen.has(card.claimId)) return; // dedup (e.g. after reconnect)
+    const verdict = String((card.docket && card.docket.verdict) || 'UNVERIFIABLE').toUpperCase();
+    const prog = slots.get(card.claimId);
+    slots.delete(card.claimId);
+    seen.add(card.claimId);
+    if (seen.size > MAX_SEEN) seen.delete(seen.values().next().value);
+    bumpChecked();
+
+    if (verdict === 'UNVERIFIABLE') {
+      if (prog) prog.remove();        // resolves into the aggregate, not its own card
+      addUnverif(card);
+      pruneCards();
+      refreshEmpty();
+      return;
+    }
+
+    const node = buildCard(card, verdict);
+    if (prog && prog.isConnected) {
+      prog.parentNode.insertBefore(node, prog); // upgrade IN PLACE — same DOM slot
+      prog.remove();
+    } else {
+      node.classList.add('in');
+      prependNode(node);
+    }
+    pruneCards();
+    refreshEmpty();
+  }
+
+  function handleMessage(msg) {
+    switch (msg && msg.type) {
+      case 'claim_card':     onCard(msg); break;
+      case 'claim_progress': onProgress(msg); break;
+      case 'session_state':  applySession(msg.state, msg.url); break;
+      case 'transcript_segment': listeningPulse(); break;
+      // unknown types ignored for forward compatibility
+    }
+  }
+
+  // ─── Orphan progress sweep ───
+  setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+    for (const [id, node] of slots) {
+      if (now - Number(node.dataset.ts || 0) > PROGRESS_TTL_MS) {
+        node.remove(); slots.delete(id); changed = true;
+      }
+    }
+    if (changed) refreshEmpty();
+  }, 15_000);
+
+  // ─── WebSocket ───
+  let ws = null;
+  let backoff = BACKOFF_MIN;
+  let reconnectTimer = null;
+
+  function wsUrl() {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const base = proto + '://' + window.location.host + '/ws';
+    return token ? base + '?token=' + encodeURIComponent(token) : base;
+  }
+  function connect() {
+    try { ws = new WebSocket(wsUrl()); }
+    catch { scheduleReconnect(); return; }
+    ws.addEventListener('open', () => {
+      wsOpen = true; backoff = BACKOFF_MIN; renderStrip();
+    });
+    ws.addEventListener('message', (e) => {
+      let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      handleMessage(msg);
+    });
+    ws.addEventListener('close', () => {
+      wsOpen = false; renderStrip(); recheckThenReconnect();
+    });
+    ws.addEventListener('error', () => { try { ws.close(); } catch {} });
+  }
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimer);
+    const jitter = Math.random() * backoff * 0.3;
+    reconnectTimer = setTimeout(connect, Math.min(backoff, BACKOFF_MAX) + jitter);
+    backoff = Math.min(backoff * 2, BACKOFF_MAX);
+  }
+  // A WS close is normally a network drop → reconnect. But a token that goes
+  // stale mid-session (server redeploy / rotation) is rejected at the handshake,
+  // and the browser can't read that 401 from the close event — so re-run the
+  // HTTP canary to tell auth failure apart from a network drop.
+  function recheckThenReconnect() {
+    if (!token) { scheduleReconnect(); return; }
+    fetch('/api/session/status', { headers: { Authorization: 'Bearer ' + token } })
+      .then((res) => {
+        if (res.status === 401) {
+          sessionStorage.removeItem(TOKEN_KEY);
+          token = null;
+          showGate('Invalid token'); // auth failure → no reconnect loop
+          return;
+        }
+        scheduleReconnect();
+      })
+      .catch(() => scheduleReconnect()); // canary unreachable = network, keep retrying
+  }
+
+  // ─── Token gate ───
+  function showGate(message) {
+    gateError.textContent = message || '';
+    gate.classList.remove('hidden');
+    gateInput.focus();
+  }
+  gateForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = gateInput.value.trim();
+    if (!v) return;
+    sessionStorage.setItem(TOKEN_KEY, v);
+    location.reload();
+  });
+
+  // ─── Document Picture-in-Picture ───
+  let pipWin = null;
+  let popPending = false; // guards the async gap before pipWin is assigned
+  if ('documentPictureInPicture' in window) {
+    popBtn.hidden = false;
+    popBtn.addEventListener('click', () => { pipWin ? pipWin.close() : popOut(); });
+  }
+  async function popOut() {
+    if (pipWin || popPending) return; // a double-click can't open two windows
+    popPending = true;
+    let win;
+    try {
+      win = await documentPictureInPicture.requestWindow({ width: 380, height: 640 });
+    } catch { popPending = false; return; }
+    pipWin = win;
+    popPending = false;
+    document.querySelectorAll('style, link[rel="stylesheet"]').forEach((n) => {
+      win.document.head.appendChild(n.cloneNode(true));
+    });
+    win.document.body.style.margin = '0';
+    win.document.body.appendChild(app); // move live DOM; WS in opener keeps driving it
+    dockNote.style.display = 'block';
+    popBtn.textContent = 'Dock';
+    win.addEventListener('pagehide', () => dockBack(win), { once: true });
+  }
+  function dockBack(w) {
+    if (w !== pipWin) return; // a stale window's pagehide can't re-dock the live app
+    if (app.ownerDocument === w.document) appHost.insertBefore(app, appHost.firstChild);
+    dockNote.style.display = 'none';
+    popBtn.textContent = 'Pop out';
+    pipWin = null;
+  }
+  dockNote.addEventListener('click', () => { if (pipWin) pipWin.close(); });
+
+  // ─── Boot: HTTP canary doubles as auth gate + strip seed ───
+  // Browser WS can't distinguish a 401 handshake from a network drop, so a
+  // bad token must be caught here (HTTP 401), not via the WS close code.
+  (async function boot() {
+    const hadToken = !!token;
+    try {
+      const res = await fetch('/api/session/status', {
+        headers: token ? { Authorization: 'Bearer ' + token } : {},
+      });
+      if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY);
+        token = null;
+        showGate(hadToken ? 'Invalid token' : '');
+        return; // auth failure → no WS, no reconnect loop
+      }
+      if (res.ok) {
+        const d = await res.json().catch(() => null);
+        if (d && typeof d.state === 'string') applySession(d.state, d.url);
+      }
+    } catch {
+      // Network error reaching the canary (server down) ≠ auth failure.
+      // Fall through to connect(); the WS will enter reconnect backoff.
+    }
+    connect();
+  })();
+})();
+</script>
+</body>
+</html>
