@@ -703,6 +703,37 @@ export class DeepgramClient extends EventEmitter {
     });
   }
 
+  /** Source-agnostic audio ingestion point. All audio sources (ffmpeg today,
+   *  browser capture in a future commit) must enter through here. Preserves
+   *  the bounded-buffer + drain-while-OPEN semantics exactly. */
+  public pushAudio(chunk: Buffer): void {
+    if (this.expectingResolveAck) {
+      this.expectingResolveAck = false;
+      this.reResolutionAttempts = 0;
+      console.log('[deepgram] re-resolution: audio bytes flowing, attempt counter reset');
+      this.emit('reresolved');
+    }
+    // Bounded buffer: drop oldest if full. Audio capture must never block.
+    this.audioBuffer.push(chunk);
+    while (this.audioBuffer.length > AUDIO_BUFFER_MAX_CHUNKS) {
+      this.audioBuffer.shift();
+      console.warn('[deepgram] audio buffer full — dropped oldest chunk');
+    }
+
+    // Drain to Deepgram if WS open.
+    while (this.audioBuffer.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
+      const next = this.audioBuffer.shift()!;
+      try {
+        this.ws.send(next);
+      } catch {
+        // Lost the WS mid-send: re-queue at front, exit loop. Reconnect
+        // will pick up the buffer on the next chunk after WS reopens.
+        this.audioBuffer.unshift(next);
+        break;
+      }
+    }
+  }
+
   private attachFfmpegStreams(ffmpeg: ChildProcess): void {
     if (!ffmpeg.stdout) {
       this.rollbackActive();
@@ -715,33 +746,7 @@ export class DeepgramClient extends EventEmitter {
       return;
     }
 
-    ffmpeg.stdout.on('data', (chunk: Buffer) => {
-      if (this.expectingResolveAck) {
-        this.expectingResolveAck = false;
-        this.reResolutionAttempts = 0;
-        console.log('[deepgram] re-resolution: audio bytes flowing, attempt counter reset');
-        this.emit('reresolved');
-      }
-      // Bounded buffer: drop oldest if full. Audio capture must never block.
-      this.audioBuffer.push(chunk);
-      while (this.audioBuffer.length > AUDIO_BUFFER_MAX_CHUNKS) {
-        this.audioBuffer.shift();
-        console.warn('[deepgram] audio buffer full — dropped oldest chunk');
-      }
-
-      // Drain to Deepgram if WS open.
-      while (this.audioBuffer.length > 0 && this.ws?.readyState === WebSocket.OPEN) {
-        const next = this.audioBuffer.shift()!;
-        try {
-          this.ws.send(next);
-        } catch {
-          // Lost the WS mid-send: re-queue at front, exit loop. Reconnect
-          // will pick up the buffer on the next chunk after WS reopens.
-          this.audioBuffer.unshift(next);
-          break;
-        }
-      }
-    });
+    ffmpeg.stdout.on('data', (chunk: Buffer) => this.pushAudio(chunk));
 
     this.ffmpegStderr = '';
     if (ffmpeg.stderr) {
