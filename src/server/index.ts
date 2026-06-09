@@ -1067,16 +1067,126 @@ const server = createServer(app);
 // Railway's HTTP access logs as part of the upgrade request path — rotate
 // if log access is ever shared. Acceptable tradeoff for a single-token
 // share-with-one-teammate gate; not suitable for multi-user auth.
-const wss = new WebSocketServer({
-  server,
-  path: '/ws',
-  verifyClient: (info, cb) => {
-    if (!AUTH_ENABLED) return cb(true);
-    const url = new URL(info.req.url || '', `http://${info.req.headers.host}`);
-    const token = url.searchParams.get('token');
-    if (token !== ACCESS_TOKEN) return cb(false, 401, 'Unauthorized');
-    cb(true);
-  },
+// Two WS endpoints share the single HTTP server via a manual upgrade router:
+//   /ws         — dashboard + sidebar broadcast (contract unchanged)
+//   /ws/capture — browser tab-audio ingestion (hello JSON + binary PCM16)
+// Both honor the same query-param token gate the old verifyClient enforced.
+const wss = new WebSocketServer({ noServer: true });
+const captureWss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  // req.headers.host is attacker-controlled; a malformed value throws here and,
+  // with no uncaughtException handler, would crash the process. Treat a parse
+  // failure as an invalid request and drop the socket.
+  let url: URL;
+  try { url = new URL(req.url || '', `http://${req.headers.host}`); }
+  catch { socket.destroy(); return; }
+  if (AUTH_ENABLED && url.searchParams.get('token') !== ACCESS_TOKEN) {
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+  if (url.pathname === '/ws') {
+    wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+  } else if (url.pathname === '/ws/capture') {
+    captureWss.handleUpgrade(req, socket, head, (ws) => captureWss.emit('connection', ws, req));
+  } else {
+    socket.destroy();
+  }
+});
+
+// ─── Browser tab-audio capture (/ws/capture) ───
+// Lazy Deepgram connect: nothing spins up until the first valid binary PCM
+// frame, so opening the capture page costs no Deepgram minutes. One capture
+// session at a time — a transport-level guard only; roles/slots/caps are a
+// later commit. Application close codes (4xxx) tell the client why it was shut.
+const CAPTURE_MAX_FRAME_BYTES = 16000; // 100ms @16k mono s16le ≈ 3200B; cap well above, reject abuse
+const CAPTURE_IDLE_MS = 60000;         // WS open but no frames for 60s → tear down (no orphaned Deepgram)
+
+captureWss.on('connection', (ws) => {
+  console.log('[capture] client connected');
+  let helloOk = false;
+  let started = false;
+  let idleTimer: NodeJS.Timeout | null = null;
+
+  const closeWith = (code: number, reason: string) => {
+    try { ws.close(code, reason); } catch { /* already closing */ }
+  };
+  const armIdle = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      console.warn('[capture] idle 60s with no frames — tearing down');
+      closeWith(4002, 'idle timeout');
+    }, CAPTURE_IDLE_MS);
+  };
+  const teardown = () => {
+    if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    // Only stop the session this capture actually started — a rejected (4409)
+    // capture never set `started`, so it can't tear down the live session.
+    if (started && deepgram?.isActive()) {
+      deepgram.stopSession().then(() => setSessionState('idle')).catch(() => {});
+    }
+  };
+
+  // Reap a connection that opens but never sends a valid hello/frame.
+  armIdle();
+
+  ws.on('message', async (data, isBinary) => {
+    if (!isBinary) {
+      // Hello must arrive first, and must be linear16/16000/1 (the client
+      // downsamples to 16k mono before sending — reject anything else).
+      let hello: any;
+      try { hello = JSON.parse(data.toString()); } catch { closeWith(4400, 'hello must be JSON'); return; }
+      if (hello?.format !== 'linear16' || hello?.sampleRate !== 16000 || hello?.channels !== 1) {
+        closeWith(4400, 'hello must be {format:linear16, sampleRate:16000, channels:1}');
+        return;
+      }
+      helloOk = true;
+      console.log('[capture] hello ok', hello);
+      // Early single-session reject so the second user learns immediately.
+      // "Any mode" includes a demo replay, which is live without isActive().
+      if (deepgram?.isActive() || replayActive) { closeWith(4409, 'capture busy — a session is already live'); return; }
+      armIdle();
+      return;
+    }
+
+    if (!helloOk) { closeWith(4400, 'hello required before audio'); return; }
+    let frame: Buffer;
+    if (Buffer.isBuffer(data)) frame = data;
+    else if (Array.isArray(data)) frame = Buffer.concat(data);
+    else frame = Buffer.from(data);
+    if (frame.length === 0 || frame.length % 2 !== 0) return; // drop empty / non-s16le-aligned
+    if (frame.length > CAPTURE_MAX_FRAME_BYTES) { closeWith(4400, 'frame too large'); return; }
+    armIdle();
+
+    if (!started) {
+      if (!deepgram) { closeWith(4500, 'deepgram unavailable'); return; }
+      // Race guard: a session may have gone live between hello and first frame.
+      if (deepgram.isActive() || replayActive) { closeWith(4409, 'capture busy — a session is already live'); return; }
+      started = true;
+      setSessionState('connecting', 'browser://tab-capture');
+      try {
+        await deepgram.startSession({ mode: 'browser-capture', source: 'browser://tab-capture' });
+        // Audio is flowing — advance to 'live' now rather than waiting for the
+        // first transcript, so a silent shared tab doesn't strand the UI on 'connecting'.
+        setSessionState('live');
+      } catch (err) {
+        const se = toSessionError(err);
+        console.error(`[capture] startSession failed: code=${se.code} message="${se.message}"`);
+        setSessionState('error', undefined, se); // surface the cause, not a silent idle
+        started = false;
+        closeWith(4500, se.message);
+        return;
+      }
+    }
+    deepgram?.pushAudio(frame);
+  });
+
+  ws.on('close', () => {
+    console.log('[capture] client disconnected');
+    teardown();
+  });
+  ws.on('error', () => { teardown(); });
 });
 
 const clients = new Set<WebSocket>();

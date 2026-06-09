@@ -159,7 +159,7 @@ function avfoundationPermissionDenied(detail?: string): SessionError {
   };
 }
 
-export type SessionMode = 'stream' | 'system-audio';
+export type SessionMode = 'stream' | 'system-audio' | 'browser-capture';
 
 export interface SessionConfig {
   mode: SessionMode;
@@ -261,7 +261,8 @@ export class DeepgramClient extends EventEmitter {
 
     try {
       await this.connectDeepgram();
-      this.startAudioPipeline();
+      // browser-capture has no server-side pipeline — audio arrives via pushAudio().
+      if (config.mode !== 'browser-capture') this.startAudioPipeline();
     } catch (err) {
       this.rollbackActive();
       throw err;
@@ -494,6 +495,17 @@ export class DeepgramClient extends EventEmitter {
       this.reconnectTimer = null;
       try {
         await this.connectDeepgram();
+        // If the session was stopped while this reconnect was in flight, the
+        // freshly-opened socket would be orphaned (stopSession already ran and
+        // nulled the old ws). Close it and bail rather than leave a
+        // keepalive-pinned connection burning minutes with no audio source.
+        if (this.intentionalStop || !this.active) {
+          try { this.ws?.close(); } catch { /* ignore */ }
+          this.ws = null;
+          this.stopKeepAlive();
+          this.reconnecting = false;
+          return;
+        }
         this.reconnecting = false;
       } catch (err) {
         this.reconnecting = false;

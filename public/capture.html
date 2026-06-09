@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TWiST Sentinel — Check Live Tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@400&family=JetBrains+Mono:wght@500;700&display=swap" />
+<style>
+  :root {
+    --bg0:#08080A; --bg1:#111114; --bg2:#18181C;
+    --t0:#FFFFFF; --t1:#E2E4E9; --t2:#8B8F9A; --t3:#555861;
+    --orange:#FF5C00;
+    --ok:#34D399; --warn:#FBBF24; --bad:#F87171;
+    --line:rgba(255,255,255,0.06);
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+    --serif:"Source Serif 4",Georgia,serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; }
+  body {
+    background:var(--bg0); color:var(--t1); font-family:var(--mono);
+    -webkit-font-smoothing:antialiased;
+    display:flex; justify-content:center; min-height:100vh;
+  }
+  #app { width:100%; max-width:460px; min-height:100vh; display:flex; flex-direction:column; padding:18px; gap:16px; }
+
+  .brand { font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--orange); }
+  .lead { font-family:var(--serif); font-size:18px; line-height:1.4; color:var(--t0); }
+  .sub { font-size:13px; line-height:1.5; color:var(--t2); }
+
+  .btn {
+    font-family:var(--mono); font-size:13px; font-weight:700; letter-spacing:0.04em;
+    padding:12px 16px; border-radius:8px; border:none; cursor:pointer; text-align:center;
+  }
+  .btn.primary { background:var(--orange); color:var(--bg0); }
+  .btn.primary:hover { filter:brightness(1.1); }
+  .btn.ghost { background:transparent; color:var(--t1); border:1px solid var(--line); }
+  .btn.ghost:hover { color:var(--t0); border-color:var(--t3); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:10px; }
+  .row .btn { flex:1; }
+
+  .panel { background:var(--bg1); border:1px solid var(--line); border-radius:10px; padding:14px; display:flex; flex-direction:column; gap:12px; }
+
+  .stat { display:flex; align-items:center; justify-content:space-between; font-size:12px; }
+  .stat .k { color:var(--t3); letter-spacing:0.04em; }
+  .stat .v { color:var(--t1); }
+  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px; vertical-align:middle; background:var(--t3); }
+  .dot.live { background:var(--ok); } .dot.warn { background:var(--warn); } .dot.bad { background:var(--bad); } .dot.idle { background:var(--t3); }
+
+  .meter { height:6px; border-radius:3px; background:var(--bg2); overflow:hidden; }
+  .meter > i { display:block; height:100%; width:0%; background:var(--orange); transition:width 100ms linear; }
+
+  .notice { font-size:13px; line-height:1.5; border-radius:8px; padding:12px; }
+  .notice.bad { background:rgba(248,113,113,0.08); border:1px solid rgba(248,113,113,0.3); color:var(--t1); }
+  .notice.warn { background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.3); color:var(--t1); }
+  .notice.info { background:var(--bg1); border:1px solid var(--line); color:var(--t2); }
+  .hide { display:none; }
+
+  .foot { margin-top:auto; font-size:11px; color:var(--t3); }
+  .foot a { color:var(--t2); text-decoration:none; } .foot a:hover { color:var(--t1); }
+
+  .gate { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; background:rgba(8,8,10,0.96); }
+  .gate.hide { display:none; }
+  .gate-card { display:flex; flex-direction:column; gap:12px; padding:24px; border-radius:12px; background:var(--bg2); border:1px solid rgba(255,92,0,0.4); min-width:300px; max-width:88vw; }
+  .gate-title { font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:var(--orange); }
+  .gate-input { font-family:var(--mono); font-size:13px; padding:10px 12px; background:var(--bg0); border:1px solid var(--line); border-radius:6px; color:var(--t1); outline:none; }
+  .gate-input:focus { border-color:var(--orange); }
+  .gate-error { font-size:10px; color:var(--bad); min-height:12px; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <div class="brand">TWiST Sentinel</div>
+
+    <div id="intro" class="panel">
+      <div class="lead">Check a live tab</div>
+      <div class="sub">Pick the <b>YouTube or Zoom tab</b> playing the show, and turn on <b>"Share tab audio."</b> Sentinel listens for checkable claims and only shows cited verdicts — nothing else leaves your machine.</div>
+      <button id="start" class="btn primary">Check Live Tab</button>
+      <div id="intro-note" class="notice info hide"></div>
+    </div>
+
+    <div id="unsupported" class="notice info hide">Live capture needs desktop Chrome or Edge. On other browsers you can still watch the <a href="/sidebar.html" style="color:var(--orange);text-decoration:none">sidebar</a> or run a demo.</div>
+
+    <div id="live" class="panel hide">
+      <div class="stat"><span class="k"><span id="dot" class="dot idle"></span>STATUS</span><span class="v" id="state">—</span></div>
+      <div class="stat"><span class="k">SOURCE</span><span class="v">tab audio · 16 kHz mono</span></div>
+      <div class="stat"><span class="k">GRANTED RATE</span><span class="v" id="rate">—</span></div>
+      <div class="stat"><span class="k">FRAMES SENT</span><span class="v" id="frames">0</span></div>
+      <div class="stat"><span class="k">LEVEL (RMS)</span><span class="v" id="rms">—</span></div>
+      <div class="meter"><i id="bar"></i></div>
+      <div id="cap-note" class="notice warn hide"></div>
+      <div class="row">
+        <button id="stop" class="btn ghost">Stop</button>
+        <a class="btn ghost" href="/sidebar.html" target="_blank" rel="noopener noreferrer" style="line-height:1.4">Open verdicts ↗</a>
+      </div>
+    </div>
+
+    <div class="foot">Verdicts appear on the <a href="/sidebar.html">sidebar</a>. Voice changes wording. Evidence stays locked.</div>
+  </div>
+
+  <div id="gate" class="gate hide">
+    <form id="gate-form" class="gate-card">
+      <div class="gate-title">Sentinel Access</div>
+      <input id="gate-input" class="gate-input" type="password" placeholder="Enter access token" autocomplete="off" />
+      <button type="submit" class="btn primary">Connect</button>
+      <div id="gate-error" class="gate-error"></div>
+    </form>
+  </div>
+
+<script>
+(() => {
+  const TOKEN_KEY = 'sentinel_token';
+  const SILENCE_RMS = 0.004;     // below this ≈ silence
+  const SILENCE_MS = 8000;       // sustained silence before we warn
+  const STABLE_MS = 3000;        // WS must stay open this long before backoff resets
+  const BK_MIN = 500, BK_MAX = 8000;
+  let token = sessionStorage.getItem(TOKEN_KEY) || null;
+
+  const $ = (id) => document.getElementById(id);
+  const intro = $('intro'), live = $('live'), unsupported = $('unsupported');
+  const startBtn = $('start'), stopBtn = $('stop');
+  const stateEl = $('state'), rateEl = $('rate'), framesEl = $('frames'), rmsEl = $('rms'), barEl = $('bar'), dotEl = $('dot');
+  const capNote = $('cap-note'), introNote = $('intro-note');
+  const gate = $('gate'), gateForm = $('gate-form'), gateInput = $('gate-input'), gateError = $('gate-error');
+
+  // Chromium family + the two APIs we actually require (getDisplayMedia + AudioWorklet).
+  const isChromium = (('documentPictureInPicture' in window) || (navigator.userAgentData && navigator.userAgentData.brands?.some(b => /Chromium|Google Chrome|Microsoft Edge/.test(b.brand))))
+    && !!navigator.mediaDevices?.getDisplayMedia && !!window.AudioWorklet;
+
+  // All dynamic text goes through textContent — server-sent close reasons are untrusted.
+  function setState(text, cls) { stateEl.textContent = text; dotEl.className = 'dot ' + (cls || 'idle'); }
+  function showNote(el, text, kind) { el.textContent = text; el.className = 'notice ' + kind; el.classList.remove('hide'); }
+  function hideNote(el) { el.classList.add('hide'); }
+
+  let stream = null, ctx = null, node = null, ws = null;
+  let framesSent = 0, everStarted = false, stopping = false;
+  let backoff = BK_MIN, reconnectTimer = null, stableTimer = null, silenceSince = 0;
+
+  function wsUrl() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const base = proto + '://' + location.host + '/ws/capture';
+    return token ? base + '?token=' + encodeURIComponent(token) : base;
+  }
+
+  const WORKLET_SRC = `
+  class CaptureProcessor extends AudioWorkletProcessor {
+    constructor(o) {
+      super();
+      this.step = o.processorOptions.inRate / 16000; // input samples per 16k output sample
+      this.pos = 0; this.prev = 0;
+      this.frame = new Int16Array(1600); this.fill = 0;
+    }
+    process(inputs) {
+      const input = inputs[0];
+      if (!input || input.length === 0 || input[0].length === 0) return true; // skip empty quantum, keep prev/pos
+      const chans = input.length, n = input[0].length;
+      const block = new Float32Array(n);
+      for (let i = 0; i < n; i++) { let s = 0; for (let c = 0; c < chans; c++) s += input[c][i]; block[i] = s / chans; }
+      let pos = this.pos;
+      while (pos < n) {
+        const i = Math.floor(pos), frac = pos - i;
+        const s0 = i < 0 ? this.prev : block[i];
+        const s1 = (i + 1) < n ? block[i + 1] : null;
+        if (s1 === null) break;                 // next sample is in the following block — carry over
+        let v = s0 + (s1 - s0) * frac;
+        if (v > 1) v = 1; else if (v < -1) v = -1;
+        this.frame[this.fill++] = v < 0 ? v * 0x8000 : v * 0x7fff;
+        if (this.fill === 1600) { this.port.postMessage(this.frame.buffer.slice(0)); this.fill = 0; }
+        pos += this.step;
+      }
+      this.pos = pos - n;          // fractional carry (can be slightly negative for non-integer rates)
+      this.prev = block[n - 1];    // last sample for cross-block interpolation
+      return true;
+    }
+  }
+  registerProcessor('capture-processor', CaptureProcessor);`;
+
+  async function beginCapture() {
+    startBtn.disabled = true;
+    hideNote(introNote);
+    let s;
+    try {
+      s = await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: 'browser' },
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        systemAudio: 'include',
+        selfBrowserSurface: 'exclude',
+      });
+    } catch (e) {
+      showNote(introNote, 'Capture was cancelled. Click again and choose the tab playing the show.', 'info');
+      startBtn.disabled = false;
+      return;
+    }
+    const audio = s.getAudioTracks();
+    if (audio.length === 0) {
+      s.getTracks().forEach(t => t.stop());
+      showNote(introNote, 'No tab audio. You picked a window or screen, or left "Share tab audio" unchecked. Click again, choose the Tab, and turn on Share tab audio.', 'bad');
+      startBtn.disabled = false;
+      return;
+    }
+    stream = s;
+    stream.getVideoTracks().forEach(t => t.stop());        // we only need audio
+    audio[0].addEventListener('ended', () => { if (!stopping) endCapture('Capture ended — you stopped sharing or the tab closed.'); });
+
+    // Audio-engine setup can fail (addModule / AudioContext) — recover the page rather than brick it.
+    try {
+      ctx = new AudioContext({ sampleRate: 16000 });        // Chromium usually honors 16k; resampler covers the rest
+      rateEl.textContent = ctx.sampleRate + ' Hz' + (ctx.sampleRate === 16000 ? '' : ' → 16k');
+      const wurl = URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'application/javascript' }));
+      await ctx.audioWorklet.addModule(wurl);
+      URL.revokeObjectURL(wurl);                             // module is fetched; free the blob
+      const src = ctx.createMediaStreamSource(new MediaStream([audio[0]]));
+      node = new AudioWorkletNode(ctx, 'capture-processor', { processorOptions: { inRate: ctx.sampleRate } });
+      const sink = ctx.createGain(); sink.gain.value = 0;    // silent pull — graph runs, no echo
+      src.connect(node); node.connect(sink); sink.connect(ctx.destination);
+      node.port.onmessage = (e) => {
+        if (ws && ws.readyState === 1) { ws.send(e.data); framesSent++; framesEl.textContent = String(framesSent); }
+        meter(e.data);
+      };
+      await ctx.resume();
+    } catch (err) {
+      try { if (ctx) ctx.close(); } catch {}
+      try { stream.getTracks().forEach(t => t.stop()); } catch {}
+      ctx = node = stream = null;
+      showNote(introNote, 'Audio engine failed to start. Reload the page and try again.', 'bad');
+      startBtn.disabled = false;
+      return;
+    }
+
+    intro.classList.add('hide');
+    live.classList.remove('hide');
+    stopBtn.disabled = false;                                // re-enable on every (re-entrant) start
+    silenceSince = 0; framesSent = 0; framesEl.textContent = '0'; hideNote(capNote);
+    setState('Connecting…', 'warn');
+    connectWs();
+  }
+
+  function meter(buf) {
+    const v = new Int16Array(buf); let sum = 0;
+    for (let i = 0; i < v.length; i++) { const f = v[i] / 32768; sum += f * f; }
+    const rms = Math.sqrt(sum / v.length);
+    rmsEl.textContent = rms.toFixed(4);
+    barEl.style.width = Math.min(100, rms * 400).toFixed(0) + '%';
+    const now = Date.now();
+    if (rms < SILENCE_RMS) {
+      if (!silenceSince) silenceSince = now;
+      else if (now - silenceSince > SILENCE_MS) showNote(capNote, 'Connected, but hearing silence — is the show playing in the shared tab?', 'warn');
+    } else { silenceSince = 0; hideNote(capNote); }
+  }
+
+  function connectWs() {
+    try { ws = new WebSocket(wsUrl()); } catch { scheduleReconnect(); return; }
+    ws.binaryType = 'arraybuffer';
+    ws.addEventListener('open', () => {
+      ws.send(JSON.stringify({ format: 'linear16', sampleRate: 16000, channels: 1 }));  // hello first, then frames resume
+      everStarted = true;
+      setState('Live', 'live');
+      // Reset backoff only once the connection proves stable — a server that
+      // opens then immediately closes (4409 busy / 4002 idle) must keep backing off.
+      clearTimeout(stableTimer);
+      stableTimer = setTimeout(() => { backoff = BK_MIN; }, STABLE_MS);
+    });
+    ws.addEventListener('close', (ev) => {
+      clearTimeout(stableTimer);
+      // Reconnect only while the capture graph is alive. endCapture() nulls ctx
+      // synchronously, so a post-Stop close can't reconnect even if the 0ms
+      // `stopping=false` UI reset already won its race with this close event.
+      if (stopping || !ctx) return;
+      if (ev.code === 4400 || ev.code === 4500) { endCapture('Capture error: ' + (ev.reason || 'server rejected the stream') + '.'); return; }
+      if (ev.code === 4409 && !everStarted) { endCapture('Capture busy — a session is already live. Try again once it ends.'); return; }
+      setState('Reconnecting…', 'warn');                    // network / idle / reconnect-race → back off and resume
+      recheckThenReconnect();
+    });
+    ws.addEventListener('error', () => { try { ws.close(); } catch {} });
+  }
+
+  // A non-app-range close (e.g. 1006 from a 401 handshake rejection) may mean a
+  // stale/rotated token, which the WS can't surface — re-run the HTTP canary to
+  // tell auth failure apart from a network drop (parity with sidebar.html).
+  function recheckThenReconnect() {
+    if (!token) { scheduleReconnect(); return; }
+    fetch('/api/session/status', { headers: { Authorization: 'Bearer ' + token } })
+      .then((res) => {
+        if (res.status === 401) {
+          sessionStorage.removeItem(TOKEN_KEY); token = null;
+          endCapture(''); showGate('Invalid token'); return;  // auth failure → stop, prompt, no loop
+        }
+        scheduleReconnect();
+      })
+      .catch(() => scheduleReconnect());
+  }
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimer);
+    const delay = Math.min(backoff, BK_MAX) + Math.random() * backoff * 0.3;
+    reconnectTimer = setTimeout(connectWs, delay);
+    backoff = Math.min(backoff * 2, BK_MAX);
+  }
+
+  function endCapture(message) {
+    if (stopping) return;                                    // idempotent — close+ended can both fire
+    stopping = true;
+    clearTimeout(reconnectTimer); clearTimeout(stableTimer);
+    try { if (ws && ws.readyState <= 1) ws.close(1000, 'client stop'); } catch {}
+    try { if (node) node.port.onmessage = null; } catch {}
+    try { if (ctx) ctx.close(); } catch {}
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch {}
+    ws = ctx = node = stream = null;
+    hideNote(capNote); silenceSince = 0;                     // never carry a stale silence warning into the next session
+    setState('Stopped', 'idle');
+    if (message) showNote(capNote, message, 'info');
+    stopBtn.disabled = true;
+    setTimeout(() => {
+      live.classList.add('hide'); intro.classList.remove('hide');
+      startBtn.disabled = false; stopping = false; everStarted = false; framesSent = 0; framesEl.textContent = '0';
+      hideNote(introNote); if (!message) hideNote(capNote);
+    }, message ? 2500 : 0);
+  }
+
+  startBtn.addEventListener('click', beginCapture);
+  stopBtn.addEventListener('click', () => endCapture(''));
+
+  function showGate(msg) { gateError.textContent = msg || ''; gate.classList.remove('hide'); gateInput.focus(); }
+  gateForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = gateInput.value.trim(); if (!v) return;
+    sessionStorage.setItem(TOKEN_KEY, v); location.reload();
+  });
+
+  // boot: feature-gate + auth canary (same /api/* bearer mechanism as the other pages)
+  (async function boot() {
+    if (!isChromium) { intro.classList.add('hide'); unsupported.classList.remove('hide'); return; }
+    const hadToken = !!token;
+    try {
+      const res = await fetch('/api/session/status', { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+      if (res.status === 401) {
+        sessionStorage.removeItem(TOKEN_KEY); token = null;
+        showGate(hadToken ? 'Invalid token' : '');
+        return;
+      }
+    } catch { /* server unreachable — let the capture attempt surface it */ }
+  })();
+})();
+</script>
+</body>
+</html>
