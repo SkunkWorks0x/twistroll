@@ -314,7 +314,11 @@ async function main() {
   const tbl = await initMemory();
   const results: BackfillResult[] = [];
 
+  let throttleFirst = true;
   for (const url of urls) {
+    // Throttle: 2.5s between URLs to reduce YouTube 429 / bot-check over long runs.
+    if (!throttleFirst) await new Promise((r) => setTimeout(r, 2500));
+    throttleFirst = false;
     console.log(`\n[backfill] → ${url}`);
     const r: BackfillResult = {
       url,
