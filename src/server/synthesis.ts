@@ -926,9 +926,26 @@ export async function synthesize(
 ): Promise<SynthesisResult> {
   const tStart = Date.now();
   console.log(`[classifier-pass] claimId=${claim.segmentId} claimType=${claim.claimType} primaryEntity="${claim.primaryEntity}"`);
+
+  // 4a observability (logging only — no behavior change). One greppable line per
+  // evidence chunk entering the Docket: retrieval lane + per-chunk episodeNumber
+  // (lancedb only; null elsewhere) + similarity score. Lets 4b key on lane +
+  // episode identity, and surfaces own-episode archive chunks (self-citation arming).
+  for (const s of sources) {
+    console.log(`[evidence] claimId=${claim.segmentId} lane=${s.type} ep=${s.metadata?.episodeNumber ?? 'null'} score=${s.score?.toFixed(4) ?? 'null'}`);
+  }
+  console.log(`[evidence] claimId=${claim.segmentId} lane=conversation ep=null score=null segments=${recentSegments.length}`);
+
   const docketContext = formatForDocket(sources, claim, recentSegments);
 
   const { output: docketOutput, ms: docketMs } = await runDocket(claim, sources, docketContext);
+
+  // 4a observability: emitted-card prose. Fires only when a card actually
+  // broadcasts (docketOutput is null when suppressed by the render policy).
+  // JSON.stringify keeps quotes/newlines on one greppable line.
+  if (docketOutput) {
+    console.log(`[card-final] claimId=${claim.segmentId} verdict=${docketOutput.verdict} grounding=${JSON.stringify(docketOutput.grounding)} explanation=${JSON.stringify(docketOutput.explanation)}`);
+  }
 
   return {
     docket: docketOutput,
