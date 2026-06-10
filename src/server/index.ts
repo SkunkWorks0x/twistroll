@@ -205,6 +205,10 @@ function setDeepgramHealth(next: DeepgramHealthState): void {
 let sessionState: SessionUiState = 'idle';
 let sessionUrl: string | null = null;
 let sessionStartedAt: string | null = null;
+// 4b: session's live episode number, supplied by the demo-replay path (the cached
+// transcript's episode is known). Read by synthesize() to veto self-citation. null
+// for live/tab-capture (identity not exposed) → veto disarms.
+let currentLiveEpisode: number | null = null;
 let lastSessionError: SessionError | null = null;
 // Tracks an in-flight startSession() so /api/session/stop can wait for it
 // before deciding the session is gone. Without this, a Stop click during
@@ -214,6 +218,10 @@ let pendingStart: Promise<void> | null = null;
 function setSessionState(next: SessionUiState, url?: string, error?: SessionError): void {
   if (sessionState === next && (next !== 'error' || !error)) return;
   sessionState = next;
+  // 4b: the live-episode identity is session-scoped — clear it as every session
+  // begins (the demo-replay branch re-supplies it after startReplay; live/tab-capture
+  // leave it null so the self-citation veto disarms).
+  if (next === 'connecting') currentLiveEpisode = null;
   if (next === 'connecting' && url) {
     sessionUrl = url;
     sessionStartedAt = new Date().toISOString();
@@ -536,7 +544,7 @@ setProcessHandler(async ({ claim, segmentSnapshot, retrieval }) => {
       primaryEntity: claim.primaryEntity,
       claimText: claim.claimText.slice(0, 60),
     });
-    const result = await synthesize(claim, retrieval.merged, segmentSnapshot);
+    const result = await synthesize(claim, retrieval.merged, segmentSnapshot, currentLiveEpisode);
     recordStage(claim.segmentId, 'synthesisEndMs', Date.now());
     if (!result.docket?.verdict) {
       console.log(`[synthesis] suppressed card — no Docket verdict claimId=${claim.segmentId} primaryEntity="${claim.primaryEntity}"`);
@@ -707,6 +715,10 @@ app.post('/api/session/start', async (req, res) => {
 const DEMO_DIR = resolve(__dirname, '..', '..', 'data', 'demo');
 const DEMO_YOUTUBE_URL = process.env.DEMO_YOUTUBE_URL?.trim() || 'https://www.youtube.com/@TWiStartups';
 const DEMO_FORCE_REPLAY = process.env.DEMO_FORCE_REPLAY === '1';
+// 4b: supplied (not detected) live-episode identity for cached demo transcripts.
+// twist-sample.jsonl is E2291 (confirmed by content markers Kled/General Catalyst/Avi).
+// Unmapped files leave the veto disarmed rather than mis-firing on a wrong number.
+const DEMO_EPISODE_BY_FILE: Record<string, number> = { 'twist-sample.jsonl': 2291 };
 
 interface ReplaySegmentRecord {
   text: string;
@@ -858,6 +870,14 @@ app.post('/api/session/demo', async (req, res) => {
   // guest assignment unreliable). Pill overrides still work mid-session.
   currentSpeakerMap = validateSpeakerMap({ 0: 'host', 2: 'cohost' });
   startReplay(records, `demo://${chosen}`);
+  // 4b: supply this session's live-episode id (set AFTER startReplay, whose
+  // setSessionState('connecting') just cleared it). Drives the self-citation veto.
+  currentLiveEpisode = DEMO_EPISODE_BY_FILE[chosen] ?? null;
+  console.log(
+    currentLiveEpisode !== null
+      ? `[self-cite-veto] armed: live-episode=${currentLiveEpisode} (demo-replay ${chosen})`
+      : `[self-cite-veto] disarmed: demo-replay ${chosen} has no mapped episode`
+  );
   res.json({ status: 'connecting', mode: 'replay', file: chosen, segments: records.length, source: `demo://${chosen}` });
 });
 

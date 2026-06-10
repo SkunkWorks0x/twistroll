@@ -922,23 +922,44 @@ export async function runDocket(
 export async function synthesize(
   claim: ClaimClassification,
   sources: RetrievedSource[],
-  recentSegments: TranscriptSegment[]
+  recentSegments: TranscriptSegment[],
+  liveEpisodeNumber: number | null = null
 ): Promise<SynthesisResult> {
   const tStart = Date.now();
   console.log(`[classifier-pass] claimId=${claim.segmentId} claimType=${claim.claimType} primaryEntity="${claim.primaryEntity}"`);
+
+  // 4b same-episode self-citation veto. Drop lancedb sources whose episodeNumber
+  // equals the session's live episode — a replayed/captured episode must not cite its
+  // own archived chunks as evidence. Identity is supplied (demo-replay), never detected;
+  // when absent the veto disarms transparently and says so. Coerce the id to a finite
+  // positive integer first (a string '2291' would never === the numeric ep and the veto
+  // would silently no-op). Runs before the [evidence] loop so that loop logs only
+  // survivors, and formatForDocket/runDocket/injection never see the self-chunk.
+  const coercedEp = Number(liveEpisodeNumber);
+  const liveEp = liveEpisodeNumber != null && Number.isInteger(coercedEp) && coercedEp > 0 ? coercedEp : null;
+  let vettedSources = sources;
+  if (liveEp !== null) {
+    vettedSources = sources.filter((s) => {
+      const isSelf = s.type === 'lancedb' && Number(s.metadata?.episodeNumber) === liveEp;
+      if (isSelf) console.log(`[self-cite-veto] dropped lane=lancedb ep=${s.metadata?.episodeNumber} score=${s.score?.toFixed(4) ?? 'null'}`);
+      return !isSelf;
+    });
+  } else {
+    console.log(`[self-cite-veto] disarmed: no live-episode id`);
+  }
 
   // 4a observability (logging only — no behavior change). One greppable line per
   // evidence chunk entering the Docket: retrieval lane + per-chunk episodeNumber
   // (lancedb only; null elsewhere) + similarity score. Lets 4b key on lane +
   // episode identity, and surfaces own-episode archive chunks (self-citation arming).
-  for (const s of sources) {
+  for (const s of vettedSources) {
     console.log(`[evidence] claimId=${claim.segmentId} lane=${s.type} ep=${s.metadata?.episodeNumber ?? 'null'} score=${s.score?.toFixed(4) ?? 'null'}`);
   }
   console.log(`[evidence] claimId=${claim.segmentId} lane=conversation ep=null score=null segments=${recentSegments.length}`);
 
-  const docketContext = formatForDocket(sources, claim, recentSegments);
+  const docketContext = formatForDocket(vettedSources, claim, recentSegments);
 
-  const { output: docketOutput, ms: docketMs } = await runDocket(claim, sources, docketContext);
+  const { output: docketOutput, ms: docketMs } = await runDocket(claim, vettedSources, docketContext);
 
   // 4a observability: emitted-card prose. Fires only when a card actually
   // broadcasts (docketOutput is null when suppressed by the render policy).
