@@ -880,6 +880,47 @@ export async function runDocket(
       }
     }
 
+    // 4c circular-evidence veto. An affirmative verdict (TRUE/PARTIAL) cannot rest
+    // solely on the live transcript — the speaker's own words are the claim, not
+    // evidence for it. Lane-based, not prose: a citation corroborates only if it maps
+    // to a retrieved lane — web (has a URL), archive injection (post_processor), or an
+    // archive reference that names an actually-retrieved episode (provenance-checked below).
+    // If an affirmative card has citations but none corroborate, every citation is
+    // conversation-lane → downgrade to UNVERIFIABLE (canonical phrase, citation kept so
+    // the card still renders). FALSE/MISLEADING are out of scope. Runs after injection
+    // so a post-injection archive citation rescues a PARTIAL.
+    // Archive corroboration is PROVENANCE-based, not a title-string shortcut: a
+    // "TWiST Ep N" citation corroborates only if episode N was actually retrieved.
+    // A bare title (e.g. a hallucinated "TWiST Ep 9999" with no retrieved chunk —
+    // null-URL citations bypass the URL cross-check) must NOT count, else it evades
+    // the very downgrade 4c exists for.
+    const archiveEp = (title: string): number | null => {
+      const m = title.match(/twist\s+ep(?:isode)?\.?\s*(\d{2,5})/i);
+      return m ? parseInt(m[1], 10) : null;
+    };
+    const corroborated = (c: DocketCitation): boolean => {
+      if (c.url !== null) return true;                          // web (tavily) — survived the URL cross-check
+      if (c.citationSource === 'post_processor') return true;   // archive injection — provenance by construction
+      const ep = archiveEp(c.title);                            // archive ref → must name a retrieved episode
+      // Numeric compare by construction (the 4b lesson): archiveEp is parseInt (number);
+      // coerce the source side too so a LanceDB int/BigInt/string never fails === and
+      // mis-classifies a real archive cite as conversation (over-suppression).
+      return ep !== null && sources.some((s) => s.type === 'lancedb' && Number(s.metadata?.episodeNumber) === ep);
+    };
+    if (
+      (candidate.verdict === 'TRUE' || candidate.verdict === 'PARTIAL') &&
+      candidate.citations.length > 0 &&
+      !candidate.citations.some(corroborated)
+    ) {
+      console.log(`[circular-evidence-veto] downgraded claimId=${claim.segmentId} ${candidate.verdict}→UNVERIFIABLE (conversation-only)`);
+      candidate = {
+        ...candidate,
+        verdict: 'UNVERIFIABLE',
+        grounding: 'The claim is supported only by the speaker\'s own words in the live transcript [1], which cannot independently confirm it.',
+        explanation: CANONICAL_UNVERIFIABLE_PHRASE,
+      };
+    }
+
     // UNVERIFIABLE: trust Haiku's judgment. If sources existed and Haiku still
     // returned UNVERIFIABLE with empty citations after injection guards
     // declined to add one, log it.
