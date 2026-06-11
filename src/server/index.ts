@@ -15,7 +15,7 @@ import {
   manualOverride as pinSpeaker,
 } from './speakerRegistry.js';
 import { fetchYouTubeTitle } from './youtubeMeta.js';
-import { commitEpisode } from './episodeMemory.js';
+import { commitEpisode, corpusVectorDim, EXPECTED_EMBED_DIM, EMBED_PROVIDER } from './episodeMemory.js';
 import { loadDossier, setCurrentDossier } from './dossier.js';
 import { DeepgramClient, SessionMode } from './deepgram.js';
 import { SpeakerMap } from './classifier.js';
@@ -25,7 +25,7 @@ import {
   classifierQueueStats,
 } from './classifierQueue.js';
 import { enqueueClaim, queueStats, setProcessHandler, setRetrievalStartHandler } from './claimQueue.js';
-import { getBreakerState } from './retrieval.js';
+import { getBreakerState, forceBreakerOpen } from './retrieval.js';
 import { synthesize } from './synthesis.js';
 import {
   type Density,
@@ -91,9 +91,9 @@ app.use('/api', (req, res, next) => {
 
 // API: Get current state
 app.get('/api/status', (_req, res) => {
-  const retrievalReady = process.env.EMBED_PROVIDER === 'openai'
+  const retrievalReady = (process.env.EMBED_PROVIDER === 'openai'
     ? !!process.env.OPENAI_API_KEY
-    : isOllamaAvailable();
+    : isOllamaAvailable()) && !corpusGuardTripped;
   res.json({
     ollama: isOllamaAvailable(),
     retrievalReady,
@@ -167,6 +167,11 @@ if (process.env.EMBED_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
     'Set OPENAI_API_KEY or use EMBED_PROVIDER=ollama.'
   );
 }
+
+// Archive-lane corpus guard — set in main() before warmup, read by /api/status.
+// True when the loaded corpus dimension doesn't match the provider's: the
+// lancedb lane is force-disabled and retrieval reports not-ready.
+let corpusGuardTripped = false;
 
 // ─── Session state machine ───
 type SessionUiState = 'idle' | 'connecting' | 'live' | 'error';
@@ -1384,16 +1389,32 @@ async function main() {
     }
   }
 
-  // Warmup LanceDB embedding path so the first claim doesn't hit 300ms
-  // cold-start timeout. context.ts opens the connection at module load,
-  // but the embedding side stays cold until the first queryMemory call.
-  try {
-    const { queryMemory } = await import('./episodeMemory.js');
-    await queryMemory('startup funding venture capital', 1);
-    console.log('[LANCEDB] Warmup complete');
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[LANCEDB] Warmup failed — first query may timeout: ${msg}`);
+  // Corpus dimension guard. The loaded corpus must match the provider's
+  // embedding dimension or every similarity search hits a foreign vector space
+  // and returns silent garbage. Read the dim from the existing table (no create
+  // path → no embed probe); on mismatch or absent corpus, force the lancedb
+  // breaker open so queryLanceDB short-circuits, mark retrieval not-ready, and
+  // skip the warmup (which would otherwise create+probe an absent table). The
+  // Tavily/web lane is untouched.
+  const corpusDim = await corpusVectorDim();
+  if (corpusDim !== EXPECTED_EMBED_DIM) {
+    corpusGuardTripped = true;
+    const reason = `corpus=${corpusDim ?? 'absent'} provider=${EMBED_PROVIDER}(${EXPECTED_EMBED_DIM})`;
+    forceBreakerOpen('lancedb', reason);
+    console.error(`[corpus-guard] dim mismatch: ${reason} — archive lane disabled`);
+  } else {
+    console.log(`[corpus-guard] ok: corpus=${corpusDim} provider=${EMBED_PROVIDER}(${EXPECTED_EMBED_DIM})`);
+    // Warmup LanceDB embedding path so the first claim doesn't hit the 300ms
+    // cold-start timeout. Only when the corpus matches — a mismatch already
+    // disabled the lane above.
+    try {
+      const { queryMemory } = await import('./episodeMemory.js');
+      await queryMemory('startup funding venture capital', 1);
+      console.log('[LANCEDB] Warmup complete');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[LANCEDB] Warmup failed — first query may timeout: ${msg}`);
+    }
   }
 
   // Start Express server

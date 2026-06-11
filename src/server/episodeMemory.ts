@@ -17,8 +17,13 @@ export const OPENAI_EMBED_URL = 'https://api.openai.com/v1/embeddings';
 // IMPORTANT: vectors from different providers occupy different spaces — the
 // corpus must be re-embedded when switching (see scripts/reembed-corpus.ts).
 type EmbedProvider = 'ollama' | 'openai';
-const EMBED_PROVIDER: EmbedProvider =
+export const EMBED_PROVIDER: EmbedProvider =
   (process.env.EMBED_PROVIDER as EmbedProvider) === 'openai' ? 'openai' : 'ollama';
+
+// Embedding dimension for the active provider, derived from the model constants
+// above (embeddinggemma=768, text-embedding-3-small=1536). Constants-based so
+// the boot corpus guard can compare without a live embed probe.
+export const EXPECTED_EMBED_DIM = EMBED_PROVIDER === 'openai' ? 1536 : 768;
 
 // EXCLUDE_EPISODE_ID — env-gated filter for live runs against in-window
 // episodes. When set to a numeric episode ID, queryMemory excludes that
@@ -169,6 +174,29 @@ async function openOrCreateTable(): Promise<lancedb.Table> {
   // Delete the seed row so the table is effectively empty but schema is locked.
   await table.delete("id = '__seed__'");
   return table;
+}
+
+/**
+ * Read the loaded corpus's vector dimension from the Arrow schema via the
+ * open-existing path ONLY — never creates the table, so it triggers no embed
+ * probe (no Ollama/OpenAI call). Returns null when the corpus dir, table, or
+ * vector column is absent or unreadable. The boot guard compares this to
+ * EXPECTED_EMBED_DIM; a mismatch means queries would search a foreign vector
+ * space and return silent garbage.
+ */
+export async function corpusVectorDim(): Promise<number | null> {
+  if (!existsSync(DB_PATH)) return null;
+  try {
+    const conn = await lancedb.connect(DB_PATH);
+    const names = await conn.tableNames();
+    if (!names.includes(TABLE_NAME)) return null;
+    const tbl = await conn.openTable(TABLE_NAME);
+    const field = (await tbl.schema()).fields.find((f) => f.name === 'vector');
+    const listSize = (field?.type as { listSize?: number } | undefined)?.listSize;
+    return typeof listSize === 'number' ? listSize : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

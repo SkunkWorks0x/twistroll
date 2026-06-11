@@ -153,15 +153,18 @@ type SourceKey = 'lancedb' | 'tavily' | 'grokipedia';
 interface BreakerState {
   failures: number;
   openedAt: number | null;
+  // Latched open by the corpus guard — ignores the cooldown reset below.
+  forced: boolean;
 }
 const breakers: Record<SourceKey, BreakerState> = {
-  lancedb: { failures: 0, openedAt: null },
-  tavily: { failures: 0, openedAt: null },
-  grokipedia: { failures: 0, openedAt: null },
+  lancedb: { failures: 0, openedAt: null, forced: false },
+  tavily: { failures: 0, openedAt: null, forced: false },
+  grokipedia: { failures: 0, openedAt: null, forced: false },
 };
 
 function isBreakerOpen(source: SourceKey): boolean {
   const b = breakers[source];
+  if (b.forced) return true;
   if (b.openedAt === null) return false;
   if (Date.now() - b.openedAt > COOLDOWN_MS) {
     b.openedAt = null;
@@ -183,6 +186,16 @@ function recordFailure(source: SourceKey): void {
     b.openedAt = Date.now();
     console.warn(`[RETRIEVAL] Circuit breaker OPEN for ${source} after ${b.failures} failures — disabled for 60s`);
   }
+}
+
+// Latch a lane permanently open (corpus guard). Unlike failure-driven opens, a
+// forced breaker ignores the 60s cooldown reset — a dimension mismatch is a
+// boot-constant condition, so re-enabling the lane after cooldown would just
+// resume serving garbage. Reason is surfaced in the [corpus-guard] log at the
+// call site.
+export function forceBreakerOpen(source: SourceKey, reason: string): void {
+  breakers[source].forced = true;
+  console.warn(`[RETRIEVAL] Circuit breaker FORCED OPEN for ${source}: ${reason}`);
 }
 
 export function getBreakerState(): Record<SourceKey, { failures: number; open: boolean }> {
